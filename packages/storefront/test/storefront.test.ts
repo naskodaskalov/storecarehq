@@ -98,6 +98,9 @@ test('looksBlocked spots status codes and challenge pages', () => {
 test('normalizeStoreUrl', () => {
   assert.equal(normalizeStoreUrl('JuniperAndAsh.com/collections/all'), 'https://juniperandash.com');
   assert.equal(normalizeStoreUrl('http://x.myshopify.com'), 'https://x.myshopify.com');
+  for (const bad of ['localhost', '127.0.0.1', 'http://169.254.169.254/latest', '10.0.0.5', 'shop.internal', 'x.com:8080', 'user@x.com']) {
+    assert.throws(() => normalizeStoreUrl(bad), bad);
+  }
 });
 
 const base = (over: Partial<Snapshot> = {}): Snapshot => ({

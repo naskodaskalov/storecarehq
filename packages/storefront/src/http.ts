@@ -85,10 +85,21 @@ export async function politeGet(
   }
 }
 
-/** Normalizes "juniperandash.com", "https://x.com/path" etc. to "https://host". */
+/** Normalizes "juniperandash.com", "https://x.com/path" etc. to "https://host".
+ *  Only public domain names are accepted: no IP addresses, ports, localhost or internal names,
+ *  so a URL typed into the app can't be used to reach private networks. */
 export function normalizeStoreUrl(input: string): string {
   const trimmed = input.trim();
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   const u = new URL(withScheme);
-  return `https://${u.host.toLowerCase()}`;
+  const host = u.hostname.toLowerCase();
+  if (
+    u.port ||
+    u.username ||
+    !/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(host) ||
+    /(^|\.)(localhost|local|internal|intranet|lan|home|corp)$/.test(host)
+  ) {
+    throw new Error('Enter a public store domain, like clientstore.com');
+  }
+  return `https://${host}`;
 }
