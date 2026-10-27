@@ -33,6 +33,17 @@ Database tests need a Postgres server (any local one works; nothing Supabase-spe
 TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres npm test
 ```
 
+### Demo mode (no Supabase needed)
+
+```bash
+STORECARE_DEMO=1 NEXT_PUBLIC_SUPABASE_URL=https://demo.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=demo \
+  npm run dev --workspace @storecare/web
+```
+
+Signs you in as a sample agency (Northline Studio, 6 client stores) with in-memory data from
+`apps/web/src/lib/demo.ts`. The "Check store" step in onboarding still reads the real storefront you type in.
+Good for reviewing the UI and for showing the product to agencies.
+
 ### Against a real Supabase project
 
 1. Create a Supabase project (EU region). In **SQL editor**, run `supabase/migrations/20261027000001_init.sql`

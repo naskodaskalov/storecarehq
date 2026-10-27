@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <nav className="nav" aria-label="Main">
-        <div className="brand"><div className="mark">SC</div>StoreCare HQ</div>
+        <div className="brand"><div className="mark">SC</div><span className="brand-name">StoreCare HQ</span></div>
         <NavLinks />
         <div className="nav-foot">
           <div style={{ fontWeight: 600 }}>{agency.name}</div>

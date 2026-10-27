@@ -104,7 +104,7 @@ export default async function Dashboard() {
                       <Link href={`/stores/${s.id}`} style={{ color: 'var(--text)', fontWeight: 600, textDecoration: 'none' }}>{s.name}</Link>
                       <div className="small muted">{host(s.public_url)}{s.status === 'limited' ? ' · limited monitoring' : ''}</div>
                     </td>
-                    <td className={`mono tone-${h.tone}`}>{h.text}</td>
+                    <td className={`mono tone-${h.tone}`}>{s.health_score === null && s.status === 'limited' ? '—' : h.text}</td>
                     <td className={co?.result === 'fail' ? 'warn' : ''} style={{ fontWeight: co?.result === 'fail' ? 600 : 400 }}>
                       {co ? `${co.result === 'pass' ? 'Passed' : co.result === 'fail' ? 'Failed' : 'Blocked'} ${when(co.ran_at).time}` : <span className="muted">—</span>}
                     </td>

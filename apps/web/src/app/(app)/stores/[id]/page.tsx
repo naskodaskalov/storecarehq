@@ -187,8 +187,8 @@ export default async function StorePage({ params, searchParams }: { params: Prom
                 {lastIncident.resolved_at ? 'Last incident · resolved' : 'Open incident'}
               </h2>
               <div>
-                {when(lastIncident.opened_at, store.timezone).date} · {lastIncident.kind === 'down' ? 'Store down' : 'Checkout test failed'}: {lastIncident.cause}
-                {lastIncident.resolved_at ? ` Resolved ${when(lastIncident.resolved_at, store.timezone).time}.` : ''}
+                {when(lastIncident.opened_at, store.timezone).date} · {lastIncident.kind === 'down' ? 'Store down' : 'Checkout test failed'}: {lastIncident.cause}.
+                {lastIncident.resolved_at ? ` Resolved ${when(lastIncident.resolved_at, store.timezone).date} at ${when(lastIncident.resolved_at, store.timezone).time}.` : ''}
               </div>
             </section>
           )}
