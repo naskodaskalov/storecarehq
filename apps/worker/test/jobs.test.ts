@@ -83,17 +83,51 @@ describe('jobs against Postgres', { skip: !process.env.TEST_DATABASE_URL && 'TES
     assert.ok(rows[0].work_entry_id, 'change should be matched to the work entry');
   });
 
-  test('storefront diff: a blocked visit writes no snapshot and marks the store limited', async () => {
+  test('storefront diff: blocked visits write no snapshot; only 3 in a row mark the store limited', async () => {
     const store = await seedStore(db!.pool, { public_url: 'https://blocked.example' });
+    const blocked = async () =>
+      probeResult({ home: { status: 429, ms: 50, blocked: true }, theme: null, apps: [], productFeed: { status: 'skipped', reason: 'home page not readable' } });
+    const status = async () =>
+      (await db!.pool.query(`select status, limited_reason from public.stores where id = $1`, [store.id])).rows[0];
+
     await runStorefrontDiff(db!.pool, store, async () => probeResult());
-    const r = await runStorefrontDiff(db!.pool, store, async () =>
-      probeResult({ home: { status: 429, ms: 50, blocked: true }, theme: null, apps: [], productFeed: { status: 'blocked', httpStatus: 429 } }),
-    );
+    const r = await runStorefrontDiff(db!.pool, store, blocked);
     assert.equal(r.changes.length, 0, 'blocked must not look like "all apps removed"');
-    const { rows: [s] } = await db!.pool.query(`select status, limited_reason from public.stores where id = $1`, [store.id]);
-    assert.deepEqual(s, { status: 'limited', limited_reason: 'blocked' });
+    await runStorefrontDiff(db!.pool, store, blocked);
+    assert.deepEqual(await status(), { status: 'active', limited_reason: null });
+    await runStorefrontDiff(db!.pool, store, blocked);
+    assert.deepEqual(await status(), { status: 'limited', limited_reason: 'blocked' });
+    await runStorefrontDiff(db!.pool, store, async () => probeResult());
+    assert.deepEqual(await status(), { status: 'active', limited_reason: null });
+
     const { rows: [n] } = await db!.pool.query(`select count(*)::int as n from public.storefront_snapshots where store_id = $1`, [store.id]);
-    assert.equal(n.n, 1);
+    assert.equal(n.n, 2);
+  });
+
+  test('storefront diff: products are read daily and compared with the last snapshot that has them', async () => {
+    const store = await seedStore(db!.pool, { public_url: 'https://daily.example' });
+    const asked: boolean[] = [];
+    const withProducts = (price: string) => async (_u: string, o: { skipProducts: boolean }) => {
+      asked.push(o.skipProducts);
+      return o.skipProducts
+        ? probeResult({ productFeed: { status: 'skipped', reason: 'not due' } })
+        : probeResult({
+            productFeed: {
+              status: 'ok', pages: 1, truncated: false,
+              products: [{ id: 1, handle: 'hearthwood-candle', title: 'Hearthwood Candle', updatedAt: null, prices: { '11': price } }],
+            },
+          });
+    };
+    await runStorefrontDiff(db!.pool, store, withProducts('28.00'));
+    const hourly = await runStorefrontDiff(db!.pool, store, withProducts('30.00'));
+    assert.deepEqual(asked, [false, true], 'second run within a day skips the product feed');
+    assert.equal(hourly.changes.length, 0);
+
+    // A day later the feed is read again and compared with the first snapshot's products.
+    await db!.pool.query(`update public.storefront_snapshots set taken_at = taken_at - interval '1 day' where store_id = $1`, [store.id]);
+    const daily = await runStorefrontDiff(db!.pool, store, withProducts('30.00'));
+    assert.equal(asked.at(-1), false);
+    assert.deepEqual(daily.changes.map((c) => c.kind), ['prices_changed']);
   });
 
   test('uptime: two failures open one incident, recovery resolves it, a bot challenge never does', async () => {

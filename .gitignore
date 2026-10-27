@@ -9,3 +9,4 @@ probe-results.json
 *.log
 supabase/.branches
 supabase/.temp
+*.tsbuildinfo

@@ -1,28 +1,23 @@
 // Hourly: snapshot the storefront, diff against the last snapshot, write change-feed rows.
 
 import { createHash } from 'node:crypto';
-import { diffSnapshots, probeStore, toSnapshot, type Change, type ProbeResult, type Snapshot } from '@storecare/storefront';
+import { diffSnapshots, probeStore, toSnapshot, workEntryExplains, type Change, type ProbeResult, type Snapshot } from '@storecare/storefront';
 import type { Db, StoreRow } from '../db.ts';
 
-type Probe = (url: string) => Promise<ProbeResult>;
+type Probe = (url: string, opts: { skipProducts: boolean }) => Promise<ProbeResult>;
 
+/** Bot checks come and go; a store is only "limited: blocked" after this many in a row. */
+export const BLOCKED_STREAK_LIMIT = 3;
+/** The product feed is read once a day; theme and apps every hour. */
+export const PRODUCTS_EVERY_MS = 23 * 3600 * 1000;
+
+/** Reason from a readable visit. null = full monitoring. */
 export function limitedReason(r: ProbeResult): string | null {
-  if (r.home.blocked) return 'blocked';
   if (r.isShopify && !r.theme) return 'headless';
-  if (r.productFeed.status !== 'ok') return 'no_product_feed';
+  if (r.productFeed.status !== 'ok' && r.productFeed.status !== 'skipped') return 'no_product_feed';
+  if (r.productFeed.status === 'skipped' && r.productFeed.reason === 'disallowed by robots.txt') return 'no_product_feed';
   return null;
 }
-
-/** Keywords in a work-log title that explain a detected change of this kind. */
-const MATCH_WORDS: Record<string, RegExp> = {
-  theme_published: /theme|publish|redesign|homepage|template/i,
-  theme_updated: /theme|update|upgrade/i,
-  app_added: /app|install|integration/i,
-  app_removed: /app|uninstall|remove|clean/i,
-  products_added: /product|launch|collection|upload/i,
-  products_removed: /product|archive|remove|unpublish/i,
-  prices_changed: /price|sale|discount|promo/i,
-};
 
 /** Finds the agency's own work entry that likely explains a change, within a day either side. */
 export async function matchWorkEntry(db: Db, storeId: string, change: Change, at: Date): Promise<string | null> {
@@ -32,24 +27,33 @@ export async function matchWorkEntry(db: Db, storeId: string, change: Change, at
       order by created_at desc`,
     [storeId, at.toISOString().slice(0, 10)],
   );
-  const re = MATCH_WORDS[change.kind];
-  const appName = typeof change.details.app === 'string' ? String(change.summary.replace(/ (added|removed)$/, '')) : null;
-  const hit = rows.find((r) => {
-    const text = `${r.title} ${r.client_text ?? ''}`;
-    return (re && re.test(text)) || (appName && text.toLowerCase().includes(appName.toLowerCase()));
-  });
+  const hit = rows.find((r) => workEntryExplains(change, `${r.title} ${r.client_text ?? ''}`));
   return hit?.id ?? null;
 }
 
-export async function runStorefrontDiff(db: Db, store: StoreRow, probe: Probe = (u) => probeStore(u)) {
-  const result = await probe(store.public_url);
-  const next = toSnapshot(result);
+type PrevRow = { taken_at: Date; theme: Snapshot['theme']; apps: Snapshot['apps']; products: Snapshot['products'] };
 
-  const { rows: prevRows } = await db.query<{ taken_at: Date; theme: Snapshot['theme']; apps: Snapshot['apps']; products: Snapshot['products'] }>(
-    `select taken_at, theme, apps, products from public.storefront_snapshots
+export async function runStorefrontDiff(
+  db: Db,
+  store: StoreRow,
+  probe: Probe = (u, o) => probeStore(u, { skipProducts: o.skipProducts, skipCart: true }),
+) {
+  const { rows: prevRows } = await db.query<PrevRow>(
+    `select taken_at, theme, apps, null::jsonb as products from public.storefront_snapshots
       where store_id = $1 order by taken_at desc limit 1`,
     [store.id],
   );
+  // Products are compared with the last snapshot that actually has them.
+  const { rows: prevProductRows } = await db.query<{ taken_at: Date; products: Snapshot['products'] }>(
+    `select taken_at, products from public.storefront_snapshots
+      where store_id = $1 and products is not null order by taken_at desc limit 1`,
+    [store.id],
+  );
+  const lastProducts = prevProductRows[0];
+  const skipProducts = !!lastProducts && Date.now() - lastProducts.taken_at.getTime() < PRODUCTS_EVERY_MS;
+
+  const result = await probe(store.public_url, { skipProducts });
+  const next = toSnapshot(result);
 
   const productsHash = next.products
     ? createHash('sha256').update(JSON.stringify(next.products)).digest('hex')
@@ -76,7 +80,12 @@ export async function runStorefrontDiff(db: Db, store: StoreRow, probe: Probe = 
     const prev = prevRows[0];
     if (prev) {
       changes = diffSnapshots(
-        { takenAt: prev.taken_at.toISOString(), theme: prev.theme, apps: prev.apps, products: prev.products },
+        {
+          takenAt: prev.taken_at.toISOString(),
+          theme: prev.theme,
+          apps: prev.apps,
+          products: next.products ? (lastProducts?.products ?? null) : null,
+        },
         next,
       );
     }
@@ -92,7 +101,20 @@ export async function runStorefrontDiff(db: Db, store: StoreRow, probe: Probe = 
     );
   }
 
-  const reason = limitedReason(result);
+  let reason: string | null;
+  if (result.home.blocked) {
+    const { rows } = await db.query<{ blocked_streak: number; limited_reason: string | null }>(
+      `update public.stores set blocked_streak = blocked_streak + 1 where id = $1 returning blocked_streak, limited_reason`,
+      [store.id],
+    );
+    // Until the streak limit, keep whatever we knew before.
+    reason = rows[0].blocked_streak >= BLOCKED_STREAK_LIMIT ? 'blocked' : rows[0].limited_reason;
+  } else if (readable) {
+    await db.query(`update public.stores set blocked_streak = 0 where id = $1`, [store.id]);
+    reason = limitedReason(result);
+  } else {
+    reason = store.limited_reason; // a network error or 5xx is uptime's business, not a monitoring limit
+  }
   await db.query(`update public.stores set status = $2, limited_reason = $3 where id = $1 and status <> 'paused'`, [
     store.id,
     reason ? 'limited' : 'active',

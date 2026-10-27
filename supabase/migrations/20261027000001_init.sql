@@ -72,6 +72,7 @@ create table public.stores (
   connection text not null default 'storefront' check (connection in ('storefront', 'connector')),
   status text not null default 'active' check (status in ('active', 'limited', 'paused')),
   limited_reason text,                          -- 'blocked', 'headless', 'no_product_feed'
+  blocked_streak int not null default 0,        -- consecutive storefront visits that hit a bot check
   timezone text not null default 'UTC',
   client_contact_name text,
   client_contact_email text,

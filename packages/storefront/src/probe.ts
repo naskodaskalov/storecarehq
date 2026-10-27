@@ -23,7 +23,7 @@ export type ProbeResult = {
 
 export async function probeStore(
   input: string,
-  opts: { gapMs?: number; maxProductPages?: number } = {},
+  opts: { gapMs?: number; maxProductPages?: number; skipProducts?: boolean; skipCart?: boolean } = {},
 ): Promise<ProbeResult> {
   const baseUrl = normalizeStoreUrl(input);
   const clock: HostClock = { last: 0 };
@@ -46,12 +46,17 @@ export async function probeStore(
   const pageBase = finalUrl ? new URL(finalUrl).origin : baseUrl;
   const scripts = html ? parseScripts(html, pageBase) : [];
 
-  const productFeed: ProbeResult['productFeed'] = allowed.products
-    ? await fetchProductFeed(pageBase, { clock, gapMs: effectiveGap, maxPages: opts.maxProductPages })
-    : { status: 'skipped', reason: 'disallowed by robots.txt' };
+  const homeOk = !!home && !home.blocked && home.status === 200;
+  const productFeed: ProbeResult['productFeed'] = !allowed.products
+    ? { status: 'skipped', reason: 'disallowed by robots.txt' }
+    : opts.skipProducts
+      ? { status: 'skipped', reason: 'not due' }
+      : !homeOk
+        ? { status: 'skipped', reason: 'home page not readable' }
+        : await fetchProductFeed(pageBase, { clock, gapMs: effectiveGap, maxPages: opts.maxProductPages });
 
-  let cartJs: ProbeResult['cartJs'] = { status: 'skipped', reason: 'disallowed by robots.txt' };
-  if (allowed.cart) {
+  let cartJs: ProbeResult['cartJs'] = { status: 'skipped', reason: opts.skipCart ? 'not requested' : 'disallowed by robots.txt' };
+  if (allowed.cart && !opts.skipCart && homeOk) {
     const c = await politeGet(`${pageBase}/cart.js`, { clock, gapMs: effectiveGap, accept: 'application/json' });
     cartJs = { status: c.status, blocked: c.blocked };
   }
