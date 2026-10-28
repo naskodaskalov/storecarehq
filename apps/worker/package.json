@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.ts",
     "once": "node src/run-once.ts",
+    "tick": "node src/tick.ts",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit -p ."
   },

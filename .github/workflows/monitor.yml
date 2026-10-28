@@ -1,0 +1,75 @@
+name: Monitor stores
+
+# Every 30 minutes: uptime for every store, storefront snapshot when the last one is ~an hour old,
+# checkout test and speed once a day after 06:00 store time. See apps/worker/src/tick.ts.
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+# Never let two passes overlap; a late one waits for the running one.
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
+      PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      APP_URL: https://storecarehq.vercel.app
+    steps:
+      # Until the secret exists, skip quietly instead of failing (and emailing) every 30 minutes.
+      - name: Check secrets
+        id: setup
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::Skipped: add the DATABASE_URL secret (Settings → Secrets and variables → Actions)."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.setup.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.setup.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install worker
+        if: steps.setup.outputs.ready == 'true'
+        run: npm ci --workspace @storecare/worker --include-workspace-root=false --omit=dev --no-audit --no-fund
+
+      - name: What is due
+        id: due
+        if: steps.setup.outputs.ready == 'true'
+        working-directory: apps/worker
+        run: |
+          node src/tick.ts --dry-run | tee due.txt
+          if grep -q checkout due.txt; then echo "checkout=true" >> "$GITHUB_OUTPUT"; fi
+
+      # Chromium is only needed for checkout tests, so it is installed (from cache) only then.
+      - name: Cache browser
+        if: steps.due.outputs.checkout == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install browser
+        if: steps.due.outputs.checkout == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Run checks
+        if: steps.setup.outputs.ready == 'true'
+        working-directory: apps/worker
+        run: node src/tick.ts

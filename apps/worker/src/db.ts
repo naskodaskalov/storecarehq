@@ -2,9 +2,23 @@ import pg from 'pg';
 
 export type Db = Pick<pg.Pool, 'query'>;
 
-export function createPool(connectionString = process.env.DATABASE_URL): pg.Pool {
-  if (!connectionString) throw new Error('DATABASE_URL is not set');
-  return new pg.Pool({ connectionString, max: 5 });
+/** Connection settings shared by the pool and pg-boss.
+ *  Remote databases (Supabase) get TLS. Supabase's server certificate is not in Node's default trust store,
+ *  so set DATABASE_CA_CERT to its CA (Project settings → Database → SSL) to verify it; without it the
+ *  connection is still encrypted but the certificate is not checked. Local databases connect without TLS. */
+export function dbConfig(url = process.env.DATABASE_URL): { connectionString: string; ssl?: pg.ConnectionConfig['ssl'] } {
+  if (!url) throw new Error('DATABASE_URL is not set');
+  const u = new URL(url);
+  const local = ['localhost', '127.0.0.1', ''].includes(u.hostname) || u.searchParams.has('host');
+  if (local) return { connectionString: url };
+  // pg treats sslmode in the URL as "verify-full" and would ignore the ssl object below.
+  u.searchParams.delete('sslmode');
+  const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n');
+  return { connectionString: u.toString(), ssl: ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false } };
+}
+
+export function createPool(url = process.env.DATABASE_URL): pg.Pool {
+  return new pg.Pool({ ...dbConfig(url), max: 5 });
 }
 
 export type StoreRow = {

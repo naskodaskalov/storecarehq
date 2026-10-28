@@ -1,11 +1,11 @@
 // Worker entry point: pg-boss schedules fan-out jobs, which enqueue one job per store.
 
 import PgBoss from 'pg-boss';
-import { activeStores, createPool, type StoreRow } from './db.ts';
+import { activeStores, createPool, dbConfig, type StoreRow } from './db.ts';
 import { checkoutTask, speedTask, storefrontTask, uptimeTask } from './tasks.ts';
 
 const pool = createPool();
-const boss = new PgBoss({ connectionString: process.env.DATABASE_URL, schema: 'pgboss' });
+const boss = new PgBoss({ ...dbConfig(), schema: 'pgboss', max: 3 });
 boss.on('error', (e) => console.error('[pg-boss]', e));
 await boss.start();
 
