@@ -72,4 +72,42 @@ do $$ begin
   if (select count(*) from public.uptime_checks) <> 0 then raise exception 'monitoring rows not deleted with store'; end if;
 end $$;
 
+-- Reports: anonymous users read a report only through public_report, only once approved.
+reset role;
+with s as (
+  insert into public.stores (agency_id, name, public_url)
+  select id, 'Report Store', 'https://report-store.com' from public.agencies where name = 'Northline Studio'
+  returning id, agency_id
+)
+insert into public.reports (store_id, agency_id, period, summary_text)
+  select id, agency_id, '2026-10-01', 'All good.' from s;
+select share_token as token from public.reports where summary_text = 'All good.' \gset
+
+set role anon;
+do $$ begin
+  begin
+    perform 1 from public.reports;
+    raise exception 'anon could read the reports table';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+select set_config('test.token', :'token', false);
+do $$ begin
+  if public.public_report(current_setting('test.token')) is not null then raise exception 'draft report was public'; end if;
+  if public.public_report('short') is not null then raise exception 'short token accepted'; end if;
+end $$;
+
+reset role;
+update public.reports set status = 'approved' where share_token = :'token';
+set role anon;
+do $$
+declare r jsonb;
+begin
+  r := public.public_report(current_setting('test.token'));
+  if r is null then raise exception 'approved report not readable by token'; end if;
+  if r->>'store_name' <> 'Report Store' or r->>'agency_name' <> 'Northline Studio' then raise exception 'wrong report: %', r; end if;
+  if public.public_report(current_setting('test.token') || 'x') is not null then raise exception 'wrong token accepted'; end if;
+end $$;
+reset role;
+
 select 'rls ok' as result;

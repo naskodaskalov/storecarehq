@@ -11,6 +11,8 @@ export function SubmitButton({
   secondary,
   style,
   pending: pendingOverride,
+  name,
+  value,
 }: {
   children: ReactNode;
   pendingText: string;
@@ -18,19 +20,27 @@ export function SubmitButton({
   style?: CSSProperties;
   /** For forms driven by useActionState, pass its pending flag. */
   pending?: boolean;
+  /** For forms with more than one submit button: sent with the form when this one is clicked. */
+  name?: string;
+  value?: string;
 }) {
-  const { pending: formPending } = useFormStatus();
+  const { pending: formPending, data } = useFormStatus();
   const pending = pendingOverride ?? formPending;
+  // With two submit buttons in one form, only the one that was clicked shows the spinner.
+  const mine = !name || !data || data.get(name) === value;
+  const busy = pending && mine;
   return (
     <button
       type="submit"
       className={`btn${secondary ? ' secondary' : ''}`}
       disabled={pending}
-      aria-busy={pending}
+      aria-busy={busy}
       style={style}
+      name={name}
+      value={value}
     >
-      {pending && <span className="spinner" aria-hidden="true" />}
-      {pending ? pendingText : children}
+      {busy && <span className="spinner" aria-hidden="true" />}
+      {busy ? pendingText : children}
     </button>
   );
 }

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "@storecare/reports": "*",
     "@storecare/storefront": "*",
     "@supabase/ssr": "0.6.1",
     "@supabase/supabase-js": "2.57.4",

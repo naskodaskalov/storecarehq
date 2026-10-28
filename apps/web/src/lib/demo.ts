@@ -236,6 +236,7 @@ class Query implements PromiseLike<Result> {
       const list = (Array.isArray(this.payload) ? this.payload : [this.payload!]).map((v) => ({
         id: this.table === 'changes' ? rows.length + 1 : uid(),
         created_at: new Date().toISOString(),
+        ...(this.table === 'reports' ? { share_token: [uid(), uid()].join('').replace(/-/g, ''), status: 'draft' } : {}),
         ...v,
       }));
       rows.push(...list);
@@ -289,6 +290,17 @@ export function demoClient() {
   return {
     from: (table: string) => new Query(table),
     rpc: async (fn: string, args: Row) => {
+      if (fn === 'public_report') {
+        const t = db();
+        const r = t.reports.find((x) => x.share_token === args.token && x.status !== 'draft');
+        if (!r) return { data: null, error: null };
+        const s = t.stores.find((x) => x.id === r.store_id);
+        const a = t.agencies.find((x) => x.id === r.agency_id);
+        return {
+          data: { period: r.period, status: r.status, summary_text: r.summary_text, facts: r.facts, sections: r.sections, store_name: s?.name, agency_name: a?.name, brand_color: a?.brand_color, logo_url: a?.logo_url ?? null },
+          error: null,
+        };
+      }
       if (fn !== 'create_agency') return { data: null, error: { message: `unknown rpc ${fn}` } };
       const id = uid();
       db().agencies.push({ id, name: args.agency_name, plan: 'trial', brand_color: '#2747A8', created_at: new Date().toISOString() });

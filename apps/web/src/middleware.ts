@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC = ['/login', '/auth'];
+// /r/<token> is the client's report link: no account, the token is the key.
+const PUBLIC = ['/login', '/auth', '/r/'];
 
 export async function middleware(request: NextRequest) {
   if (process.env.STORECARE_DEMO === '1') return NextResponse.next({ request });
