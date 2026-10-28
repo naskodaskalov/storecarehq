@@ -25,4 +25,31 @@ test('remote databases use TLS and drop sslmode from the URL', () => {
 
 test('missing DATABASE_URL is a clear error', () => {
   assert.throws(() => dbConfig(''), /DATABASE_URL is not set/);
+  assert.throws(() => dbConfig('  '), /DATABASE_URL is not set/);
+});
+
+test('pasted URLs with spaces, quotes or special characters in the password still work', () => {
+  const host = 'aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
+  const cases: [string, string][] = [
+    [`  postgresql://postgres.abc:simple123@${host}\n`, 'simple123'],
+    [`"postgresql://postgres.abc:simple123@${host}"`, 'simple123'],
+    [`postgresql://postgres.abc:p@ss#w/rd?x%@${host}`, 'p@ss#w/rd?x%'],
+    [`postgresql://postgres.abc:p%40ss@${host}`, 'p@ss'],
+  ];
+  for (const [raw, password] of cases) {
+    const c = dbConfig(raw);
+    const u = new URL(c.connectionString);
+    assert.equal(u.hostname, 'aws-0-eu-west-1.pooler.supabase.com', raw);
+    assert.equal(u.port, '5432');
+    assert.equal(u.username, 'postgres.abc');
+    assert.equal(decodeURIComponent(u.password), password, raw);
+    assert.equal(u.pathname, '/postgres');
+  }
+});
+
+test('an unusable URL gives an error without the password in it', () => {
+  assert.throws(
+    () => dbConfig('my secret password'),
+    (e: Error) => /not a valid connection string/.test(e.message) && !e.message.includes('secret'),
+  );
 });

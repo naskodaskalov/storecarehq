@@ -54,6 +54,7 @@ jobs:
         if: steps.setup.outputs.ready == 'true'
         working-directory: apps/worker
         run: |
+          set -o pipefail
           node src/tick.ts --dry-run | tee due.txt
           if grep -q checkout due.txt; then echo "checkout=true" >> "$GITHUB_OUTPUT"; fi
 

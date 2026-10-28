@@ -6,11 +6,42 @@ export type Db = Pick<pg.Pool, 'query'>;
  *  Remote databases (Supabase) get TLS. Supabase's server certificate is not in Node's default trust store,
  *  so set DATABASE_CA_CERT to its CA (Project settings → Database → SSL) to verify it; without it the
  *  connection is still encrypted but the certificate is not checked. Local databases connect without TLS. */
+/** Parses a Postgres URL, tolerating what people paste: surrounding spaces or quotes, and passwords with
+ *  unencoded special characters (@ : / # ? %). Never puts the password in an error message. */
+export function parseDbUrl(raw: string): URL {
+  const s = raw.trim().replace(/^["']|["']$/g, '').trim();
+  // scheme://user:password@host[:port]/db[?query] — the password is everything between the first ':'
+  // after the user and the LAST '@' before the host. This runs before the standard URL parser, which
+  // "succeeds" on e.g. "pa#ss@host" but reads the wrong host.
+  const m = s.match(/^(postgres(?:ql)?):\/\/([^:@/]+)(?::(.*))?@([^@/?#]+)(\/[^?#]*)?(\?.*)?$/);
+  if (!m) {
+    try {
+      const u = new URL(s);
+      if (u.hostname && /^postgres(ql)?:$/.test(u.protocol)) return u;
+    } catch {
+      /* fall through to the error */
+    }
+    throw new Error(
+      'DATABASE_URL is not a valid connection string. It should look like ' +
+        'postgresql://postgres.<project>:<password>@<host>:5432/postgres',
+    );
+  }
+  const [, scheme, user, password = '', host, path = '/postgres', query = ''] = m;
+  const pass = (() => {
+    try {
+      return decodeURIComponent(password); // already encoded: keep it as is
+    } catch {
+      return password;
+    }
+  })();
+  return new URL(`${scheme}://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}${path}${query}`);
+}
+
 export function dbConfig(url = process.env.DATABASE_URL): { connectionString: string; ssl?: pg.ConnectionConfig['ssl'] } {
-  if (!url) throw new Error('DATABASE_URL is not set');
-  const u = new URL(url);
+  if (!url?.trim()) throw new Error('DATABASE_URL is not set');
+  const u = parseDbUrl(url);
   const local = ['localhost', '127.0.0.1', ''].includes(u.hostname) || u.searchParams.has('host');
-  if (local) return { connectionString: url };
+  if (local) return { connectionString: url.trim() };
   // pg treats sslmode in the URL as "verify-full" and would ignore the ssl object below.
   u.searchParams.delete('sslmode');
   const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n');
