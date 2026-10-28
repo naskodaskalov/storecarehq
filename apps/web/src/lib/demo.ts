@@ -93,6 +93,8 @@ function seed(): Tables {
     { store: bloom, ago: 3 * DAY, kind: 'app_added', summary: 'Klaviyo added', risky: false },
     { store: salt, ago: 3 * DAY, kind: 'prices_changed', summary: 'Prices changed on 64 products', risky: true, note: 'no zero or extreme prices found', entry: 'Summer sale prices and banners' },
     { store: kite, ago: 5 * DAY, kind: 'products_added', summary: '12 new products published', risky: false, entry: 'Holiday collection pages' },
+    { store: juniper, ago: 4 * DAY, kind: 'stock_out', summary: 'Out of stock: Hearthwood Candle 300g', risky: false },
+    { store: juniper, ago: 9 * DAY, kind: 'stock_out', summary: '2 products went out of stock', risky: false },
   ].map((c, i) => ({
     id: i + 1,
     store_id: c.store.id,
@@ -131,20 +133,36 @@ function seed(): Tables {
 
   const uptime_checks: Row[] = [];
   for (const s of stores) {
-    for (let k = 0; k < 288; k++) uptime_checks.push({ store_id: s.id, agency_id: AGENCY, checked_at: iso(k * 2.5 * 3600e3), ok: !(s === bloom && k === 40), status: 200, ms: 400 });
+    for (let k = 0; k < 288; k++) uptime_checks.push({ store_id: s.id, agency_id: AGENCY, checked_at: iso(k * 2.5 * 3600e3), ok: !(s === bloom && k === 40), status: 200, ms: 320 + ((k * 37) % 260) + (s === bloom ? 500 : 0) });
   }
 
   const speed_samples: Row[] = stores.flatMap((s, i) => [
-    { store_id: s.id, agency_id: AGENCY, sampled_at: iso(0.2 * DAY), page: 'home', strategy: 'mobile', performance_score: 70 + i * 3, lcp_ms: s === bloom ? 3900 : 2100 + i * 150, cls: 0.03, tbt_ms: 200 },
+    {
+      store_id: s.id, agency_id: AGENCY, sampled_at: iso(0.2 * DAY), page: 'home', strategy: 'mobile', performance_score: 70 + i * 3,
+      lcp_ms: s === bloom ? 3900 : 2100 + i * 150, cls: 0.03, tbt_ms: 200,
+      seo_score: 92 - i, accessibility_score: s === bloom ? 74 : 88 + (i % 3), best_practices_score: 96,
+      field_scope: i < 3 ? 'origin' : null, field_lcp_ms: i < 3 ? (s === bloom ? 3600 : 2300 + i * 200) : null,
+      field_inp_ms: i < 3 ? 160 + i * 40 : null, field_cls: i < 3 ? 0.05 : null, field_category: i < 3 ? (s === bloom ? 'SLOW' : i === 0 ? 'FAST' : 'AVERAGE') : null,
+    },
     { store_id: s.id, agency_id: AGENCY, sampled_at: iso(1.2 * DAY), page: 'home', strategy: 'mobile', performance_score: 68 + i * 3, lcp_ms: s === bloom ? 3100 : 2900 + i * 100, cls: 0.04, tbt_ms: 240 },
   ]);
 
+  const demoProducts = (n: number, out: number, names: string[]) =>
+    Array.from({ length: n }, (_, k) => ({
+      id: 1000 + k,
+      handle: `product-${k}`,
+      title: names[k] ?? `Product ${k + 1}`,
+      updatedAt: null,
+      prices: { [`${k}1`]: '24.00', [`${k}2`]: '28.00' },
+      soldOut: k < out ? [`${k}1`, `${k}2`] : [],
+    }));
   const storefront_snapshots: Row[] = stores.slice(0, 5).map((s, i) => ({
     id: i + 1,
     store_id: s.id,
     agency_id: AGENCY,
     taken_at: iso(0.5 * 3600e3),
     feed_status: 'ok',
+    products: s === juniper ? demoProducts(42, 3, ['Hearthwood Candle 300g', 'Fig & Cedar Diffuser', 'Linen Room Spray']) : demoProducts(20 + i * 5, i % 2, []),
     theme:
       s === juniper
         ? { id: 141234567890, name: 'Dawn – Autumn', schemaName: 'Dawn', schemaVersion: '15.2.0' }
@@ -157,7 +175,23 @@ function seed(): Tables {
     ).map((name) => ({ key: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, known: !name.includes('.'), evidence: [] })),
   }));
 
+  const site_checks: Row[] = stores.slice(0, 5).map((s, i) => ({
+    id: i + 1,
+    store_id: s.id,
+    agency_id: AGENCY,
+    checked_at: iso(0.3 * DAY),
+    ssl_expires_at: iso(-(64 - i * 7) * DAY),
+    ssl_issuer: i % 2 ? 'Google Trust Services' : "Let's Encrypt",
+    ssl_error: null,
+    domain: s.public_url.replace('https://', ''),
+    domain_expires_at: s === ferro ? iso(-19 * DAY) : iso(-(200 + i * 40) * DAY),
+    domain_error: null,
+    pages_checked: 22 + i,
+    broken: s === juniper ? [{ url: `${s.public_url}/pages/summer-sale`, status: 404 }] : [],
+  }));
+
   return {
+    site_checks,
     agencies: [{ id: AGENCY, name: 'Northline Studio', plan: 'agency', brand_color: '#2747A8', created_at: iso(41 * DAY) }],
     memberships: [{ agency_id: AGENCY, user_id: USER.id, role: 'owner' }],
     stores: stores.map(({ _hours, ...s }) => s),
@@ -300,6 +334,11 @@ export function demoClient() {
           data: { period: r.period, status: r.status, summary_text: r.summary_text, facts: r.facts, sections: r.sections, store_name: s?.name, agency_name: a?.name, brand_color: a?.brand_color, logo_url: a?.logo_url ?? null },
           error: null,
         };
+      }
+      if (fn === 'uptime_stats') {
+        const rows = db().uptime_checks.filter((u) => u.store_id === args.p_store && u.checked_at >= args.p_from && u.checked_at < args.p_to);
+        const ok = rows.filter((u) => u.ok);
+        return { data: [{ checks: rows.length, ok: ok.length, avg_ms: ok.length ? Math.round(ok.reduce((a, u) => a + u.ms, 0) / ok.length) : null }], error: null };
       }
       if (fn !== 'create_agency') return { data: null, error: { message: `unknown rpc ${fn}` } };
       const id = uid();

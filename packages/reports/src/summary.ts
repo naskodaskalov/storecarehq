@@ -16,10 +16,15 @@ export function factsForPrompt(f: Facts): string {
       : 'Incidents: none',
     f.checkout ? `Checkout test: ${f.checkout.passed} of ${f.checkout.runs} daily runs passed${f.checkout.failed ? `, ${f.checkout.failed} failed` : ''}` : 'Checkout test: not running',
     f.speed?.lcpEnd ? `Mobile load (largest content): ${(f.speed.lcpEnd / 1000).toFixed(1)}s${f.speed.lcpStart && f.speed.lcpStart !== f.speed.lcpEnd ? `, was ${(f.speed.lcpStart / 1000).toFixed(1)}s at the start of the month` : ''}` : 'Speed: not measured',
+    f.responseMs ? `Average response time: ${f.responseMs} ms` : null,
+    f.realVisitors?.lcpMs ? `Real visitors' load time (75th percentile, Chrome): ${(f.realVisitors.lcpMs / 1000).toFixed(1)}s${f.realVisitors.rating ? `, rated ${f.realVisitors.rating}` : ''}` : null,
+    f.stock ? `Stock: ${f.stock.outOfStock} of ${f.stock.products} products sold out now; ${f.stock.wentOut} went out of stock and ${f.stock.cameBack} came back this month` : null,
+    f.site?.broken.length ? `Broken links on the home page: ${f.site.broken.length}` : null,
+    f.site?.domainDays !== null && f.site?.domainDays !== undefined && f.site.domainDays <= 45 ? `Domain registration ends in ${f.site.domainDays} days` : null,
     `Changes detected: ${f.changes.total}${f.changes.highlights.length ? ` (${f.changes.highlights.map((c) => c.summary).join('; ')})` : ''}`,
     `Agency work: ${f.work.entries.length} tasks, ${f.work.hoursUsed}h${f.work.hoursIncluded !== null ? ` of ${f.work.hoursIncluded}h included` : ''}${f.work.entries.length ? ` (${f.work.entries.slice(0, 6).map((e) => e.text).join('; ')})` : ''}`,
   ];
-  return lines.join('\n');
+  return lines.filter(Boolean).join('\n');
 }
 
 export const SUMMARY_SYSTEM = [

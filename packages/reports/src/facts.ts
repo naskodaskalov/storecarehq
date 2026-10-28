@@ -55,6 +55,32 @@ export function buildFacts(d: MonthData): Facts {
       ? round1(Math.max(0, included - d.previousMonthMinutes / 60))
       : 0;
 
+  const sumProducts = (kind: string) =>
+    d.changes
+      .filter((c) => c.kind === kind)
+      .reduce((a, c) => a + (Number(c.summary.match(/^(\d+) products/)?.[1]) || 1), 0);
+  const stock = d.stock
+    ? { products: d.stock.products, outOfStock: d.stock.outOfStock, wentOut: sumProducts('stock_out'), cameBack: sumProducts('stock_back') }
+    : null;
+
+  const q = d.quality;
+  const rating = (cat: string | null | undefined): 'good' | 'needs improvement' | 'poor' | null =>
+    cat === 'FAST' ? 'good' : cat === 'AVERAGE' ? 'needs improvement' : cat === 'SLOW' ? 'poor' : null;
+  const realVisitors = q && (q.fieldLcpMs !== null || q.fieldInpMs !== null) ? { lcpMs: q.fieldLcpMs, inpMs: q.fieldInpMs, rating: rating(q.fieldCategory) } : null;
+  const scores = q && (q.seo !== null || q.accessibility !== null) ? { seo: q.seo, accessibility: q.accessibility } : null;
+
+  const asOf = d.asOf ? Date.parse(d.asOf) : Date.now();
+  const days = (iso: string | null) => (iso ? Math.floor((Date.parse(iso) - asOf) / 864e5) : null);
+  const site = d.site
+    ? {
+        sslDays: days(d.site.sslExpiresAt),
+        domainDays: days(d.site.domainExpiresAt),
+        domain: d.site.domain,
+        pagesChecked: d.site.pagesChecked,
+        broken: d.site.broken.map((b) => ({ path: b.url.replace(/^https?:\/\/[^/]+/, '') || '/', status: b.status })),
+      }
+    : null;
+
   const facts: Facts = {
     period: d.period,
     storeName: d.store.name,
@@ -65,10 +91,15 @@ export function buildFacts(d: MonthData): Facts {
     limited: d.store.status === 'limited' ? d.store.limited_reason : null,
     uptimePct,
     uptimeChecks,
+    responseMs: d.uptime.avgMs ?? null,
     incidents,
     checkout,
     speed,
     changes: { total: d.changes.length, highlights },
+    stock,
+    realVisitors,
+    scores,
+    site,
     work: {
       // Client-facing work only: billable entries, plus unbilled ones the agency wrote client wording for.
       // An unbilled entry with only an internal title ("Internal call") stays out of the report.
@@ -108,6 +139,30 @@ export function recommend(f: Facts, d: MonthData): Facts['recommendations'] {
     out.push({
       title: 'Review apps and scripts',
       detail: `The store loads scripts from ${unknown} services we couldn't identify. Removing unused ones usually helps load time.`,
+    });
+  }
+  if (f.site && f.site.domainDays !== null && f.site.domainDays <= 45) {
+    out.unshift({
+      title: `Renew ${f.site.domain ?? 'the domain'}`,
+      detail: `The domain registration ends in ${f.site.domainDays} days. If it lapses, the store goes offline. Check auto-renew and the card on file with the registrar.`,
+    });
+  }
+  if (f.site && f.site.broken.length) {
+    out.push({
+      title: 'Fix broken links',
+      detail: `${f.site.broken.length} link${f.site.broken.length === 1 ? '' : 's'} on the home page lead${f.site.broken.length === 1 ? 's' : ''} to a missing page (${f.site.broken.slice(0, 3).map((b) => b.path).join(', ')}).`,
+    });
+  }
+  if (f.stock && f.stock.products >= 10 && f.stock.outOfStock / f.stock.products >= 0.2) {
+    out.push({
+      title: 'Review sold-out products',
+      detail: `${f.stock.outOfStock} of ${f.stock.products} products are sold out. Hiding them or adding back-in-stock alerts keeps visitors from dead ends.`,
+    });
+  }
+  if (f.scores?.accessibility !== null && f.scores?.accessibility !== undefined && f.scores.accessibility < 80) {
+    out.push({
+      title: 'Improve accessibility',
+      detail: `Google rates the home page ${f.scores.accessibility}/100 for accessibility. Common fixes are image descriptions, colour contrast and button labels.`,
     });
   }
   if (f.checkout && f.checkout.failed > 0) {

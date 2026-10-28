@@ -1,12 +1,13 @@
 // Decides which jobs are due for a store. Used by the run-once-per-tick runner (GitHub Actions),
 // which may start late or skip a beat, so it compares against what last ran instead of the clock alone.
 
-export type JobName = 'uptime' | 'storefront' | 'checkout' | 'speed';
+export type JobName = 'uptime' | 'storefront' | 'checkout' | 'speed' | 'site';
 
 export type LastRuns = {
   snapshotAt: Date | null;
   checkoutAt: Date | null;
   speedAt: Date | null;
+  siteAt?: Date | null;
 };
 
 export type StoreForSchedule = { timezone: string; checkout_consent_at: Date | null };
@@ -48,5 +49,6 @@ export function dueJobs(store: StoreForSchedule, last: LastRuns, now = new Date(
   // The checkout test needs a product from the first snapshot, so it waits for one.
   if (store.checkout_consent_at && last.snapshotAt && dailyDue(store.timezone, last.checkoutAt, now)) jobs.push('checkout');
   if (dailyDue(store.timezone, last.speedAt, now)) jobs.push('speed');
+  if (dailyDue(store.timezone, last.siteAt ?? null, now)) jobs.push('site');
   return jobs;
 }

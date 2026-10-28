@@ -67,6 +67,10 @@ export function ReportView({
               }
             />
             <Stat label="Health score" value={f.healthScore !== null ? String(f.healthScore) : '—'} note="out of 100" />
+            {f.realVisitors?.lcpMs ? (
+              <Stat label="Real visitors' load" value={secs(f.realVisitors.lcpMs)} note={f.realVisitors.rating ? `Chrome visitors · ${f.realVisitors.rating}` : 'Chrome visitors, 28 days'} />
+            ) : null}
+            {f.responseMs ? <Stat label="Response time" value={`${f.responseMs} ms`} note="average this month" /> : null}
           </div>
           {f.limited && <p className="report-note">Some checks are limited on this store because of how it is set up.</p>}
         </section>
@@ -134,6 +138,54 @@ export function ReportView({
           {f.changes.total > f.changes.highlights.length && (
             <p className="report-note">The {f.changes.highlights.length} most significant of {f.changes.total} changes.</p>
           )}
+        </section>
+      )}
+
+      {sections.site && (f.stock || f.site || f.scores) && (
+        <section className="report-section">
+          <h2>Site checks</h2>
+          <ul className="report-list">
+            {f.stock && (
+              <li>
+                <span className="report-check">Stock</span>
+                <span>
+                  {f.stock.outOfStock === 0 ? 'Every product is available' : `${f.stock.outOfStock} of ${f.stock.products} products sold out`}
+                  {(f.stock.wentOut > 0 || f.stock.cameBack > 0) && (
+                    <span className="report-muted"> · {f.stock.wentOut} went out of stock, {f.stock.cameBack} came back this month</span>
+                  )}
+                </span>
+              </li>
+            )}
+            {f.site && (
+              <li>
+                <span className="report-check">Links</span>
+                <span>
+                  {f.site.broken.length === 0
+                    ? `No broken links (${f.site.pagesChecked} pages checked from the home page)`
+                    : `${f.site.broken.length} broken link${f.site.broken.length === 1 ? '' : 's'}: ${f.site.broken.slice(0, 5).map((b) => b.path).join(', ')}`}
+                </span>
+              </li>
+            )}
+            {f.site && (f.site.sslDays !== null || f.site.domainDays !== null) && (
+              <li>
+                <span className="report-check">Renewals</span>
+                <span>
+                  {f.site.sslDays !== null && <>Security certificate valid for {f.site.sslDays} more days. </>}
+                  {f.site.domainDays !== null && <>Domain {f.site.domain} registered for {f.site.domainDays} more days.</>}
+                </span>
+              </li>
+            )}
+            {f.scores && (
+              <li>
+                <span className="report-check">Google audit</span>
+                <span>
+                  {f.scores.seo !== null && <>SEO {f.scores.seo}/100</>}
+                  {f.scores.seo !== null && f.scores.accessibility !== null && ' · '}
+                  {f.scores.accessibility !== null && <>Accessibility {f.scores.accessibility}/100</>}
+                </span>
+              </li>
+            )}
+          </ul>
         </section>
       )}
 

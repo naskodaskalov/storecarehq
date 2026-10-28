@@ -9,19 +9,32 @@ export type ProductLite = {
   updatedAt: string | null;
   /** variant id → price as a string, exactly as Shopify sends it ("19.00"). */
   prices: Record<string, string>;
+  /** IDs of variants that are sold out. Missing on snapshots taken before stock tracking existed. */
+  soldOut?: string[];
 };
+
+/** A product is out of stock when it has variants and none of them can be bought. */
+export function isOutOfStock(p: ProductLite): boolean {
+  if (!p.soldOut) return false;
+  const variants = Object.keys(p.prices).length;
+  return variants > 0 && p.soldOut.length >= variants;
+}
 
 export type ProductFeed =
   | { status: 'ok'; products: ProductLite[]; pages: number; truncated: boolean }
   | { status: 'blocked' | 'missing' | 'error'; httpStatus: number; detail?: string };
 
-type RawVariant = { id: number; price: string };
+type RawVariant = { id: number; price: string; available?: boolean };
 type RawProduct = { id: number; handle: string; title: string; updated_at?: string; variants?: RawVariant[] };
 
 export function toLite(p: RawProduct): ProductLite {
   const prices: Record<string, string> = {};
-  for (const v of p.variants ?? []) prices[String(v.id)] = String(v.price);
-  return { id: p.id, handle: p.handle, title: p.title, updatedAt: p.updated_at ?? null, prices };
+  const soldOut: string[] = [];
+  for (const v of p.variants ?? []) {
+    prices[String(v.id)] = String(v.price);
+    if (v.available === false) soldOut.push(String(v.id));
+  }
+  return { id: p.id, handle: p.handle, title: p.title, updatedAt: p.updated_at ?? null, prices, soldOut };
 }
 
 export async function fetchProductFeed(

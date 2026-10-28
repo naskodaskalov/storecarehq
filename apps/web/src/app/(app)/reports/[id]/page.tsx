@@ -13,6 +13,7 @@ const SECTION_LABELS: Record<keyof Sections, string> = {
   incidents: 'Incidents',
   work: 'Work we did',
   changes: 'Changes to the store',
+  site: 'Site checks (stock, links, renewals, SEO)',
   recommendations: 'Recommendations',
 };
 

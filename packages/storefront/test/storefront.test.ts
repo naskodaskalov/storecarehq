@@ -139,6 +139,37 @@ test('diff: bulk price change is grouped and flagged; zero price is suspicious',
   assert.equal((change.details.suspicious as unknown[]).length, 1);
 });
 
+test('stock: sold-out variants are recorded and stock changes logged', async () => {
+  const { toLite, isOutOfStock } = await import('../src/index.ts');
+  const p = toLite({ id: 1, handle: 'h', title: 'Candle', variants: [{ id: 11, price: '9.00', available: false }, { id: 12, price: '9.00', available: true }] });
+  assert.deepEqual(p.soldOut, ['11']);
+  assert.equal(isOutOfStock(p), false);
+  const out = toLite({ id: 1, handle: 'h', title: 'Candle', variants: [{ id: 11, price: '9.00', available: false }, { id: 12, price: '9.00', available: false }] });
+  assert.equal(isOutOfStock(out), true);
+
+  const a = base({ products: [p] });
+  const b = base({ products: [out] });
+  assert.deepEqual(diffSnapshots(a, b).map((c) => c.summary), ['Out of stock: Candle']);
+  assert.deepEqual(diffSnapshots(b, a).map((c) => c.summary), ['Back in stock: Candle']);
+  // Old snapshots without stock data never produce stock changes.
+  const legacy = base({ products: [{ ...p, soldOut: undefined }] });
+  assert.deepEqual(diffSnapshots(legacy, b), []);
+});
+
+test('site: registrable domain, internal links, broken link check', async () => {
+  const { registrableDomain, internalLinks, findBrokenLinks, daysUntil } = await import('../src/index.ts');
+  assert.equal(registrableDomain('www.juniperandash.com'), 'juniperandash.com');
+  assert.equal(registrableDomain('shop.example.co.uk'), 'example.co.uk');
+  const html = `<a href="/collections/all">All</a><a href="/products/candle?variant=1">C</a><a href="/cart">Cart</a>
+    <a href="https://other.com/x">x</a><a href="/pages/about/">About</a><a href="#top">t</a><a href="/products/candle">dup</a>`;
+  assert.deepEqual(internalLinks(html, 'https://shop.com/'), ['https://shop.com/collections/all', 'https://shop.com/products/candle', 'https://shop.com/pages/about']);
+  const fake = (async (url: string) => ({ url, status: url.endsWith('about') ? 404 : 200, ok: !url.endsWith('about'), headers: {}, body: '', ms: 1, blocked: false })) as never;
+  const r = await findBrokenLinks(html, 'https://shop.com/', { get: fake, gapMs: 0 });
+  assert.deepEqual(r, { checked: 3, broken: [{ url: 'https://shop.com/pages/about', status: 404 }] });
+  assert.equal(daysUntil(new Date(Date.now() + 10.5 * 864e5).toISOString()), 10);
+  assert.equal(daysUntil(null), null);
+});
+
 test('diff: products added and removed; unreadable feed produces no product changes', () => {
   const a = base();
   const products = [...a.products!.slice(1), { id: 99, handle: 'new', title: 'New', updatedAt: null, prices: {} }];

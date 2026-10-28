@@ -4,6 +4,7 @@ import { getStore, type Db } from './db.ts';
 import { recomputeHealth } from './health.ts';
 import { runCheckout } from './jobs/checkout.ts';
 import { runSpeed } from './jobs/speed.ts';
+import { expiryAlerts, runSite } from './jobs/site.ts';
 import { runStorefrontDiff } from './jobs/storefront.ts';
 import { runUptime } from './jobs/uptime.ts';
 import { notify, type Alert } from './notify.ts';
@@ -49,4 +50,12 @@ export async function speedTask(db: Db, storeId: string) {
   if (!store || store.status === 'paused') return;
   await runSpeed(db, store);
   await recomputeHealth(db, store.id);
+}
+
+export async function siteTask(db: Db, storeId: string) {
+  const store = await getStore(db, storeId);
+  if (!store || store.status === 'paused') return;
+  const r = await runSite(db, store);
+  const alerts: Alert[] = expiryAlerts(r).map((a) => ({ severity: 'incident', title: a.title, body: a.body, link: appUrl(store.id) }));
+  await notify(db, store, alerts);
 }

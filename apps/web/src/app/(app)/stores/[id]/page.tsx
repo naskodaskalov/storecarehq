@@ -5,6 +5,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { healthLabel, host, hours, LIMITED_REASONS, monthStartLabel, when } from '@/lib/format';
 import { monthStart } from '@/lib/data';
 import { SubmitButton } from '@/components/submit-button';
+import { daysUntil, isOutOfStock, type ProductLite } from '@storecare/storefront';
 
 type Search = { filter?: string; welcome?: string };
 
@@ -39,19 +40,39 @@ export default async function StorePage({ params, searchParams }: { params: Prom
   if (filter === 'unexplained') changesQuery = changesQuery.is('work_entry_id', null);
   if (filter === 'matched') changesQuery = changesQuery.not('work_entry_id', 'is', null);
 
-  const [changes, snapshot, uptime, speed, runs, incidents, work] = await Promise.all([
+  const now = new Date().toISOString();
+  const since24h = new Date(Date.now() - 864e5).toISOString();
+  const [changes, snapshot, uptime, uptimeDay, speed, runs, incidents, work, stockSnap, site] = await Promise.all([
     changesQuery,
     supabase.from('storefront_snapshots').select('theme, apps, feed_status, taken_at').eq('store_id', id).order('taken_at', { ascending: false }).limit(1),
-    supabase.from('uptime_checks').select('ok').eq('store_id', id).gte('checked_at', since30),
-    supabase.from('speed_samples').select('performance_score, lcp_ms, sampled_at').eq('store_id', id).eq('page', 'home').order('sampled_at', { ascending: false }).limit(2),
+    supabase.rpc('uptime_stats', { p_store: id, p_from: since30, p_to: now }),
+    supabase.rpc('uptime_stats', { p_store: id, p_from: since24h, p_to: now }),
+    supabase
+      .from('speed_samples')
+      .select('performance_score, lcp_ms, sampled_at, seo_score, accessibility_score, best_practices_score, field_scope, field_lcp_ms, field_inp_ms, field_category')
+      .eq('store_id', id)
+      .eq('page', 'home')
+      .order('sampled_at', { ascending: false })
+      .limit(2),
     supabase.from('checkout_runs').select('ran_at, result, device, failed_step').eq('store_id', id).gte('ran_at', since14).order('ran_at'),
     supabase.from('incidents').select('id, kind, opened_at, resolved_at, cause').eq('store_id', id).order('opened_at', { ascending: false }).limit(1),
     supabase.from('work_entries').select('minutes, counts_to_plan').eq('store_id', id).gte('work_date', monthStart()),
+    supabase.from('storefront_snapshots').select('products, taken_at').eq('store_id', id).not('products', 'is', null).order('taken_at', { ascending: false }).limit(1),
+    supabase.from('site_checks').select('checked_at, ssl_expires_at, ssl_issuer, ssl_error, domain, domain_expires_at, domain_error, pages_checked, broken').eq('store_id', id).order('checked_at', { ascending: false }).limit(1),
   ]);
 
   const snap = snapshot.data?.[0];
-  const up = uptime.data ?? [];
-  const uptimePct = up.length ? (up.filter((u) => u.ok).length / up.length) * 100 : null;
+  type Stats = { checks: number; ok: number; avg_ms: number | null };
+  const up = (uptime.data as Stats[] | null)?.[0];
+  const uptimePct = up && Number(up.checks) ? (Number(up.ok) / Number(up.checks)) * 100 : null;
+  const responseMs = (uptimeDay.data as Stats[] | null)?.[0]?.avg_ms ?? null;
+  const products = (stockSnap.data?.[0]?.products ?? null) as ProductLite[] | null;
+  const stockTracked = !!products && products.some((p) => p.soldOut);
+  const soldOut = stockTracked ? products!.filter(isOutOfStock) : [];
+  const siteCheck = site.data?.[0];
+  const sslDays = daysUntil(siteCheck?.ssl_expires_at);
+  const domainDays = daysUntil(siteCheck?.domain_expires_at);
+  const broken = (siteCheck?.broken ?? []) as { url: string; status: number }[];
   const [latestSpeed, prevSpeed] = speed.data ?? [];
   const usedMin = (work.data ?? []).filter((w) => w.counts_to_plan).reduce((a, w) => a + w.minutes, 0);
   const plan = store.care_plans as { name: string; hours_included: number } | null;
@@ -118,6 +139,54 @@ export default async function StorePage({ params, searchParams }: { params: Prom
           <div className="small muted">{monthStartLabel()}</div>
         </div>
       </div>
+
+      <section className="card">
+        <h2>Site checks</h2>
+        <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          <Check
+            label="Real visitors' load"
+            value={latestSpeed?.field_lcp_ms ? `${(latestSpeed.field_lcp_ms / 1000).toFixed(1)}s` : '—'}
+            note={
+              latestSpeed?.field_lcp_ms
+                ? `Chrome visitors, 28 days${latestSpeed.field_category ? ` · ${FIELD[latestSpeed.field_category] ?? latestSpeed.field_category}` : ''}${latestSpeed.field_scope === 'origin' ? ' (whole site)' : ''}`
+                : latestSpeed
+                  ? 'Not enough Chrome traffic for Google to report'
+                  : 'Daily, from Google'
+            }
+            warn={latestSpeed?.field_category === 'SLOW'}
+          />
+          <Check label="Response time" value={responseMs ? `${responseMs} ms` : '—'} note="Average, last 24 hours" warn={!!responseMs && responseMs > 1500} />
+          <Check
+            label="Stock"
+            value={stockTracked ? `${soldOut.length} sold out` : '—'}
+            note={stockTracked ? `of ${products!.length} products${soldOut.length ? `: ${soldOut.slice(0, 2).map((p) => p.title).join(', ')}${soldOut.length > 2 ? '…' : ''}` : ''}` : 'From the next snapshot'}
+          />
+          <Check
+            label="Broken links"
+            value={siteCheck ? String(broken.length) : '—'}
+            note={siteCheck ? (broken.length ? broken.slice(0, 2).map((b) => b.url.replace(/^https?:\/\/[^/]+/, '')).join(', ') : `${siteCheck.pages_checked} pages checked`) : 'Daily'}
+            warn={broken.length > 0}
+          />
+          <Check
+            label="SSL certificate"
+            value={sslDays !== null ? `${sslDays} days` : '—'}
+            note={sslDays !== null ? `left${siteCheck?.ssl_issuer ? ` · ${siteCheck.ssl_issuer}` : ''}` : siteCheck?.ssl_error ? 'Could not read' : 'Daily'}
+            warn={sslDays !== null && sslDays <= 14}
+          />
+          <Check
+            label="Domain"
+            value={domainDays !== null ? `${domainDays} days` : '—'}
+            note={domainDays !== null ? `until ${siteCheck?.domain} expires` : siteCheck?.domain_error ? 'Expiry not published for this domain' : 'Daily'}
+            warn={domainDays !== null && domainDays <= 30}
+          />
+          <Check
+            label="Google audit"
+            value={latestSpeed?.seo_score != null ? `SEO ${latestSpeed.seo_score}` : '—'}
+            note={latestSpeed?.accessibility_score != null ? `Accessibility ${latestSpeed.accessibility_score} · Best practices ${latestSpeed.best_practices_score ?? '—'}` : 'Daily'}
+            warn={latestSpeed?.accessibility_score != null && latestSpeed.accessibility_score < 80}
+          />
+        </div>
+      </section>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <section className="card" style={{ flex: '3 1 460px', minWidth: 0 }}>
@@ -226,5 +295,18 @@ const KIND_LABEL: Record<string, string> = {
   products_added: 'Products',
   products_removed: 'Products',
   prices_changed: 'Prices',
+  stock_out: 'Stock',
+  stock_back: 'Stock',
 };
+const FIELD: Record<string, string> = { FAST: 'good', AVERAGE: 'needs improvement', SLOW: 'poor' };
+
+function Check({ label, value, note, warn }: { label: string; value: string; note: string; warn?: boolean }) {
+  return (
+    <div className="kpi" style={{ padding: 14 }}>
+      <div className="small muted">{label}</div>
+      <div className={`mono ${warn ? 'warn' : ''}`} style={{ fontSize: 22 }}>{value}</div>
+      <div className="small muted">{note}</div>
+    </div>
+  );
+}
 const RESULT: Record<string, string> = { pass: 'Passed', fail: 'Failed', blocked: 'Blocked' };

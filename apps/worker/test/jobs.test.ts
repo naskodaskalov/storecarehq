@@ -6,6 +6,7 @@ import { runUptime } from '../src/jobs/uptime.ts';
 import { healthScore, recomputeHealth } from '../src/health.ts';
 import { notify } from '../src/notify.ts';
 import { parsePsi } from '../src/jobs/speed.ts';
+import { expiryAlerts, runSite } from '../src/jobs/site.ts';
 import { freshDb, seedStore } from './helpers.ts';
 
 const probeResult = (over: Partial<ProbeResult> = {}): ProbeResult => ({
@@ -53,7 +54,37 @@ test('parsePsi reads score and metrics', () => {
       },
     },
   });
-  assert.deepEqual(s, { performanceScore: 72, lcpMs: 2934, cls: 0.04, tbtMs: 180 });
+  assert.deepEqual(s, {
+    performanceScore: 72, lcpMs: 2934, cls: 0.04, tbtMs: 180,
+    seoScore: null, accessibilityScore: null, bestPracticesScore: null, field: null,
+  });
+});
+
+test('parsePsi reads real-visitor (CrUX) data and other category scores', () => {
+  const s = parsePsi({
+    lighthouseResult: { categories: { performance: { score: 0.5 }, seo: { score: 0.92 }, accessibility: { score: 0.81 }, 'best-practices': { score: 1 } } },
+    loadingExperience: {},
+    originLoadingExperience: {
+      overall_category: 'AVERAGE',
+      metrics: {
+        LARGEST_CONTENTFUL_PAINT_MS: { percentile: 2710, category: 'AVERAGE' },
+        INTERACTION_TO_NEXT_PAINT: { percentile: 180, category: 'FAST' },
+        CUMULATIVE_LAYOUT_SHIFT_SCORE: { percentile: 4, category: 'FAST' },
+      },
+    },
+  });
+  assert.equal(s.seoScore, 92);
+  assert.equal(s.accessibilityScore, 81);
+  assert.equal(s.bestPracticesScore, 100);
+  assert.deepEqual(s.field, { scope: 'origin', lcpMs: 2710, inpMs: 180, cls: 0.04, category: 'AVERAGE' });
+});
+
+test('expiry alerts fire on 30/14/7/3/1/0 days only', () => {
+  const now = Date.parse('2026-10-28T08:00:00Z');
+  const in_ = (d: number) => new Date(now + d * 864e5 + 3600e3).toISOString();
+  assert.deepEqual(expiryAlerts({ sslExpiresAt: in_(14), domainExpiresAt: in_(15), domain: 'x.com' }, now).map((a) => a.title), ['SSL certificate expires in 14 days']);
+  assert.deepEqual(expiryAlerts({ sslExpiresAt: in_(90), domainExpiresAt: in_(1), domain: 'x.com' }, now).map((a) => a.title), ['Domain x.com expires in 1 day']);
+  assert.deepEqual(expiryAlerts({ sslExpiresAt: null, domainExpiresAt: null, domain: 'x.com' }, now), []);
 });
 
 describe('jobs against Postgres', { skip: !process.env.TEST_DATABASE_URL && 'TEST_DATABASE_URL not set' }, () => {
@@ -148,6 +179,25 @@ describe('jobs against Postgres', { skip: !process.env.TEST_DATABASE_URL && 'TES
     await runUptime(db!.pool, store, async () => fetchResult(200));
     const score = await recomputeHealth(db!.pool, store.id);
     assert.equal(score, 100);
+  });
+
+  test('site check stores SSL, domain and broken links', async () => {
+    const store = await seedStore(db!.pool, { public_url: 'https://site.example' });
+    const home = '<a href="/collections/all">a</a><a href="/pages/gone">b</a>';
+    const r = await runSite(db!.pool, store, {
+      cert: async () => ({ expiresAt: '2027-01-01T00:00:00.000Z', issuer: "Let's Encrypt" }),
+      domain: async () => ({ domain: 'site.example', expiresAt: '2027-06-01T00:00:00.000Z', registrar: 'Namecheap' }),
+      get: (async (url: string) => ({
+        url, ok: !url.endsWith('gone'), status: url.endsWith('gone') ? 404 : 200, headers: {}, ms: 1, blocked: false,
+        body: url.endsWith('robots.txt') ? 'User-agent: *\nDisallow:' : home,
+      })) as never,
+    });
+    assert.equal(r.pagesChecked, 2);
+    assert.deepEqual(r.broken, [{ url: 'https://site.example/pages/gone', status: 404 }]);
+    const { rows: [row] } = await db!.pool.query(`select ssl_issuer, domain, pages_checked, broken from public.site_checks where store_id = $1`, [store.id]);
+    assert.equal(row.ssl_issuer, "Let's Encrypt");
+    assert.equal(row.pages_checked, 2);
+    assert.equal(row.broken.length, 1);
   });
 
   test('notify sends only to routes at or below the alert severity', async () => {

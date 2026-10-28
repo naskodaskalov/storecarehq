@@ -1,7 +1,7 @@
 // Compares two storefront snapshots and produces change-feed entries.
 
 import type { DetectedApp, ThemeInfo } from './page.ts';
-import type { ProductLite } from './products.ts';
+import { isOutOfStock, type ProductLite } from './products.ts';
 
 export type Snapshot = {
   takenAt: string;
@@ -18,7 +18,9 @@ export type ChangeKind =
   | 'app_removed'
   | 'products_added'
   | 'products_removed'
-  | 'prices_changed';
+  | 'prices_changed'
+  | 'stock_out'
+  | 'stock_back';
 
 export type Change = {
   kind: ChangeKind;
@@ -130,6 +132,37 @@ export function diffSnapshots(prev: Snapshot, next: Snapshot): Change[] {
             ? `${plural(suspicious.length, 'price')} at zero or moved more than 3x`
             : 'no zero or extreme prices found',
         },
+      });
+    }
+  }
+
+  // Stock: only when both snapshots recorded availability.
+  if (prev.products && next.products) {
+    const before = new Map(prev.products.map((p) => [p.id, p]));
+    const wentOut: ProductLite[] = [];
+    const cameBack: ProductLite[] = [];
+    for (const p of next.products) {
+      const old = before.get(p.id);
+      if (!old || !old.soldOut || !p.soldOut) continue;
+      const was = isOutOfStock(old);
+      const now = isOutOfStock(p);
+      if (!was && now) wentOut.push(p);
+      if (was && !now) cameBack.push(p);
+    }
+    if (wentOut.length) {
+      changes.push({
+        kind: 'stock_out',
+        summary: wentOut.length === 1 ? `Out of stock: ${wentOut[0].title}` : `${wentOut.length} products went out of stock`,
+        risky: false,
+        details: { products: wentOut.map((p) => ({ id: p.id, title: p.title, handle: p.handle })) },
+      });
+    }
+    if (cameBack.length) {
+      changes.push({
+        kind: 'stock_back',
+        summary: cameBack.length === 1 ? `Back in stock: ${cameBack[0].title}` : `${cameBack.length} products are back in stock`,
+        risky: false,
+        details: { products: cameBack.map((p) => ({ id: p.id, title: p.title, handle: p.handle })) },
       });
     }
   }

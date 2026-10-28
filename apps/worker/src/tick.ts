@@ -6,24 +6,26 @@
 
 import { activeStores, createPool, type Db, type StoreRow } from './db.ts';
 import { dueJobs, type JobName, type LastRuns } from './schedule.ts';
-import { checkoutTask, speedTask, storefrontTask, uptimeTask } from './tasks.ts';
+import { checkoutTask, siteTask, speedTask, storefrontTask, uptimeTask } from './tasks.ts';
 
 const TASKS: Record<JobName, (db: Db, storeId: string) => Promise<void>> = {
   uptime: uptimeTask,
   storefront: storefrontTask,
   checkout: checkoutTask,
   speed: speedTask,
+  site: siteTask,
 };
 
 async function lastRuns(db: Db, storeId: string): Promise<LastRuns> {
-  const { rows } = await db.query<{ snapshot_at: Date | null; checkout_at: Date | null; speed_at: Date | null }>(
+  const { rows } = await db.query<{ snapshot_at: Date | null; checkout_at: Date | null; speed_at: Date | null; site_at: Date | null }>(
     `select
        (select max(taken_at) from public.storefront_snapshots where store_id = $1) as snapshot_at,
        (select max(ran_at) from public.checkout_runs where store_id = $1) as checkout_at,
-       (select max(sampled_at) from public.speed_samples where store_id = $1) as speed_at`,
+       (select max(sampled_at) from public.speed_samples where store_id = $1) as speed_at,
+       (select max(checked_at) from public.site_checks where store_id = $1) as site_at`,
     [storeId],
   );
-  return { snapshotAt: rows[0].snapshot_at, checkoutAt: rows[0].checkout_at, speedAt: rows[0].speed_at };
+  return { snapshotAt: rows[0].snapshot_at, checkoutAt: rows[0].checkout_at, speedAt: rows[0].speed_at, siteAt: rows[0].site_at };
 }
 
 async function runStore(db: Db, store: StoreRow, dryRun: boolean): Promise<string> {

@@ -111,6 +111,7 @@ h2 { margin: 0; font-size: 18px; font-weight: 700; }
 .report-list li { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
 .report-list li:last-child { border-bottom: 0; }
 .report-date { flex: 0 0 64px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.report-check { flex: 0 0 110px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .report-hours { margin-left: auto; font-family: var(--mono); font-size: 14px; }
 .report-muted { color: var(--muted); font-weight: 400; font-size: 14px; }
 .report-empty, .report-note { margin: 0; color: var(--muted); font-size: 14px; }

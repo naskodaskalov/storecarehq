@@ -2,7 +2,7 @@
 
 import PgBoss from 'pg-boss';
 import { activeStores, createPool, dbConfig, type StoreRow } from './db.ts';
-import { checkoutTask, speedTask, storefrontTask, uptimeTask } from './tasks.ts';
+import { checkoutTask, siteTask, speedTask, storefrontTask, uptimeTask } from './tasks.ts';
 
 const pool = createPool();
 const boss = new PgBoss({ ...dbConfig(), schema: 'pgboss', max: 3 });
@@ -29,6 +29,7 @@ const QUEUES = {
   storefront: storefrontTask,
   checkout: checkoutTask,
   speed: speedTask,
+  site: siteTask,
 } as const;
 
 for (const name of Object.keys(QUEUES)) await boss.createQueue(name);
@@ -63,6 +64,7 @@ await boss.work('tick-hourly', async () => {
   const sixAm = stores.filter((s) => localHour(s.timezone) === 6);
   await fanOut('checkout', sixAm.filter((s) => s.checkout_consent_at));
   await fanOut('speed', sixAm);
+  await fanOut('site', sixAm);
   if (new Date().getUTCHours() === 3) await pool.query('select public.prune_monitoring()');
 });
 

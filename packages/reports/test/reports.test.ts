@@ -32,6 +32,10 @@ const month = (over: Partial<MonthData> = {}): MonthData => ({
   ],
   apps: [{ key: 'klaviyo', name: 'Klaviyo', known: true }],
   previousMonthMinutes: 480,
+  stock: { products: 40, outOfStock: 3 },
+  quality: { fieldLcpMs: 2710, fieldInpMs: 180, fieldCategory: 'AVERAGE', seo: 92, accessibility: 76 },
+  site: { sslExpiresAt: '2027-01-10T00:00:00Z', domainExpiresAt: '2026-11-20T00:00:00Z', domain: 'juniperandash.com', pagesChecked: 22, broken: [{ url: 'https://juniperandash.com/pages/old-sale', status: 404 }] },
+  asOf: '2026-10-28T12:00:00Z',
   ...over,
 });
 
@@ -63,10 +67,12 @@ test('facts: change highlights are risky first, then agency work, max 5', () => 
   );
 });
 
+const classic = { stock: null, quality: null, site: null };
+
 test('recommendations follow the rules and stop at three', () => {
-  const f = buildFacts(month());
+  const f = buildFacts(month(classic));
   assert.deepEqual(f.recommendations.map((r) => r.title), ['Speed up the home page on mobile', 'Tell us before big changes', 'Keep the daily checkout test on']);
-  const quiet = buildFacts(month({ speed: [], changes: [], checkoutRuns: [] }));
+  const quiet = buildFacts(month({ ...classic, speed: [], changes: [], checkoutRuns: [] }));
   assert.deepEqual(quiet.recommendations, []);
 });
 
@@ -81,7 +87,7 @@ test('empty month still produces a sensible report', () => {
 });
 
 test('template summary uses only the facts', () => {
-  const s = templateSummary(buildFacts(month()));
+  const s = templateSummary(buildFacts(month(classic)));
   assert.match(s, /99\.9% of the time in October 2026, with 1 incident/);
   assert.match(s, /2 tasks \(2\.3h of 10h in your plan\), the largest being "Launched the autumn homepage"\./);
   assert.doesNotMatch(s, /internal call/i);
@@ -115,4 +121,36 @@ test('writeSummary: sends the facts to the API and returns its text', async () =
   assert.equal(sent!.model, 'claude-haiku-5-5');
   assert.match(sent!.messages[0].content, /Uptime: 99\.9%/);
   assert.match(sent!.system, /Use only the facts given/);
+});
+
+test('new metrics: stock, real visitors, scores, site checks', () => {
+  const changes = [
+    ...month().changes,
+    { occurred_at: '2026-10-10T10:00:00Z', kind: 'stock_out', summary: '4 products went out of stock', risky: false, work_entry_id: null },
+    { occurred_at: '2026-10-12T10:00:00Z', kind: 'stock_out', summary: 'Out of stock: Candle', risky: false, work_entry_id: null },
+    { occurred_at: '2026-10-20T10:00:00Z', kind: 'stock_back', summary: 'Back in stock: Candle', risky: false, work_entry_id: null },
+  ];
+  const f = buildFacts(month({ changes, uptime: { checks: 1000, ok: 999, avgMs: 412 } }));
+  assert.equal(f.responseMs, 412);
+  assert.deepEqual(f.stock, { products: 40, outOfStock: 3, wentOut: 5, cameBack: 1 });
+  assert.deepEqual(f.realVisitors, { lcpMs: 2710, inpMs: 180, rating: 'needs improvement' });
+  assert.deepEqual(f.scores, { seo: 92, accessibility: 76 });
+  assert.equal(f.site?.domainDays, 22);
+  assert.deepEqual(f.site?.broken, [{ path: '/pages/old-sale', status: 404 }]);
+  // Domain expiry jumps to the top; three recommendations at most.
+  assert.equal(f.recommendations[0].title, 'Renew juniperandash.com');
+  assert.equal(f.recommendations.length, 3);
+  const p = factsForPrompt(f);
+  assert.match(p, /Average response time: 412 ms/);
+  assert.match(p, /Real visitors' load time .*2\.7s, rated needs improvement/);
+  assert.match(p, /3 of 40 products sold out now; 5 went out of stock and 1 came back/);
+  assert.match(p, /Domain registration ends in 22 days/);
+});
+
+test('missing new metrics stay out of the facts', () => {
+  const f = buildFacts(month({ stock: null, quality: null, site: null }));
+  assert.equal(f.stock, null);
+  assert.equal(f.realVisitors, null);
+  assert.equal(f.site, null);
+  assert.doesNotMatch(factsForPrompt(f), /Stock:|Real visitors|Broken|Domain/);
 });
