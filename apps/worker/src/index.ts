@@ -2,7 +2,8 @@
 
 import PgBoss from 'pg-boss';
 import { activeStores, createPool, dbConfig, type StoreRow } from './db.ts';
-import { checkoutTask, siteTask, speedTask, storefrontTask, uptimeTask } from './tasks.ts';
+import { checkoutTask, reportTask, sendReportDigests, siteTask, speedTask, storefrontTask, takeDrafted, uptimeTask } from './tasks.ts';
+import { localDateHour, REPORT_LAST_DAY } from './schedule.ts';
 
 const pool = createPool();
 const boss = new PgBoss({ ...dbConfig(), schema: 'pgboss', max: 3 });
@@ -30,6 +31,7 @@ const QUEUES = {
   checkout: checkoutTask,
   speed: speedTask,
   site: siteTask,
+  report: reportTask,
 } as const;
 
 for (const name of Object.keys(QUEUES)) await boss.createQueue(name);
@@ -65,6 +67,8 @@ await boss.work('tick-hourly', async () => {
   await fanOut('checkout', sixAm.filter((s) => s.checkout_consent_at));
   await fanOut('speed', sixAm);
   await fanOut('site', sixAm);
+  // reportTask skips stores whose report for last month already exists.
+  await fanOut('report', sixAm.filter((s) => Number(localDateHour(s.timezone, new Date()).date.slice(8)) <= REPORT_LAST_DAY));
   if (new Date().getUTCHours() === 3) await pool.query('select public.prune_monitoring()');
 });
 
@@ -74,6 +78,7 @@ for (const [queue, task] of Object.entries(QUEUES)) {
   const batchSize = queue === 'checkout' ? 1 : 4;
   await boss.work<PerStore>(queue, { batchSize }, async (jobs) => {
     for (const job of jobs) await task(pool, job.data.storeId);
+    if (queue === 'report') await sendReportDigests(pool, takeDrafted());
   });
 }
 

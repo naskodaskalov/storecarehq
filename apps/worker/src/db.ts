@@ -64,6 +64,7 @@ export type StoreRow = {
   checkout_product_handle: string | null;
   checkout_mobile: boolean;
   checkout_desktop: boolean;
+  created_at: Date;
 };
 
 export async function activeStores(db: Db): Promise<StoreRow[]> {

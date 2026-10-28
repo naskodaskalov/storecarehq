@@ -1,14 +1,14 @@
 name: Monitor stores
 
 # Every 30 minutes: uptime for every store, storefront snapshot when the last one is ~an hour old,
-# checkout test and speed once a day after 06:00 store time. See apps/worker/src/tick.ts.
+# checkout test and speed once a day after 06:00 store time, last month's reports drafted on the 1st. See apps/worker/src/tick.ts.
 on:
   schedule:
     - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       force:
-        description: 'Also run now, even if not due (comma-separated: storefront, speed, site)'
+        description: 'Also run now, even if not due (comma-separated: storefront, speed, site, report)'
         required: false
         default: ''
 
@@ -29,6 +29,8 @@ jobs:
       DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
       PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      # Optional: AI-written summaries for the reports drafted on the 1st (template summary without it).
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       APP_URL: https://storecarehq.vercel.app
       FORCE: ${{ inputs.force }}
     steps:

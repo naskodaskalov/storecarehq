@@ -61,6 +61,13 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
           {q.drafted === 'ai' ? 'The summary was written by AI from those facts only. Read it before approving.' : 'The summary uses the standard template; edit it as you like.'}
         </div>
       )}
+      {draft && report.auto_drafted_at && !q.drafted && !q.saved && (
+        <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>
+          Drafted automatically on {new Date(report.auto_drafted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} from {facts.period.label}&apos;s checks, changes and work log.{' '}
+          {report.summary_source === 'ai' ? 'The summary was written by AI from those facts only.' : 'The summary uses the standard template.'} Read it, adjust anything, then approve.
+          {' '}Work you log for {facts.period.label} after this is picked up by &ldquo;Refresh from latest data&rdquo;.
+        </div>
+      )}
       {q.saved && <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>Saved.</div>}
       {q.approved && <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>Approved. The client link below now works; send it when you&apos;re ready.</div>}
       {q.sent && <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>Marked as sent.</div>}

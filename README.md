@@ -59,9 +59,12 @@ Good for reviewing the UI and for showing the product to agencies.
 
 - **Web:** Vercel, root `apps/web`, same env vars as `.env.example`.
 - **Worker (current): GitHub Actions.** `.github/workflows/monitor.yml` runs `apps/worker/src/tick.ts` every
-  30 minutes: uptime each run, a storefront snapshot about hourly, checkout test and speed once a day after 06:00
-  store time. Needs repository secrets `DATABASE_URL` (required) and `PAGESPEED_API_KEY`, optionally
-  `DATABASE_CA_CERT` and `RESEND_API_KEY`. Run it by hand from the Actions tab ("Monitor stores" → Run workflow).
+  30 minutes: uptime each run, a storefront snapshot about hourly, checkout test, speed and site checks once a day
+  after 06:00 store time, and last month's report drafts from 06:00 on the 1st (catching up until the 5th; an
+  existing report is never touched), followed by one "ready to review" message per agency. Needs repository
+  secrets `DATABASE_URL` (required) and `PAGESPEED_API_KEY`, optionally `DATABASE_CA_CERT`, `RESEND_API_KEY` and
+  `ANTHROPIC_API_KEY` (AI-written report summaries). Run it by hand from the Actions tab ("Monitor stores" → Run
+  workflow); the "force" box runs `storefront`, `speed`, `site` or `report` straight away.
 - **Worker (later, always-on):** any container host: `docker build -f apps/worker/Dockerfile .`, one instance,
   runs `src/index.ts` with pg-boss for 5-minute uptime checks. Env vars from `apps/worker/.env.example`.
 

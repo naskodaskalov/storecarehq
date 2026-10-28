@@ -23,10 +23,11 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
 
   const [{ data: stores }, { data: reports }] = await Promise.all([
     supabase.from('stores').select('id, name, public_url, status, client_contact_email').eq('agency_id', agency.id).order('name'),
-    supabase.from('reports').select('id, store_id, status, sent_at, sent_to, updated_at').eq('agency_id', agency.id).eq('period', period.start),
+    supabase.from('reports').select('id, store_id, status, sent_at, sent_to, updated_at, auto_drafted_at').eq('agency_id', agency.id).eq('period', period.start),
   ]);
   const byStore = new Map((reports ?? []).map((r) => [r.store_id, r]));
   const done = (reports ?? []).filter((r) => r.status !== 'draft').length;
+  const toReview = (reports ?? []).filter((r) => r.status === 'draft' && r.auto_drafted_at).length;
 
   return (
     <>
@@ -34,12 +35,18 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         <div>
           <h1>Reports</h1>
           <div className="muted">
-            Draft each store&apos;s monthly report, review it, approve it, then send the client a link.
+            Each store&apos;s report is drafted for you on the 1st of the month. Review it, approve it, then send the client a link.
           </div>
         </div>
       </div>
 
       {error && <div className="notice error" role="alert">{error}</div>}
+      {toReview > 0 && (
+        <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>
+          {toReview} {period.label} report{toReview === 1 ? ' was' : 's were'} drafted automatically and {toReview === 1 ? 'is' : 'are'} ready for you to review.
+          Nothing goes to clients until you approve and send.
+        </div>
+      )}
 
       <section className="card">
         <div className="row">
@@ -79,9 +86,14 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
                       <td>
                         {st ? (
                           <span style={{ color: st.tone, fontWeight: 600 }}>
-                            {st.label}
+                            {r?.status === 'draft' && r.auto_drafted_at ? 'Ready to review' : st.label}
                             {r?.status === 'sent' && r.sent_at && (
                               <span className="small muted" style={{ fontWeight: 400 }}> {new Date(r.sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                            )}
+                            {r?.status === 'draft' && r.auto_drafted_at && (
+                              <span className="small muted" style={{ display: 'block', fontWeight: 400 }}>
+                                Drafted automatically {new Date(r.auto_drafted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              </span>
                             )}
                           </span>
                         ) : (

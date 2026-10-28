@@ -3,11 +3,12 @@
 //
 //   node src/tick.ts            run what is due
 //   node src/tick.ts --dry-run  only print what is due
-//   FORCE=site,speed node src/tick.ts   also run these now, even if not due (manual runs)
+//   FORCE=site,speed node src/tick.ts   also run these now, even if not due (manual runs);
+//                                         FORCE=report drafts last month's report if it doesn't exist yet
 
 import { activeStores, createPool, type Db, type StoreRow } from './db.ts';
 import { dueJobs, type JobName, type LastRuns } from './schedule.ts';
-import { checkoutTask, siteTask, speedTask, storefrontTask, uptimeTask } from './tasks.ts';
+import { checkoutTask, reportTask, sendReportDigests, siteTask, speedTask, storefrontTask, takeDrafted, uptimeTask } from './tasks.ts';
 
 const TASKS: Record<JobName, (db: Db, storeId: string) => Promise<void>> = {
   uptime: uptimeTask,
@@ -15,18 +16,20 @@ const TASKS: Record<JobName, (db: Db, storeId: string) => Promise<void>> = {
   checkout: checkoutTask,
   speed: speedTask,
   site: siteTask,
+  report: reportTask,
 };
 
 async function lastRuns(db: Db, storeId: string): Promise<LastRuns> {
-  const { rows } = await db.query<{ snapshot_at: Date | null; checkout_at: Date | null; speed_at: Date | null; site_at: Date | null }>(
+  const { rows } = await db.query<{ snapshot_at: Date | null; checkout_at: Date | null; speed_at: Date | null; site_at: Date | null; report_periods: string[] }>(
     `select
        (select max(taken_at) from public.storefront_snapshots where store_id = $1) as snapshot_at,
        (select max(ran_at) from public.checkout_runs where store_id = $1) as checkout_at,
        (select max(sampled_at) from public.speed_samples where store_id = $1) as speed_at,
-       (select max(checked_at) from public.site_checks where store_id = $1) as site_at`,
+       (select max(checked_at) from public.site_checks where store_id = $1) as site_at,
+       array(select to_char(period, 'YYYY-MM-DD') from public.reports where store_id = $1 order by period desc limit 6) as report_periods`,
     [storeId],
   );
-  return { snapshotAt: rows[0].snapshot_at, checkoutAt: rows[0].checkout_at, speedAt: rows[0].speed_at, siteAt: rows[0].site_at };
+  return { snapshotAt: rows[0].snapshot_at, checkoutAt: rows[0].checkout_at, speedAt: rows[0].speed_at, siteAt: rows[0].site_at, reportPeriods: rows[0].report_periods };
 }
 
 const FORCE = (process.env.FORCE ?? '').split(',').map((s) => s.trim()).filter((s): s is JobName => s in TASKS && s !== 'checkout');
@@ -65,7 +68,12 @@ try {
       for (let s = queue.shift(); s; s = queue.shift()) lines.push(await runStore(pool, s, dryRun));
     }),
   );
-  if (!dryRun) await pool.query('select public.prune_monitoring()');
+  if (!dryRun) {
+    // One "reports ready" message per agency for everything drafted in this pass.
+    const digests = await sendReportDigests(pool, takeDrafted());
+    if (digests) lines.push(`reports ready: ${digests} notification${digests === 1 ? '' : 's'} sent`);
+    await pool.query('select public.prune_monitoring()');
+  }
   for (const l of lines.sort()) console.log(l);
   if (!dryRun && !process.env.PAGESPEED_API_KEY) {
     console.log('::warning::PAGESPEED_API_KEY is not set, so speed checks use Google\'s shared quota and usually fail.');

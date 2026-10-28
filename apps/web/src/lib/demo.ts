@@ -2,6 +2,8 @@
 // so the app can be shown and reviewed without a Supabase project. Supports only the query
 // features the app uses. Data lives in process memory and resets on restart.
 
+import { buildFacts, DEFAULT_SECTIONS, monthPeriod, previousPeriod, templateSummary } from '@storecare/reports';
+
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Tables = Record<string, Row[]>;
 
@@ -204,8 +206,45 @@ function seed(): Tables {
     uptime_checks,
     speed_samples,
     storefront_snapshots,
-    reports: [],
+    reports: autoDrafted(stores),
   };
+}
+
+/** Last month's reports, as the worker drafts them on the 1st: two waiting for review. */
+function autoDrafted(stores: Row[]): Row[] {
+  const period = previousPeriod(monthPeriod(new Date(now).toISOString().slice(0, 7)));
+  return stores.slice(3, 5).map((s) => {
+    const facts = buildFacts({
+      period,
+      store: { name: s.name, public_url: s.public_url, health_score: s.health_score, status: s.status, limited_reason: null },
+      agency: { name: 'Northline Studio', brand_color: '#2747A8' },
+      plan: { name: 'Care Plan Starter', hours_included: s._hours, rollover_rule: 'one_month' },
+      uptime: { checks: 1440, ok: 1440, avgMs: 412 },
+      incidents: [],
+      checkoutRuns: [],
+      speed: [],
+      changes: [],
+      work: [{ id: 'w', work_date: `${period.start.slice(0, 8)}12`, minutes: 120, title: 'Updates', client_text: 'Updated apps and checked the theme after Shopify changes.', counts_to_plan: true }],
+      apps: [],
+      previousMonthMinutes: null,
+      asOf: `${period.end}T00:00:00Z`,
+    });
+    return {
+      id: uid(),
+      store_id: s.id,
+      agency_id: AGENCY,
+      period: period.start,
+      status: 'draft',
+      sections: DEFAULT_SECTIONS,
+      facts,
+      summary_text: templateSummary(facts),
+      summary_source: 'template',
+      share_token: [uid(), uid()].join('').replace(/-/g, ''),
+      created_at: `${period.end}T05:07:00Z`,
+      updated_at: `${period.end}T05:07:00Z`,
+      auto_drafted_at: `${period.end}T05:07:00Z`,
+    };
+  });
 }
 
 const g = globalThis as unknown as { __storecareDemo?: Tables };
