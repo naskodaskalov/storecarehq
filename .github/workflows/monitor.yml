@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: '7,37 * * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Also run now, even if not due (comma-separated: storefront, speed, site)'
+        required: false
+        default: ''
 
 # Never let two passes overlap; a late one waits for the running one.
 concurrency:
@@ -25,6 +30,7 @@ jobs:
       PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       APP_URL: https://storecarehq.vercel.app
+      FORCE: ${{ inputs.force }}
     steps:
       # Until the secret exists, skip quietly instead of failing (and emailing) every 30 minutes.
       - name: Check secrets

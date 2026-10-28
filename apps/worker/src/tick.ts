@@ -3,6 +3,7 @@
 //
 //   node src/tick.ts            run what is due
 //   node src/tick.ts --dry-run  only print what is due
+//   FORCE=site,speed node src/tick.ts   also run these now, even if not due (manual runs)
 
 import { activeStores, createPool, type Db, type StoreRow } from './db.ts';
 import { dueJobs, type JobName, type LastRuns } from './schedule.ts';
@@ -28,8 +29,11 @@ async function lastRuns(db: Db, storeId: string): Promise<LastRuns> {
   return { snapshotAt: rows[0].snapshot_at, checkoutAt: rows[0].checkout_at, speedAt: rows[0].speed_at, siteAt: rows[0].site_at };
 }
 
+const FORCE = (process.env.FORCE ?? '').split(',').map((s) => s.trim()).filter((s): s is JobName => s in TASKS && s !== 'checkout');
+
 async function runStore(db: Db, store: StoreRow, dryRun: boolean): Promise<string> {
-  const due = dueJobs(store, await lastRuns(db, store.id));
+  const scheduled = dueJobs(store, await lastRuns(db, store.id));
+  const due = (Object.keys(TASKS) as JobName[]).filter((j) => scheduled.includes(j) || FORCE.includes(j));
   if (dryRun) return `${store.name}: ${due.join(', ')}`;
   const results: string[] = [];
   // Storefront before checkout: the checkout test picks its product from the latest snapshot.

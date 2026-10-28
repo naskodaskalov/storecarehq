@@ -177,3 +177,18 @@ test('diff: products added and removed; unreadable feed produces no product chan
   assert.deepEqual(kinds, ['products_added', 'products_removed']);
   assert.deepEqual(diffSnapshots(a, base({ products: null })), []);
 });
+
+test('domain expiry asks the registry found in the IANA directory', async () => {
+  const { domainExpiry } = await import('../src/site.ts');
+  const calls: string[] = [];
+  const fake = (async (url: string, init?: RequestInit) => {
+    calls.push(String(url));
+    if (String(url).includes('data.iana.org'))
+      return new Response(JSON.stringify({ services: [[['com', 'net'], ['https://rdap.verisign.com/com/v1/']]] }));
+    assert.match(String((init?.headers as Record<string, string>)['user-agent']), /StoreCareBot/);
+    return new Response(JSON.stringify({ events: [{ eventAction: 'expiration', eventDate: '2027-05-01T00:00:00Z' }] }));
+  }) as typeof fetch;
+  const r = await domainExpiry('www.example.com', fake);
+  assert.equal(calls[1], 'https://rdap.verisign.com/com/v1/domain/example.com');
+  assert.ok('expiresAt' in r && r.expiresAt === '2027-05-01T00:00:00.000Z');
+});

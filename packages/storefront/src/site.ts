@@ -1,7 +1,7 @@
 // Daily site checks from the outside: SSL certificate, domain registration, broken internal links.
 
 import tls from 'node:tls';
-import { politeGet, type HostClock } from './http.ts';
+import { politeGet, USER_AGENT, type HostClock } from './http.ts';
 import { isAllowed, type Robots } from './robots.ts';
 
 export type CertInfo = { expiresAt: string; issuer: string | null } | { error: string };
@@ -36,13 +36,36 @@ export type DomainInfo = { domain: string; expiresAt: string | null; registrar: 
 type RdapEvent = { eventAction?: string; eventDate?: string };
 type RdapEntity = { roles?: string[]; vcardArray?: [string, [string, unknown, string, string][]] };
 
-/** Domain registration expiry from RDAP (the successor to WHOIS). Some country domains have no RDAP service. */
+const RDAP_HEADERS = { accept: 'application/rdap+json, application/json', 'user-agent': USER_AGENT };
+let bootstrap: Promise<[string[], string[]][] | null> | null = null;
+
+/** IANA's official list of which registry runs RDAP for each top-level domain. Fetched once per process. */
+function rdapBootstrap(fetchImpl: typeof fetch) {
+  bootstrap ??= fetchImpl('https://data.iana.org/rdap/dns.json', { headers: { 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(15000) })
+    .then(async (r) => (r.ok ? ((await r.json()) as { services: [string[], string[]][] }).services : null))
+    .catch(() => null);
+  return bootstrap;
+}
+
+/** The registry's own RDAP base URL for a domain, or null when its TLD has no RDAP service. */
+export async function rdapBase(domain: string, fetchImpl: typeof fetch = fetch): Promise<string | null | undefined> {
+  const services = await rdapBootstrap(fetchImpl);
+  if (!services) return undefined; // directory unreachable: caller falls back
+  const tld = domain.split('.').at(-1)!;
+  const hit = services.find(([tlds]) => tlds.includes(tld));
+  const url = hit?.[1].find((u) => u.startsWith('https://')) ?? hit?.[1][0];
+  return url ? url.replace(/\/?$/, '/') : null;
+}
+
+/** Domain registration expiry from RDAP (the successor to WHOIS), asked of the registry directly. Some country domains have no RDAP service. */
 export async function domainExpiry(hostname: string, fetchImpl: typeof fetch = fetch): Promise<DomainInfo> {
   const domain = registrableDomain(hostname);
   if (domain.endsWith('.myshopify.com') || domain === 'myshopify.com') return { domain, expiresAt: null, registrar: 'Shopify' };
   try {
-    const res = await fetchImpl(`https://rdap.org/domain/${domain}`, {
-      headers: { accept: 'application/rdap+json, application/json' },
+    const base = await rdapBase(domain, fetchImpl);
+    if (base === null) return { domain, error: 'no RDAP service for this domain ending' };
+    const res = await fetchImpl(`${base ?? 'https://rdap.org/'}domain/${domain}`, {
+      headers: RDAP_HEADERS,
       redirect: 'follow',
       signal: AbortSignal.timeout(15000),
     });
