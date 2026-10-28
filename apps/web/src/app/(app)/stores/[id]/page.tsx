@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { supabaseServer } from '@/lib/supabase';
 import { healthLabel, host, hours, LIMITED_REASONS, monthStartLabel, when } from '@/lib/format';
 import { monthStart } from '@/lib/data';
+import { SubmitButton } from '@/components/submit-button';
 
 type Search = { filter?: string; welcome?: string };
 
@@ -158,7 +159,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
                 <input type="hidden" name="store" value={store.id} />
                 <span className="small muted">Off. Turn it on once the client agrees to a daily test visit to their checkout.</span>
                 <label className="check"><input type="checkbox" required /> We look after this store and the client agrees.</label>
-                <button className="btn secondary" type="submit" style={{ alignSelf: 'flex-start' }}>Turn on checkout test</button>
+                <SubmitButton secondary pendingText="Turning on…" style={{ alignSelf: 'flex-start' }}>Turn on checkout test</SubmitButton>
               </form>
             ) : (
               <>

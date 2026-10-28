@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
+import { SubmitButton } from '@/components/submit-button';
 import { addStore, checkStore, type StoreCheck } from '../actions';
 
 const LIMITED: Record<string, string> = {
@@ -22,8 +23,11 @@ export function AddStoreForm({ error }: { error?: string }) {
             <label htmlFor="url">Store URL</label>
             <input id="url" name="url" type="text" placeholder="clientstore.com" required className="mono" defaultValue={check?.url.replace(/^https:\/\//, '')} />
           </div>
-          <button className="btn" type="submit" disabled={checking}>{checking ? 'Checking…' : 'Check store'}</button>
+          <SubmitButton pending={checking} pendingText="Checking store…">Check store</SubmitButton>
         </div>
+        {checking && (
+          <div className="small muted" role="status">Reading the storefront: theme, products and apps. This takes a few seconds.</div>
+        )}
         {check && !check.ok && <div className="error">{check.message}</div>}
         {check?.ok && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
@@ -69,7 +73,7 @@ export function AddStoreForm({ error }: { error?: string }) {
           {error && <div className="error">{error}</div>}
           <div className="row">
             <span className="small muted">StoreCare only reads the public storefront. No app to install.</span>
-            <button className="btn" type="submit">Add store</button>
+            <SubmitButton pendingText="Adding store…">Add store</SubmitButton>
           </div>
         </form>
       )}

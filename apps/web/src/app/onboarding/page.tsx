@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/submit-button';
 import { createWorkspace } from './actions';
 import { OnboardingTop } from './steps';
 
@@ -33,7 +34,7 @@ export default async function Step1({ searchParams }: { searchParams: Promise<{ 
           {error && <div className="error">{error === 'name' ? 'Enter your agency name.' : error}</div>}
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
             <span className="small muted">14-day free trial · no card needed</span>
-            <button className="btn" type="submit">Continue</button>
+            <SubmitButton pendingText="Creating workspace…">Continue</SubmitButton>
           </div>
         </form>
       </section>

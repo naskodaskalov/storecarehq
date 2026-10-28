@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase';
+import { SubmitButton } from '@/components/submit-button';
 
 async function sendLink(formData: FormData) {
   'use server';
@@ -31,7 +32,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
               <input id="email" name="email" type="email" required autoComplete="email" />
             </div>
             {error && <div className="error">{error === 'email' ? 'Enter your email.' : error}</div>}
-            <button className="btn" type="submit">Email me a sign-in link</button>
+            <SubmitButton pendingText="Sending link…">Email me a sign-in link</SubmitButton>
           </form>
         )}
         <p className="small muted">New here? The same link creates your account. 14-day free trial, no card needed.</p>

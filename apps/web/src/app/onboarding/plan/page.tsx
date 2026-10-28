@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase';
 import { host } from '@/lib/format';
+import { SubmitButton } from '@/components/submit-button';
 import { savePlan } from '../actions';
 import { OnboardingTop } from '../steps';
 
@@ -69,7 +70,7 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
 
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
             <span className="small muted">First checks start within 5 minutes.</span>
-            <button className="btn" type="submit">Finish</button>
+            <SubmitButton pendingText="Saving…">Finish</SubmitButton>
           </div>
         </form>
       </section>

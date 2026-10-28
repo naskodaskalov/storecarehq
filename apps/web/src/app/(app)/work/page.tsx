@@ -4,6 +4,7 @@ import { workEntryExplains } from '@storecare/storefront';
 import { requireAgency, monthStart } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { hours } from '@/lib/format';
+import { SubmitButton } from '@/components/submit-button';
 
 async function logWork(formData: FormData) {
   'use server';
@@ -105,7 +106,7 @@ export default async function Work({ searchParams }: { searchParams: Promise<{ s
             </div>
             <div className="row">
               <label className="check" style={{ alignItems: 'center' }}><input type="checkbox" name="counts" defaultChecked style={{ marginTop: 0 }} /> Counts toward the care plan</label>
-              <button className="btn" type="submit">Save entry</button>
+              <SubmitButton pendingText="Saving…">Save entry</SubmitButton>
             </div>
             {saved && <div className="small tone-good">Saved. Matching detected changes were linked to it.</div>}
             {error && <div className="error">Add a description and the time spent.</div>}
