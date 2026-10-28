@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { NavLinks } from './nav-links';
+import { isDemo } from '@/lib/demo';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { agency } = await requireAgency();
@@ -20,7 +21,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </nav>
-      <main className="main">{children}</main>
+      <main className="main">
+        {isDemo() && (
+          <div className="small" style={{ background: 'var(--accent-soft)', borderRadius: 8, padding: '8px 14px' }}>
+            <strong>Demo</strong> · Sample agency with made-up stores. Changes you make reset when the server restarts.
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }
