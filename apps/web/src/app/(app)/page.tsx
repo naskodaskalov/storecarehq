@@ -2,9 +2,15 @@ import Link from 'next/link';
 import { dashboard, requireAgency } from '@/lib/data';
 import { healthLabel, host, hours, when } from '@/lib/format';
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
+  const { deleted } = await searchParams;
   const { agency } = await requireAgency();
   const d = await dashboard(agency.id);
+  const deletedNotice = deleted ? (
+    <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>
+      {deleted} was deleted.
+    </div>
+  ) : null;
 
   const minutesByStore = new Map<string, number>();
   for (const w of d.work) if (w.counts_to_plan) minutesByStore.set(w.store_id, (minutesByStore.get(w.store_id) ?? 0) + w.minutes);
@@ -25,9 +31,10 @@ export default async function Dashboard() {
     return (
       <>
         <h1>Client stores</h1>
+        {deletedNotice}
         <section className="card">
           <h2>Add your first store</h2>
-          <p className="muted" style={{ margin: 0 }}>Paste a client&apos;s store address and StoreCare starts watching it within 5 minutes.</p>
+          <p className="muted" style={{ margin: 0 }}>Paste a client&apos;s store address and StoreCare starts watching it within 30 minutes.</p>
           <Link className="btn" href="/onboarding/store" style={{ alignSelf: 'flex-start' }}>Add store</Link>
         </section>
       </>
@@ -43,6 +50,7 @@ export default async function Dashboard() {
         </div>
         <Link className="btn" href="/onboarding/store">Add store</Link>
       </div>
+      {deletedNotice}
 
       <div className="kpis">
         <div className="kpi">
@@ -102,7 +110,7 @@ export default async function Dashboard() {
                   <tr key={s.id}>
                     <td>
                       <Link href={`/stores/${s.id}`} style={{ color: 'var(--text)', fontWeight: 600, textDecoration: 'none' }}>{s.name}</Link>
-                      <div className="small muted">{host(s.public_url)}{s.status === 'limited' ? ' · limited monitoring' : ''}</div>
+                      <div className="small muted">{host(s.public_url)}{s.status === 'limited' ? ' · limited monitoring' : s.status === 'paused' ? ' · paused' : ''}</div>
                     </td>
                     <td className={`mono tone-${h.tone}`}>{s.health_score === null && s.status === 'limited' ? '—' : h.text}</td>
                     <td className={co?.result === 'fail' ? 'warn' : ''} style={{ fontWeight: co?.result === 'fail' ? 600 : 400 }}>

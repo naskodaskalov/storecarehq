@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
@@ -18,7 +18,9 @@ export async function freshDb(): Promise<{ pool: pg.Pool; drop: () => Promise<vo
   u.pathname = `/${name}`;
   const pool = new pg.Pool({ connectionString: u.toString(), max: 3 });
   await pool.query(readFileSync(`${root}supabase/tests/supabase-stub.sql`, 'utf8'));
-  await pool.query(readFileSync(`${root}supabase/migrations/20261027000001_init.sql`, 'utf8'));
+  for (const f of readdirSync(`${root}supabase/migrations`).filter((f) => f.endsWith('.sql')).sort()) {
+    await pool.query(readFileSync(`${root}supabase/migrations/${f}`, 'utf8'));
+  }
   return {
     pool,
     drop: async () => {

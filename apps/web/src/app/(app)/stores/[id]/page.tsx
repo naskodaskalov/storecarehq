@@ -66,7 +66,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
       <Link href="/" style={{ fontSize: 14, textDecoration: 'none' }}>← All stores</Link>
       {welcome && (
         <div className="notice">
-          <strong>{store.name} is being set up.</strong> The first storefront snapshot, uptime check and speed sample arrive within a few minutes.
+          <strong>{store.name} is being set up.</strong> The first storefront snapshot, uptime check and speed sample arrive within 30 minutes.
           Changes appear from the second snapshot onwards.
         </div>
       )}
@@ -77,9 +77,17 @@ export default async function StorePage({ params, searchParams }: { params: Prom
             {host(store.public_url)}{plan ? ` · ${plan.name} · ${plan.hours_included} h/month` : ''}{store.client_contact_name ? ` · contact: ${store.client_contact_name}` : ''}
           </div>
         </div>
-        <Link className="btn secondary" href={`/work?store=${store.id}`}>Log time</Link>
+        <div className="row" style={{ gap: 10 }}>
+          <Link className="btn secondary" href={`/stores/${store.id}/settings`}>Settings</Link>
+          <Link className="btn secondary" href={`/work?store=${store.id}`}>Log time</Link>
+        </div>
       </div>
 
+      {store.status === 'paused' && (
+        <div className="notice">
+          <strong>Monitoring is paused.</strong> No checks run for this store. <Link href={`/stores/${store.id}/settings`}>Resume in settings</Link>
+        </div>
+      )}
       {store.status === 'limited' && store.limited_reason && (
         <div className="notice"><strong>Limited monitoring.</strong> {LIMITED_REASONS[store.limited_reason] ?? store.limited_reason}</div>
       )}
@@ -93,7 +101,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
         <div className="kpi">
           <div className="small muted">Uptime, 30 days</div>
           <div className="value">{uptimePct === null ? '—' : `${uptimePct.toFixed(2)}%`}</div>
-          <div className="small muted">Checked every 5 min</div>
+          <div className="small muted">Checked every 30 min</div>
         </div>
         <div className="kpi">
           <div className="small muted">Mobile LCP (home)</div>

@@ -69,7 +69,7 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
           </div>
 
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
-            <span className="small muted">First checks start within 5 minutes.</span>
+            <span className="small muted">First checks start within 30 minutes.</span>
             <SubmitButton pendingText="Saving…">Finish</SubmitButton>
           </div>
         </form>

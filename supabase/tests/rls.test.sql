@@ -48,5 +48,28 @@ do $$ begin
   end;
 end $$;
 
+-- Changing a store's address clears its snapshots (written by the worker) via the trigger.
 reset role;
+insert into public.storefront_snapshots (store_id, agency_id, feed_status)
+  select id, agency_id, 'ok' from public.stores where public_url = 'https://juniperandash.com';
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+update public.stores set public_url = 'https://new-juniper.com' where public_url = 'https://juniperandash.com';
+reset role;
+do $$ begin
+  if (select count(*) from public.storefront_snapshots) <> 0 then raise exception 'url change should clear snapshots'; end if;
+end $$;
+
+-- A member can delete their own store; its monitoring rows go with it.
+insert into public.uptime_checks (store_id, agency_id, ok)
+  select id, agency_id, true from public.stores where public_url = 'https://new-juniper.com';
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+delete from public.stores where public_url = 'https://new-juniper.com';
+reset role;
+do $$ begin
+  if (select count(*) from public.stores where public_url = 'https://new-juniper.com') <> 0 then raise exception 'store not deleted'; end if;
+  if (select count(*) from public.uptime_checks) <> 0 then raise exception 'monitoring rows not deleted with store'; end if;
+end $$;
+
 select 'rls ok' as result;

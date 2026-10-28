@@ -194,7 +194,7 @@ class Query implements PromiseLike<Result> {
   private embeds: string[] = [];
   private countOnly = false;
   private wantCount = false;
-  private op: 'select' | 'insert' | 'update' = 'select';
+  private op: 'select' | 'insert' | 'update' | 'delete' = 'select';
   private payload: Row | Row[] | null = null;
 
   constructor(private table: string) {}
@@ -213,6 +213,10 @@ class Query implements PromiseLike<Result> {
   update(values: Row) {
     this.op = 'update';
     this.payload = values;
+    return this;
+  }
+  delete() {
+    this.op = 'delete';
     return this;
   }
   eq(c: string, v: unknown) { this.filters.push((r) => r[c] === v); return this; }
@@ -239,7 +243,26 @@ class Query implements PromiseLike<Result> {
     }
     let out = rows.filter((r) => this.filters.every((f) => f(r)));
     if (this.op === 'update') {
+      // Same reset as the stores_url_change trigger.
+      if (this.table === 'stores' && this.payload && 'public_url' in this.payload) {
+        for (const r of out) {
+          if (r.public_url !== (this.payload as Row).public_url) {
+            t.storefront_snapshots = t.storefront_snapshots.filter((s) => s.store_id !== r.id);
+            Object.assign(r, { limited_reason: null, blocked_streak: 0, health_score: null, status: r.status === 'paused' ? 'paused' : 'active' });
+          }
+        }
+      }
       for (const r of out) Object.assign(r, this.payload);
+      return { data: out, error: null };
+    }
+    if (this.op === 'delete') {
+      const gone = new Set(out);
+      t[this.table] = rows.filter((r) => !gone.has(r));
+      // Cascade like the foreign keys do.
+      if (this.table === 'stores') {
+        const ids = new Set(out.map((r) => r.id));
+        for (const name of Object.keys(t)) if (name !== 'stores') t[name] = t[name].filter((r) => !ids.has(r.store_id));
+      }
       return { data: out, error: null };
     }
     for (const [c, asc] of [...this.sorts].reverse()) {
