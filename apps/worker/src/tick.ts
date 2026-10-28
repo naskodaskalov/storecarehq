@@ -38,7 +38,9 @@ async function runStore(db: Db, store: StoreRow, dryRun: boolean): Promise<strin
       results.push(`${job} ok ${Date.now() - started}ms`);
     } catch (e) {
       // One failing job must not stop the others or the other stores.
-      results.push(`${job} FAILED: ${e instanceof Error ? e.message : String(e)}`);
+      const msg = (e instanceof Error ? e.message : String(e)).split('\n')[0].slice(0, 200);
+      // Speed data is nice to have; a Google quota or timeout should not mark the whole run failed.
+      results.push(job === 'speed' ? `speed skipped (${msg})` : `${job} FAILED: ${msg}`);
     }
   }
   return `${store.name}: ${results.join(' · ')}`;
@@ -59,6 +61,9 @@ try {
   );
   if (!dryRun) await pool.query('select public.prune_monitoring()');
   for (const l of lines.sort()) console.log(l);
+  if (!dryRun && !process.env.PAGESPEED_API_KEY) {
+    console.log('::warning::PAGESPEED_API_KEY is not set, so speed checks use Google\'s shared quota and usually fail.');
+  }
   console.log(`${stores.length} stores in ${Math.round((Date.now() - started) / 1000)}s`);
   if (lines.some((l) => l.includes('FAILED'))) process.exitCode = 1;
 } finally {
