@@ -14,15 +14,16 @@ async function sendLink(formData: FormData) {
   redirect(error ? `/login?error=${encodeURIComponent(error.message)}` : `/login?sent=${encodeURIComponent(email)}`);
 }
 
-export default async function Login({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
-  const { sent, error } = await searchParams;
+export default async function Login({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string; trial?: string }> }) {
+  const { sent, error, trial } = await searchParams;
   return (
     <div className="onb">
       <div className="onb-top">
-        <div className="brand"><div className="mark">SC</div>StoreCare HQ</div>
+        <a href="/" className="brand" style={{ color: 'inherit', textDecoration: 'none' }}><div className="mark">SC</div>StoreCare HQ</a>
       </div>
       <section className="onb-card" style={{ maxWidth: 480 }}>
-        <h1 style={{ fontSize: 28 }}>Sign in</h1>
+        <h1 style={{ fontSize: 28 }}>{trial ? 'Start your free trial' : 'Sign in'}</h1>
+        {trial && !sent && <p className="muted" style={{ margin: 0 }}>Enter your work email and we&apos;ll send a link that creates your account. 14 days free, no card.</p>}
         {sent ? (
           <p>We sent a sign-in link to <strong>{sent}</strong>. Open it on this device.</p>
         ) : (
@@ -35,7 +36,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
             <SubmitButton pendingText="Sending link…">Email me a sign-in link</SubmitButton>
           </form>
         )}
-        <p className="small muted">New here? The same link creates your account. 14-day free trial, no card needed.</p>
+        {!trial && <p className="small muted">New here? The same link creates your account. 14-day free trial, no card needed.</p>}
       </section>
     </div>
   );
