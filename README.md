@@ -58,8 +58,12 @@ Good for reviewing the UI and for showing the product to agencies.
 ## Deploy
 
 - **Web:** Vercel, root `apps/web`, same env vars as `.env.example`.
-- **Worker:** any container host (Fly.io, Railway): `docker build -f apps/worker/Dockerfile .`, one instance,
-  env vars from `apps/worker/.env.example`.
+- **Worker (current): GitHub Actions.** `.github/workflows/monitor.yml` runs `apps/worker/src/tick.ts` every
+  30 minutes: uptime each run, a storefront snapshot about hourly, checkout test and speed once a day after 06:00
+  store time. Needs repository secrets `DATABASE_URL` (required) and `PAGESPEED_API_KEY`, optionally
+  `DATABASE_CA_CERT` and `RESEND_API_KEY`. Run it by hand from the Actions tab ("Monitor stores" → Run workflow).
+- **Worker (later, always-on):** any container host: `docker build -f apps/worker/Dockerfile .`, one instance,
+  runs `src/index.ts` with pg-boss for 5-minute uptime checks. Env vars from `apps/worker/.env.example`.
 
 ## Rules the code follows
 
