@@ -1,7 +1,8 @@
--- Billing: 7-day free trial without a card, then a Stripe subscription.
--- Plans differ only by store count: Solo 5, Agency 20, Pro 50. The trial allows 20.
+-- Billing: new agencies pick a plan and add a card in Stripe Checkout at sign-up; Stripe gives 7 free days
+-- (subscription status 'trialing') and charges after. Plans differ only by store count: Solo 5, Agency 20,
+-- Pro 50. trial_ends_at now only covers agencies created before card-first sign-up (a card-free trial, 20 stores).
 
-alter table public.agencies alter column trial_ends_at set default now() + interval '7 days';
+alter table public.agencies alter column trial_ends_at drop default;
 
 alter table public.agencies
   add column if not exists stripe_customer_id text unique,
@@ -23,7 +24,7 @@ as $$
   select case p_plan when 'solo' then 5 when 'agency' then 20 when 'pro' then 50 else 20 end;
 $$;
 
--- Paying (a past_due card gets Stripe's retry window) or still inside the free trial.
+-- Subscribed (including Stripe's free trial; a past_due card gets Stripe's retry window) or inside an older card-free trial.
 create or replace function public.agency_has_access(a public.agencies)
 returns boolean
 language sql
@@ -48,7 +49,7 @@ begin
   select * into a from public.agencies where id = new.agency_id;
   if a.id is null then return new; end if; -- the foreign key reports this
   if not public.agency_has_access(a) then
-    raise exception 'Your free trial has ended. Choose a plan to add stores.' using errcode = 'P0001', hint = 'billing';
+    raise exception 'Choose a plan to add stores. New plans start with 7 days free.' using errcode = 'P0001', hint = 'billing';
   end if;
   paying := coalesce(a.subscription_status in ('active', 'trialing', 'past_due'), false);
   lim := public.plan_store_limit(case when paying then a.plan else 'trial' end);

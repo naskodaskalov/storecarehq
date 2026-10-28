@@ -33,9 +33,11 @@ export type BillingFields = {
 const PAYING = ['active', 'trialing', 'past_due'];
 
 export type BillingState = {
-  paying: boolean;
-  plan: PlanKey | null; // the paid plan, when paying
-  onTrial: boolean;
+  paying: boolean; // has a live Stripe subscription, including its free trial
+  plan: PlanKey | null; // the chosen plan, when paying
+  onTrial: boolean; // Stripe trial (card on file) or an older card-free trial
+  cardOnFile: boolean; // the trial is Stripe's: the first payment happens by itself when it ends
+  trialEndsAt: string | null;
   trialDaysLeft: number; // whole days, rounded up; 0 when ended
   hasAccess: boolean;
   storeLimit: number;
@@ -47,14 +49,18 @@ export type BillingState = {
 export function billingState(a: BillingFields, now = new Date()): BillingState {
   const paying = PAYING.includes(a.subscription_status ?? '');
   const plan = paying && isPlanKey(a.plan) ? a.plan : null;
-  const trialMs = a.trial_ends_at ? Date.parse(a.trial_ends_at) - now.getTime() : -1;
-  const onTrial = !paying && trialMs > 0;
+  const stripeTrial = a.subscription_status === 'trialing';
+  const trialEndsAt = stripeTrial ? a.current_period_end : !paying ? a.trial_ends_at : null;
+  const trialMs = trialEndsAt ? Date.parse(trialEndsAt) - now.getTime() : -1;
+  const onTrial = trialMs > 0 && (stripeTrial || !paying);
   return {
     paying,
     plan,
     onTrial,
-    trialDaysLeft: trialMs > 0 ? Math.ceil(trialMs / 864e5) : 0,
-    hasAccess: paying || trialMs > 0,
+    cardOnFile: stripeTrial,
+    trialEndsAt: onTrial ? trialEndsAt : null,
+    trialDaysLeft: onTrial ? Math.ceil(trialMs / 864e5) : 0,
+    hasAccess: paying || (a.trial_ends_at ? Date.parse(a.trial_ends_at) > now.getTime() : false),
     storeLimit: plan ? PLANS[plan].stores : TRIAL_STORE_LIMIT,
     pastDue: a.subscription_status === 'past_due',
     endsAt: paying && a.cancel_at_period_end ? a.current_period_end : null,
@@ -87,12 +93,24 @@ export function agencyUpdateFromSubscription(sub: SubscriptionLike) {
   };
 }
 
-/** When subscribing during the trial, Stripe's first charge waits for the trial's end, if that is
- *  far enough ahead (Stripe needs a trial_end at least 48 hours away). Unix seconds, or null to charge now. */
+/** For agencies from before card-first sign-up, still inside their card-free trial: Stripe's first charge
+ *  waits for that trial's end, if far enough ahead (Stripe needs a trial_end at least 48 hours away). */
 export function chargeFrom(a: Pick<BillingFields, 'trial_ends_at'>, now = new Date()): number | null {
   if (!a.trial_ends_at) return null;
   const end = Date.parse(a.trial_ends_at);
   return end - now.getTime() > 49 * 3600e3 ? Math.floor(end / 1000) : null;
+}
+
+/** The free days Checkout should give: 7 for an agency's first subscription (card taken now, charged after),
+ *  the rest of an older card-free trial, or none for an agency that has subscribed before. */
+export function checkoutTrial(
+  a: Pick<BillingFields, 'trial_ends_at' | 'stripe_subscription_id'>,
+  now = new Date(),
+): { trial_period_days: number } | { trial_end: number } | Record<string, never> {
+  const legacy = chargeFrom(a, now);
+  if (legacy) return { trial_end: legacy };
+  if (!a.stripe_subscription_id && !a.trial_ends_at) return { trial_period_days: TRIAL_DAYS };
+  return {};
 }
 
 export const formatUsd = (n: number) => `$${n}`;

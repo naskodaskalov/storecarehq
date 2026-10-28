@@ -210,18 +210,24 @@ function seed(): Tables {
   };
 }
 
-/** STORECARE_DEMO_BILLING=trial (default) | ending | expired | paying, to see each billing state. */
+/** STORECARE_DEMO_BILLING=trialing (default: Stripe trial, card on file) | new (no plan yet) | legacy (old
+ *  card-free trial) | ending (its last day) | expired | paying, to see each billing state. */
 function demoBilling() {
-  const none = { stripe_customer_id: null, stripe_subscription_id: null, current_period_end: null, cancel_at_period_end: false, subscription_status: null };
+  const none = { stripe_customer_id: null, stripe_subscription_id: null, current_period_end: null, cancel_at_period_end: false, subscription_status: null, trial_ends_at: null };
+  const sub = { stripe_customer_id: 'cus_demo', stripe_subscription_id: 'sub_demo' };
   switch (process.env.STORECARE_DEMO_BILLING) {
+    case 'new':
+      return { ...none, plan: 'trial', stores_band: '6–15' };
+    case 'legacy':
+      return { ...none, plan: 'trial', trial_ends_at: iso(-4.5 * DAY) };
     case 'ending':
       return { ...none, plan: 'trial', trial_ends_at: iso(-0.6 * DAY) };
     case 'expired':
-      return { ...none, plan: 'trial', trial_ends_at: iso(2 * DAY) };
+      return { ...none, ...sub, plan: 'trial', subscription_status: 'canceled', current_period_end: iso(2 * DAY) };
     case 'paying':
-      return { ...none, plan: 'agency', trial_ends_at: iso(34 * DAY), subscription_status: 'active', stripe_customer_id: 'cus_demo', stripe_subscription_id: 'sub_demo', current_period_end: iso(-12 * DAY) };
+      return { ...none, ...sub, plan: 'agency', subscription_status: 'active', current_period_end: iso(-12 * DAY) };
     default:
-      return { ...none, plan: 'trial', trial_ends_at: iso(-4.5 * DAY) };
+      return { ...none, ...sub, plan: 'agency', subscription_status: 'trialing', current_period_end: iso(-4.5 * DAY) };
   }
 }
 

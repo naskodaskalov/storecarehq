@@ -34,7 +34,7 @@ export async function freshDb(): Promise<{ pool: pg.Pool; drop: () => Promise<vo
 }
 
 export async function seedStore(pool: pg.Pool, over: Record<string, unknown> = {}) {
-  const { rows: [agency] } = await pool.query<{ id: string }>(`insert into public.agencies (name) values ('Northline Studio') returning id`);
+  const { rows: [agency] } = await pool.query<{ id: string }>(`insert into public.agencies (name, plan, subscription_status) values ('Northline Studio', 'agency', 'active') returning id`);
   const cols = { agency_id: agency.id, name: 'Juniper & Ash', public_url: 'https://juniperandash.com', ...over };
   const keys = Object.keys(cols);
   const { rows: [store] } = await pool.query(

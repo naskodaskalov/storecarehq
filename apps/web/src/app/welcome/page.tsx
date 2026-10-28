@@ -9,7 +9,7 @@ import './landing.css';
 export const metadata: Metadata = {
   title: 'StoreCare HQ: monitoring and monthly reports for Shopify care plans',
   description:
-    'StoreCare HQ watches your clients’ Shopify stores every day (uptime, checkout, speed, apps and theme changes) and drafts the monthly report you send them. No store access needed. 7-day free trial.',
+    'StoreCare HQ watches your clients’ Shopify stores every day (uptime, checkout, speed, apps and theme changes) and drafts the monthly report you send them. No store access needed. 7 days free.',
 };
 
 const PLANS = [
@@ -47,8 +47,12 @@ const FAQ = [
     a: 'Yes. Clients see your agency’s name at the top of the report. StoreCare HQ appears only as a small line in the footer.',
   },
   {
+    q: 'Do I need a card for the free trial?',
+    a: 'Yes. You pick a plan and add a card when you sign up, and nothing is charged for 7 days. Card details are handled by Stripe.',
+  },
+  {
     q: 'What happens when the trial ends?',
-    a: 'Monitoring pauses until you pick a plan, and nothing you set up is lost. The trial covers up to 20 stores. Every plan has every feature; plans differ only by how many stores you can add.',
+    a: 'Your plan starts and your card is charged for the first month. If you cancel during the 7 days, you pay nothing and monitoring stops when the trial ends. You can switch plans any time.',
   },
 ];
 
@@ -111,7 +115,7 @@ export default function Landing() {
             </p>
             <div className="lp-cta">
               <Link href="/login?trial=1" className="btn lp-btn-big">Start free trial</Link>
-              <span className="lp-cta-note">7 days free. No card. No Shopify access needed.</span>
+              <span className="lp-cta-note">7 days free, then from $29 a month. No Shopify access needed.</span>
             </div>
           </div>
           <figure className="lp-hero-report">
@@ -193,7 +197,7 @@ export default function Landing() {
               </div>
             ))}
           </div>
-          <p className="lp-fine">Prices in US dollars, excluding VAT. Start with a 7-day free trial; no card needed.</p>
+          <p className="lp-fine">Prices in US dollars, excluding VAT. Every plan starts with 7 days free: you add a card when you sign up and aren’t charged until the trial ends. Cancel before then and you pay nothing.</p>
         </section>
 
         <section className="lp-faq" aria-labelledby="faq-title">

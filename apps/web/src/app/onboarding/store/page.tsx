@@ -1,12 +1,17 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { billingState } from '@/lib/billing';
+import { requireAgency } from '@/lib/data';
 import { OnboardingTop } from '../steps';
 import { AddStoreForm } from './add-store-form';
 
 export default async function Step2({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
+  const { agency } = await requireAgency();
+  if (!billingState(agency).hasAccess) redirect('/onboarding/trial');
   return (
     <div className="onb">
-      <OnboardingTop step={2} />
+      <OnboardingTop step={3} />
       <section className="onb-card">
         <div>
           <h1 style={{ fontSize: 30 }}>Add your first client store</h1>

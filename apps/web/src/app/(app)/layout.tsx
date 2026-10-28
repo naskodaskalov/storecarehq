@@ -16,8 +16,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const path = (await headers()).get('x-pathname') ?? '';
   const onBilling = path.startsWith('/billing');
   // Trial over and no plan: everything but billing waits until they choose one. Data is kept.
-  if (!billing.hasAccess && !onBilling) redirect('/billing');
-  const planLabel = billing.plan ? `${PLANS[billing.plan].name} plan` : billing.onTrial ? 'Free trial' : 'No plan';
+  // A new agency that never finished checkout goes back to the sign-up trial step.
+  if (!billing.hasAccess && !onBilling) redirect(agency.stripe_subscription_id || agency.trial_ends_at ? '/billing' : '/onboarding/trial');
+  const planLabel = billing.plan ? `${PLANS[billing.plan].name} plan${billing.cardOnFile ? ', trial' : ''}` : billing.onTrial ? 'Free trial' : 'No plan';
 
   return (
     <div className="shell">
@@ -37,7 +38,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <strong>Demo</strong> · Sample agency with made-up stores. Changes you make reset when the server restarts.
           </div>
         )}
-        {!onBilling && billing.onTrial && (
+        {!onBilling && billing.onTrial && billing.cardOnFile && billing.plan && (
+          <div className="trial-bar" role="status">
+            <span>
+              Free trial: <strong>{billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? '' : 's'} left</strong>. Your {PLANS[billing.plan].name} plan
+              {billing.endsAt ? ' is cancelled and ends with the trial.' : ` starts on ${new Date(billing.trialEndsAt!).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} at $${PLANS[billing.plan].usd} a month.`}
+            </span>
+            <Link href="/billing">Manage plan</Link>
+          </div>
+        )}
+        {!onBilling && billing.onTrial && !billing.cardOnFile && (
           <div className={`trial-bar${billing.trialDaysLeft <= 2 ? ' warn-bar' : ''}`} role="status">
             <span>
               Free trial: <strong>{billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? '' : 's'} left</strong>. Choose a plan to keep monitoring after that.

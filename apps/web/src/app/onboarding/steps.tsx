@@ -1,6 +1,6 @@
-const STEPS = ['Workspace', 'Store', 'Care plan'];
+const STEPS = ['Workspace', 'Free trial', 'Store', 'Care plan'];
 
-export function OnboardingTop({ step }: { step: 1 | 2 | 3 }) {
+export function OnboardingTop({ step }: { step: 1 | 2 | 3 | 4 }) {
   return (
     <div className="onb-top row">
       <div className="brand"><div className="mark">SC</div>StoreCare HQ</div>

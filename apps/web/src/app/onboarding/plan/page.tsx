@@ -18,7 +18,7 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <div className="onb">
-      <OnboardingTop step={3} />
+      <OnboardingTop step={4} />
       <section className="onb-card">
         <div>
           <span className="chip" style={{ color: 'var(--accent)', background: 'var(--accent-soft)', borderColor: 'transparent', fontWeight: 600 }}>

@@ -10,7 +10,7 @@ export async function createWorkspace(formData: FormData) {
   const supabase = await supabaseServer();
   const { error } = await supabase.rpc('create_agency', { agency_name: name, band: String(formData.get('band') ?? '') || null });
   if (error) redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
-  redirect('/onboarding/store');
+  redirect('/onboarding/trial');
 }
 
 export type StoreCheck =

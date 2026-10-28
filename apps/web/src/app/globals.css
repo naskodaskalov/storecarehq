@@ -178,3 +178,6 @@ th:first-child, td:first-child { padding-left: 0; }
 .btn:disabled:not([aria-busy='true']) { cursor: not-allowed; }
 .trial-bar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; border-radius: 10px; padding: 10px 16px; background: var(--accent-soft); font-size: 14px; }
 .trial-bar.warn-bar { background: var(--warn-bg); border: 1px solid var(--warn-border); }
+.plan-tag { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px; vertical-align: middle; }
+.onb-card .plans { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.plan-tag { white-space: nowrap; }

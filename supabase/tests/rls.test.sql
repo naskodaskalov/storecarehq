@@ -10,11 +10,16 @@ set role authenticated;
 -- User A creates an agency and a store.
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 select public.create_agency('Northline Studio', '6–15') as agency_a \gset
+-- (Stripe would set this after checkout; new agencies cannot add stores before.)
+reset role;
+update public.agencies set plan = 'agency', subscription_status = 'trialing' where id = :'agency_a';
+set role authenticated;
 insert into public.stores (agency_id, name, public_url) values (:'agency_a', 'Juniper & Ash', 'https://juniperandash.com');
 
 -- User B creates their own agency.
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 select public.create_agency('Other Agency') as agency_b \gset
+-- B's first store is added further down, after checking a new agency has no access.
 
 do $$ begin
   if (select count(*) from public.stores) <> 0 then raise exception 'B can see A''s stores'; end if;
@@ -31,7 +36,14 @@ do $$ begin
   exception when insufficient_privilege then null;
   end;
 end $$;
+reset role;
+update public.agencies set trial_ends_at = now() + interval '7 days' where id = :'agency_b'; -- older card-free trial
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 insert into public.stores (agency_id, name, public_url) values (:'agency_b', 'Own', 'https://own.com');
+reset role;
+update public.agencies set trial_ends_at = null where id = :'agency_b';
+set role authenticated;
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 do $$ begin
@@ -132,12 +144,15 @@ do $$ begin
   end;
 end $$;
 
--- New agencies get 7 days.
+-- New agencies have no access until they start a plan (card-first trial in Stripe).
 reset role;
 do $$ begin
-  if (select trial_ends_at from public.agencies where name = 'Other Agency') not between now() + interval '6 days 23 hours' and now() + interval '7 days 1 minute' then
-    raise exception 'trial should be 7 days';
-  end if;
+  if (select public.agency_has_access(a) from public.agencies a where name = 'Other Agency') then raise exception 'new agency should need a plan'; end if;
+end $$;
+-- Stripe's trial counts as subscribed.
+update public.agencies set plan = 'solo', subscription_status = 'trialing' where name = 'Other Agency';
+do $$ begin
+  if not (select public.agency_has_access(a) from public.agencies a where name = 'Other Agency') then raise exception 'trialing should have access'; end if;
 end $$;
 
 -- Store limits: trial 20, Solo 5; none after the trial ends without a plan.
@@ -161,7 +176,7 @@ do $$ begin
     insert into public.stores (agency_id, name, public_url) select id, 'Late', 'https://late.com' from public.agencies where name = 'Other Agency';
     raise exception 'expired trial could add a store';
   exception when raise_exception then
-    if sqlerrm not like 'Your free trial has ended%' then raise; end if;
+    if sqlerrm not like 'Choose a plan to add stores%' then raise; end if;
   end;
 end $$;
 

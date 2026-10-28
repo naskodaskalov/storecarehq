@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { agencyUpdateFromSubscription, billingState, chargeFrom, planFromLookupKey, type BillingFields } from './billing.ts';
+import { agencyUpdateFromSubscription, billingState, chargeFrom, checkoutTrial, planFromLookupKey, type BillingFields } from './billing.ts';
 
 const now = new Date('2026-10-28T12:00:00Z');
 const base: BillingFields = {
@@ -62,4 +62,18 @@ test('subscribing mid-trial: first charge when the trial ends, unless that is un
   assert.equal(chargeFrom({ trial_ends_at: '2026-11-03T12:00:00Z' }, now), Date.parse('2026-11-03T12:00:00Z') / 1000);
   assert.equal(chargeFrom({ trial_ends_at: '2026-10-30T10:00:00Z' }, now), null);
   assert.equal(chargeFrom({ trial_ends_at: null }, now), null);
+});
+
+test('Stripe trial (card on file): on trial, paying, plan limits, days from the period end', () => {
+  const s = billingState({ ...base, plan: 'solo', subscription_status: 'trialing', trial_ends_at: null, current_period_end: '2026-11-04T12:00:00Z', stripe_subscription_id: 'sub_1' }, now);
+  assert.deepEqual([s.onTrial, s.cardOnFile, s.paying, s.hasAccess, s.trialDaysLeft, s.storeLimit, s.trialEndsAt], [true, true, true, true, 7, 5, '2026-11-04T12:00:00Z']);
+});
+
+test('new agency without a plan has no access; first checkout gets 7 days, a returning one none', () => {
+  const fresh = { ...base, trial_ends_at: null };
+  assert.equal(billingState(fresh, now).hasAccess, false);
+  assert.deepEqual(checkoutTrial(fresh, now), { trial_period_days: 7 });
+  assert.deepEqual(checkoutTrial({ ...fresh, stripe_subscription_id: 'sub_old' }, now), {});
+  assert.deepEqual(checkoutTrial({ ...fresh, trial_ends_at: '2026-11-10T00:00:00Z' }, now), { trial_end: Date.parse('2026-11-10T00:00:00Z') / 1000 });
+  assert.deepEqual(checkoutTrial({ ...fresh, trial_ends_at: '2026-10-20T00:00:00Z' }, now), {});
 });

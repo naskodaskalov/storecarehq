@@ -101,10 +101,10 @@ describe('monitoring follows billing (database)', { skip: !db && 'set TEST_DATAB
     const trial = await seedStore(d!.pool, { name: 'On trial' });
     const lapsed = await seedStore(d!.pool, { name: 'Lapsed', public_url: 'https://lapsed.com' });
     const paying = await seedStore(d!.pool, { name: 'Paying', public_url: 'https://paying.com' });
-    await d!.pool.query(`update public.agencies set trial_ends_at = now() - interval '1 day' where id in ($1, $2)`, [lapsed.agency_id, paying.agency_id]);
-    await d!.pool.query(`update public.agencies set plan = 'solo', subscription_status = 'active' where id = $1`, [paying.agency_id]);
+    await d!.pool.query(`update public.agencies set plan = 'trial', subscription_status = null, trial_ends_at = now() + interval '3 days' where id = $1`, [trial.agency_id]);
+    await d!.pool.query(`update public.agencies set plan = 'trial', subscription_status = 'canceled', trial_ends_at = now() - interval '1 day' where id = $1`, [lapsed.agency_id]);
+    await d!.pool.query(`update public.agencies set plan = 'solo', subscription_status = 'trialing' where id = $1`, [paying.agency_id]);
     const names = (await activeStores(d!.pool)).map((s) => s.name).sort();
     assert.deepEqual(names, ['On trial', 'Paying']);
-    void trial;
   });
 });

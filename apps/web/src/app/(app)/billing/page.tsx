@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { billingState, chargeFrom, PLAN_KEYS, PLANS, TRIAL_STORE_LIMIT } from '@/lib/billing';
+import { billingState, chargeFrom, checkoutTrial, PLAN_KEYS, PLANS, TRIAL_DAYS, TRIAL_STORE_LIMIT } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { confirmCheckout, stripeEnabled } from '@/lib/stripe';
@@ -22,6 +22,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
   const stores = count ?? 0;
   const s = billingState(agency);
   const connected = stripeEnabled();
+  const firstPlan = 'trial_period_days' in checkoutTrial(agency); // never subscribed: 7 days free with a card
 
   return (
     <>
@@ -69,9 +70,13 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
                 : ' Choose a plan to keep monitoring; the first payment is taken at checkout.'}
             </span>
           </p>
+        ) : firstPlan ? (
+          <p style={{ margin: 0, fontSize: 17 }}>
+            <strong>No plan yet.</strong> Choose one to start your {TRIAL_DAYS}-day free trial. You add a card now and pay nothing until the trial ends.
+          </p>
         ) : (
           <p style={{ margin: 0, fontSize: 17 }}>
-            <strong>Your free trial has ended.</strong> Monitoring is paused and your data is kept. Choose a plan to start it again.
+            <strong>{agency.stripe_subscription_id ? 'Your plan has ended.' : 'Your free trial has ended.'}</strong> Monitoring is paused and your data is kept. Choose a plan to start it again.
           </p>
         )}
       </section>
@@ -95,7 +100,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
                   <span className="plan-note muted">You have {stores} stores</span>
                 ) : (
                   <SubmitButton secondary={key !== 'agency'} pendingText={s.paying ? 'Changing…' : 'Opening checkout…'} disabled={!connected}>
-                    {s.paying ? `Switch to ${p.name}` : `Choose ${p.name}`}
+                    {s.paying ? `Switch to ${p.name}` : firstPlan ? 'Start free trial' : `Choose ${p.name}`}
                   </SubmitButton>
                 )}
               </form>
