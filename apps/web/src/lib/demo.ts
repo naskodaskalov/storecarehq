@@ -194,7 +194,7 @@ function seed(): Tables {
 
   return {
     site_checks,
-    agencies: [{ id: AGENCY, name: 'Northline Studio', plan: 'agency', brand_color: '#2747A8', created_at: iso(41 * DAY) }],
+    agencies: [{ id: AGENCY, name: 'Northline Studio', brand_color: '#2747A8', created_at: iso(41 * DAY), ...demoBilling() }],
     memberships: [{ agency_id: AGENCY, user_id: USER.id, role: 'owner' }],
     stores: stores.map(({ _hours, ...s }) => s),
     care_plans,
@@ -208,6 +208,21 @@ function seed(): Tables {
     storefront_snapshots,
     reports: autoDrafted(stores),
   };
+}
+
+/** STORECARE_DEMO_BILLING=trial (default) | ending | expired | paying, to see each billing state. */
+function demoBilling() {
+  const none = { stripe_customer_id: null, stripe_subscription_id: null, current_period_end: null, cancel_at_period_end: false, subscription_status: null };
+  switch (process.env.STORECARE_DEMO_BILLING) {
+    case 'ending':
+      return { ...none, plan: 'trial', trial_ends_at: iso(-0.6 * DAY) };
+    case 'expired':
+      return { ...none, plan: 'trial', trial_ends_at: iso(2 * DAY) };
+    case 'paying':
+      return { ...none, plan: 'agency', trial_ends_at: iso(34 * DAY), subscription_status: 'active', stripe_customer_id: 'cus_demo', stripe_subscription_id: 'sub_demo', current_period_end: iso(-12 * DAY) };
+    default:
+      return { ...none, plan: 'trial', trial_ends_at: iso(-4.5 * DAY) };
+  }
 }
 
 /** Last month's reports, as the worker drafts them on the 1st: two waiting for review. */

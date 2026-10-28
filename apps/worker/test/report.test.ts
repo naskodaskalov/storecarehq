@@ -91,3 +91,20 @@ describe('monthly report drafting (database)', { skip: !db && 'set TEST_DATABASE
     assert.equal(await sendReportDigests(pool, [], senders), 0);
   });
 });
+
+describe('monitoring follows billing (database)', { skip: !db && 'set TEST_DATABASE_URL' }, async () => {
+  const { activeStores } = await import('../src/db.ts');
+  const d = await freshDb();
+  after(() => d!.drop());
+
+  test('stores of agencies without a trial or plan are not monitored', async () => {
+    const trial = await seedStore(d!.pool, { name: 'On trial' });
+    const lapsed = await seedStore(d!.pool, { name: 'Lapsed', public_url: 'https://lapsed.com' });
+    const paying = await seedStore(d!.pool, { name: 'Paying', public_url: 'https://paying.com' });
+    await d!.pool.query(`update public.agencies set trial_ends_at = now() - interval '1 day' where id in ($1, $2)`, [lapsed.agency_id, paying.agency_id]);
+    await d!.pool.query(`update public.agencies set plan = 'solo', subscription_status = 'active' where id = $1`, [paying.agency_id]);
+    const names = (await activeStores(d!.pool)).map((s) => s.name).sort();
+    assert.deepEqual(names, ['On trial', 'Paying']);
+    void trial;
+  });
+});

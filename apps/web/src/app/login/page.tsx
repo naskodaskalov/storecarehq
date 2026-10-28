@@ -23,7 +23,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
       </div>
       <section className="onb-card" style={{ maxWidth: 480 }}>
         <h1 style={{ fontSize: 28 }}>{trial ? 'Start your free trial' : 'Sign in'}</h1>
-        {trial && !sent && <p className="muted" style={{ margin: 0 }}>Enter your work email and we&apos;ll send a link that creates your account. 14 days free, no card.</p>}
+        {trial && !sent && <p className="muted" style={{ margin: 0 }}>Enter your work email and we&apos;ll send a link that creates your account. 7 days free, no card.</p>}
         {sent ? (
           <p>We sent a sign-in link to <strong>{sent}</strong>. Open it on this device.</p>
         ) : (
@@ -36,7 +36,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
             <SubmitButton pendingText="Sending link…">Email me a sign-in link</SubmitButton>
           </form>
         )}
-        {!trial && <p className="small muted">New here? The same link creates your account. 14-day free trial, no card needed.</p>}
+        {!trial && <p className="small muted">New here? The same link creates your account. 7-day free trial, no card needed.</p>}
       </section>
     </div>
   );

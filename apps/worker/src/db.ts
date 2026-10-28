@@ -68,7 +68,11 @@ export type StoreRow = {
 };
 
 export async function activeStores(db: Db): Promise<StoreRow[]> {
-  const { rows } = await db.query<StoreRow>(`select * from public.stores where status <> 'paused' order by created_at`);
+  // Agencies whose trial ended without a plan are not monitored (their data stays).
+  const { rows } = await db.query<StoreRow>(
+    `select s.* from public.stores s join public.agencies a on a.id = s.agency_id
+      where s.status <> 'paused' and public.agency_has_access(a) order by s.created_at`,
+  );
   return rows;
 }
 

@@ -9,7 +9,7 @@ import './landing.css';
 export const metadata: Metadata = {
   title: 'StoreCare HQ: monitoring and monthly reports for Shopify care plans',
   description:
-    'StoreCare HQ watches your clients’ Shopify stores every day (uptime, checkout, speed, apps and theme changes) and drafts the monthly report you send them. No store access needed. 14-day free trial.',
+    'StoreCare HQ watches your clients’ Shopify stores every day (uptime, checkout, speed, apps and theme changes) and drafts the monthly report you send them. No store access needed. 7-day free trial.',
 };
 
 const PLANS = [
@@ -48,7 +48,7 @@ const FAQ = [
   },
   {
     q: 'What happens when the trial ends?',
-    a: 'You pick a plan to keep monitoring. Every plan has every feature; plans differ only by how many stores you can add.',
+    a: 'Monitoring pauses until you pick a plan, and nothing you set up is lost. The trial covers up to 20 stores. Every plan has every feature; plans differ only by how many stores you can add.',
   },
 ];
 
@@ -111,7 +111,7 @@ export default function Landing() {
             </p>
             <div className="lp-cta">
               <Link href="/login?trial=1" className="btn lp-btn-big">Start free trial</Link>
-              <span className="lp-cta-note">14 days free. No card. No Shopify access needed.</span>
+              <span className="lp-cta-note">7 days free. No card. No Shopify access needed.</span>
             </div>
           </div>
           <figure className="lp-hero-report">
@@ -193,7 +193,7 @@ export default function Landing() {
               </div>
             ))}
           </div>
-          <p className="lp-fine">Prices in US dollars, excluding VAT. Every plan starts with a 14-day free trial; no card needed to start.</p>
+          <p className="lp-fine">Prices in US dollars, excluding VAT. Start with a 7-day free trial; no card needed.</p>
         </section>
 
         <section className="lp-faq" aria-labelledby="faq-title">

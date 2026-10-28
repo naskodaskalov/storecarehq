@@ -72,6 +72,8 @@ export async function addStore(formData: FormData) {
     })
     .select('id')
     .single();
+  // Store limit or ended trial (database trigger): explain on the billing page, where the fix is.
+  if (error?.hint === 'billing') redirect(`/billing?error=${encodeURIComponent(error.message)}`);
   if (error) redirect(`/onboarding/store?error=${encodeURIComponent(error.message)}`);
 
   await supabase.from('care_plans').insert({ store_id: store.id, agency_id: agencyId });

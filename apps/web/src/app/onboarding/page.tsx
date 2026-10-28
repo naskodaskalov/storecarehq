@@ -33,7 +33,7 @@ export default async function Step1({ searchParams }: { searchParams: Promise<{ 
           </fieldset>
           {error && <div className="error">{error === 'name' ? 'Enter your agency name.' : error}</div>}
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
-            <span className="small muted">14-day free trial · no card needed</span>
+            <span className="small muted">7-day free trial · no card needed</span>
             <SubmitButton pendingText="Creating workspace…">Continue</SubmitButton>
           </div>
         </form>

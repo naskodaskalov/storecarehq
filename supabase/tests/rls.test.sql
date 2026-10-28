@@ -110,4 +110,59 @@ begin
 end $$;
 reset role;
 
+-- Billing: members cannot change their plan, trial or Stripe fields; they can rename the agency.
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+update public.agencies set name = 'Northline Studio';
+do $$ begin
+  begin
+    update public.agencies set plan = 'pro';
+    raise exception 'member could change their plan';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    update public.agencies set trial_ends_at = now() + interval '1 year';
+    raise exception 'member could extend their trial';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    update public.agencies set subscription_status = 'active';
+    raise exception 'member could mark themselves as paying';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- New agencies get 7 days.
+reset role;
+do $$ begin
+  if (select trial_ends_at from public.agencies where name = 'Other Agency') not between now() + interval '6 days 23 hours' and now() + interval '7 days 1 minute' then
+    raise exception 'trial should be 7 days';
+  end if;
+end $$;
+
+-- Store limits: trial 20, Solo 5; none after the trial ends without a plan.
+update public.agencies set plan = 'solo', subscription_status = 'active' where name = 'Other Agency';
+insert into public.stores (agency_id, name, public_url)
+  select id, 'S' || n, 'https://s' || n || '.com' from public.agencies, generate_series(1, 4) n where name = 'Other Agency';
+do $$ begin
+  begin
+    insert into public.stores (agency_id, name, public_url) select id, 'Sixth', 'https://six.com' from public.agencies where name = 'Other Agency';
+    raise exception 'Solo allowed a 6th store';
+  exception when raise_exception then
+    if sqlerrm not like 'Solo plan includes up to 5 stores%' then raise; end if;
+  end;
+end $$;
+update public.agencies set plan = 'agency' where name = 'Other Agency';
+insert into public.stores (agency_id, name, public_url) select id, 'Sixth', 'https://six.com' from public.agencies where name = 'Other Agency';
+update public.agencies set plan = 'trial', subscription_status = 'canceled', trial_ends_at = now() - interval '1 day' where name = 'Other Agency';
+do $$ begin
+  if (select public.agency_has_access(a) from public.agencies a where name = 'Other Agency') then raise exception 'expired trial still has access'; end if;
+  begin
+    insert into public.stores (agency_id, name, public_url) select id, 'Late', 'https://late.com' from public.agencies where name = 'Other Agency';
+    raise exception 'expired trial could add a store';
+  exception when raise_exception then
+    if sqlerrm not like 'Your free trial has ended%' then raise; end if;
+  end;
+end $$;
+
 select 'rls ok' as result;

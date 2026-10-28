@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/stores', label: 'Stores', match: (p: string) => p.startsWith('/stores') },
   { href: '/work', label: 'Work log', match: (p: string) => p.startsWith('/work') },
   { href: '/reports', label: 'Reports', match: (p: string) => p.startsWith('/reports') },
+  { href: '/billing', label: 'Billing', match: (p: string) => p.startsWith('/billing') },
 ];
 
 export function NavLinks() {

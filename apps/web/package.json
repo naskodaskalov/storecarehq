@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --test src/lib/*.test.ts"
   },
   "dependencies": {
     "@storecare/reports": "*",
@@ -16,7 +17,8 @@
     "@supabase/supabase-js": "2.57.4",
     "next": "15.5.28",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "stripe": "22.6.2"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

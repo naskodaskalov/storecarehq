@@ -2,9 +2,12 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // /r/<token> is the client's report link: no account, the token is the key. /welcome is the landing page.
-const PUBLIC = ['/login', '/auth', '/r/', '/welcome'];
+// /api/stripe/webhook is called by Stripe and checks its own signature.
+const PUBLIC = ['/login', '/auth', '/r/', '/welcome', '/api/stripe/webhook'];
 
 export async function middleware(request: NextRequest) {
+  // Layouts read the path (the app layout sends lapsed agencies to /billing from any other page).
+  request.headers.set('x-pathname', request.nextUrl.pathname);
   if (process.env.STORECARE_DEMO === '1') return NextResponse.next({ request });
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {

@@ -1,7 +1,11 @@
 import { redirect } from 'next/navigation';
 import { supabaseServer } from './supabase';
 
-export type Agency = { id: string; name: string; plan: string; brand_color: string };
+import type { BillingFields } from './billing';
+
+export type Agency = { id: string; name: string; plan: string; brand_color: string } & BillingFields;
+const AGENCY_COLUMNS =
+  'id, name, plan, brand_color, trial_ends_at, subscription_status, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_subscription_id';
 
 /** The signed-in user's agency, or a redirect to onboarding. */
 export async function requireAgency(): Promise<{ agency: Agency; userId: string }> {
@@ -10,7 +14,7 @@ export async function requireAgency(): Promise<{ agency: Agency; userId: string 
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
-  const { data } = await supabase.from('agencies').select('id, name, plan, brand_color').order('created_at').limit(1);
+  const { data } = await supabase.from('agencies').select(AGENCY_COLUMNS).order('created_at').limit(1);
   if (!data?.length) redirect('/onboarding');
   return { agency: data[0] as Agency, userId: user.id };
 }

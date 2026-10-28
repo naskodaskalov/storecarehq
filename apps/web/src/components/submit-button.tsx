@@ -13,6 +13,7 @@ export function SubmitButton({
   pending: pendingOverride,
   name,
   value,
+  disabled,
 }: {
   children: ReactNode;
   pendingText: string;
@@ -23,6 +24,8 @@ export function SubmitButton({
   /** For forms with more than one submit button: sent with the form when this one is clicked. */
   name?: string;
   value?: string;
+  /** Unavailable regardless of form state. */
+  disabled?: boolean;
 }) {
   const { pending: formPending, data } = useFormStatus();
   const pending = pendingOverride ?? formPending;
@@ -33,7 +36,7 @@ export function SubmitButton({
     <button
       type="submit"
       className={`btn${secondary ? ' secondary' : ''}`}
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={busy}
       style={style}
       name={name}

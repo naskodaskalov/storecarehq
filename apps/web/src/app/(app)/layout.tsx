@@ -1,4 +1,8 @@
 import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { billingState, PLANS } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { NavLinks } from './nav-links';
@@ -8,6 +12,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const { agency } = await requireAgency();
   const supabase = await supabaseServer();
   const { count } = await supabase.from('stores').select('id', { count: 'exact', head: true }).eq('agency_id', agency.id);
+  const billing = billingState(agency);
+  const path = (await headers()).get('x-pathname') ?? '';
+  const onBilling = path.startsWith('/billing');
+  // Trial over and no plan: everything but billing waits until they choose one. Data is kept.
+  if (!billing.hasAccess && !onBilling) redirect('/billing');
+  const planLabel = billing.plan ? `${PLANS[billing.plan].name} plan` : billing.onTrial ? 'Free trial' : 'No plan';
 
   return (
     <div className="shell">
@@ -17,7 +27,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <div className="nav-foot">
           <div style={{ fontWeight: 600 }}>{agency.name}</div>
           <div className="small muted">
-            {agency.plan === 'trial' ? 'Free trial' : `${agency.plan[0].toUpperCase()}${agency.plan.slice(1)} plan`} · {count ?? 0} stores
+            {planLabel} · {count ?? 0} stores
           </div>
         </div>
       </nav>
@@ -25,6 +35,20 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         {isDemo() && (
           <div className="small" style={{ background: 'var(--accent-soft)', borderRadius: 8, padding: '8px 14px' }}>
             <strong>Demo</strong> · Sample agency with made-up stores. Changes you make reset when the server restarts.
+          </div>
+        )}
+        {!onBilling && billing.onTrial && (
+          <div className={`trial-bar${billing.trialDaysLeft <= 2 ? ' warn-bar' : ''}`} role="status">
+            <span>
+              Free trial: <strong>{billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? '' : 's'} left</strong>. Choose a plan to keep monitoring after that.
+            </span>
+            <Link href="/billing">Choose a plan</Link>
+          </div>
+        )}
+        {!onBilling && billing.pastDue && (
+          <div className="trial-bar warn-bar" role="alert">
+            <span>Your last payment failed. Update your card so monitoring keeps running.</span>
+            <Link href="/billing">Update card</Link>
           </div>
         )}
         {children}
