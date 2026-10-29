@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dueJobs, localDateHour } from '../src/schedule.ts';
+import { dueJobs, localDateHour, type LastRuns } from '../src/schedule.ts';
 
 const at = (iso: string) => new Date(iso);
 const consent = { timezone: 'Europe/Sofia', checkout_consent_at: at('2026-10-01T00:00:00Z') };
@@ -46,7 +46,7 @@ test('no consent means no checkout test; a late run still catches up', () => {
 test('monthly report: from 06:00 store time on the 1st, catching up until the 5th, once', () => {
   const store = { ...consent, created_at: at('2026-10-10T00:00:00Z') };
   const last = { ...none, snapshotAt: at('2026-11-01T03:50:00Z'), reportPeriods: [] as string[] };
-  const has = (now: string, l = last, s = store) => dueJobs(s, l, at(now)).includes('report');
+  const has = (now: string, l: LastRuns = last, s = store) => dueJobs(s, l, at(now)).includes('report');
   assert.equal(has('2026-10-31T21:30:00Z'), false); // 31 Oct 23:30 Sofia
   assert.equal(has('2026-11-01T03:30:00Z'), false); // 1 Nov 05:30 Sofia: too early
   assert.equal(has('2026-11-01T04:10:00Z'), true); // 1 Nov 06:10 Sofia
