@@ -93,24 +93,10 @@ export function agencyUpdateFromSubscription(sub: SubscriptionLike) {
   };
 }
 
-/** For agencies from before card-first sign-up, still inside their card-free trial: Stripe's first charge
- *  waits for that trial's end, if far enough ahead (Stripe needs a trial_end at least 48 hours away). */
-export function chargeFrom(a: Pick<BillingFields, 'trial_ends_at'>, now = new Date()): number | null {
-  if (!a.trial_ends_at) return null;
-  const end = Date.parse(a.trial_ends_at);
-  return end - now.getTime() > 49 * 3600e3 ? Math.floor(end / 1000) : null;
-}
-
-/** The free days Checkout should give: 7 for an agency's first subscription (card taken now, charged after),
- *  the rest of an older card-free trial, or none for an agency that has subscribed before. */
-export function checkoutTrial(
-  a: Pick<BillingFields, 'trial_ends_at' | 'stripe_subscription_id'>,
-  now = new Date(),
-): { trial_period_days: number } | { trial_end: number } | Record<string, never> {
-  const legacy = chargeFrom(a, now);
-  if (legacy) return { trial_end: legacy };
-  if (!a.stripe_subscription_id && !a.trial_ends_at) return { trial_period_days: TRIAL_DAYS };
-  return {};
+/** The free days Checkout gives: 7 on an agency's first subscription (card taken now, charged after),
+ *  none for an agency that has subscribed before. Always 7, also for accounts from before card-first sign-up. */
+export function checkoutTrial(a: Pick<BillingFields, 'stripe_subscription_id'> & Partial<BillingFields>): { trial_period_days: number } | Record<string, never> {
+  return a.stripe_subscription_id ? {} : { trial_period_days: TRIAL_DAYS };
 }
 
 export const formatUsd = (n: number) => `$${n}`;

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { billingState, chargeFrom, checkoutTrial, PLAN_KEYS, PLANS, TRIAL_DAYS, TRIAL_STORE_LIMIT } from '@/lib/billing';
+import { billingState, checkoutTrial, PLAN_KEYS, PLANS, TRIAL_DAYS, TRIAL_STORE_LIMIT } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { confirmCheckout, stripeEnabled } from '@/lib/stripe';
@@ -65,9 +65,9 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
           <p style={{ margin: 0, fontSize: 17 }}>
             <strong>Free trial</strong>: {s.trialDaysLeft} day{s.trialDaysLeft === 1 ? '' : 's'} left, until {day(agency.trial_ends_at!)} · {stores} of {TRIAL_STORE_LIMIT} stores.
             <span className="muted">
-              {chargeFrom(agency)
-                ? ` Choose a plan now and your first payment is taken on ${day(agency.trial_ends_at!)}, when the trial ends.`
-                : ' Choose a plan to keep monitoring; the first payment is taken at checkout.'}
+              {firstPlan
+                ? ` Choose a plan to keep monitoring: it starts with ${TRIAL_DAYS} free days, then your card is charged.`
+                : ' Choose a plan to keep monitoring.'}
             </span>
           </p>
         ) : firstPlan ? (
