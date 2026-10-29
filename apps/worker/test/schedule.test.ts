@@ -6,6 +6,15 @@ const at = (iso: string) => new Date(iso);
 const consent = { timezone: 'Europe/Sofia', checkout_consent_at: at('2026-10-01T00:00:00Z') };
 const none = { snapshotAt: null, checkoutAt: null, speedAt: null };
 
+test('backup triggers do not duplicate recent uptime checks; late runs catch up', () => {
+  const last = { ...none, uptimeAt: at('2026-10-28T02:00:00Z') };
+  const has = (iso: string) => dueJobs(consent, last, at(iso)).includes('uptime');
+  assert.equal(has('2026-10-28T02:02:00Z'), false);
+  assert.equal(has('2026-10-28T02:24:59Z'), false);
+  assert.equal(has('2026-10-28T02:25:00Z'), true);
+  assert.equal(has('2026-10-28T09:00:00Z'), true);
+});
+
 test('localDateHour uses the store timezone', () => {
   assert.deepEqual(localDateHour('Europe/Sofia', at('2026-10-28T22:30:00Z')), { date: '2026-10-29', hour: 0 });
   assert.deepEqual(localDateHour('America/New_York', at('2026-10-28T09:00:00Z')), { date: '2026-10-28', hour: 5 });

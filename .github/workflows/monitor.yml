@@ -12,7 +12,7 @@ on:
         required: false
         default: ''
 
-# Never let two passes overlap; a late one waits for the running one.
+# Serialize manual, scheduled and externally dispatched passes. GitHub keeps only one pending run.
 concurrency:
   group: monitor
   cancel-in-progress: false
@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   tick:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -34,12 +34,13 @@ jobs:
       APP_URL: https://storecarehq.vercel.app
       FORCE: ${{ inputs.force }}
     steps:
-      # Until the secret exists, skip quietly instead of failing (and emailing) every 30 minutes.
+      # A monitoring job that cannot monitor must fail visibly.
       - name: Check secrets
         id: setup
         run: |
           if [ -z "$DATABASE_URL" ]; then
-            echo "::notice::Skipped: add the DATABASE_URL secret (Settings → Secrets and variables → Actions)."
+            echo "::error::Monitoring cannot run: DATABASE_URL is missing from repository Actions secrets."
+            exit 1
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi

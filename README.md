@@ -58,13 +58,16 @@ Good for reviewing the UI and for showing the product to agencies.
 ## Deploy
 
 - **Web:** Vercel, root `apps/web`, same env vars as `.env.example`.
-- **Worker (current): GitHub Actions.** `.github/workflows/monitor.yml` runs `apps/worker/src/tick.ts` every
-  30 minutes: uptime each run, a storefront snapshot about hourly, checkout test, speed and site checks once a day
+- **Worker (current): GitHub Actions.** `.github/workflows/monitor.yml` requests a run of `apps/worker/src/tick.ts` every
+  30 minutes. GitHub's scheduled triggers are best effort and can be delayed or dropped; this is not a guaranteed monitoring interval.
+  Each actual run performs uptime checks, a storefront snapshot about hourly, checkout test, speed and site checks once a day
   after 06:00 store time, and last month's report drafts from 06:00 on the 1st (catching up until the 5th; an
   existing report is never touched), followed by one "ready to review" message per agency. Needs repository
   secrets `DATABASE_URL` (required) and `PAGESPEED_API_KEY`, optionally `DATABASE_CA_CERT`, `RESEND_API_KEY` and
   `ANTHROPIC_API_KEY` (AI-written report summaries). Run it by hand from the Actions tab ("Monitor stores" → Run
   workflow); the "force" box runs `storefront`, `speed`, `site` or `report` straight away.
+  Missing database configuration fails the workflow. Individual store failures are isolated and logged as they finish;
+  database connections time out after 15 seconds and statements after 60 seconds. See [monitoring operations](docs/monitoring-operations.md).
 - **Worker (later, always-on):** any container host: `docker build -f apps/worker/Dockerfile .`, one instance,
   runs `src/index.ts` with pg-boss for 5-minute uptime checks. Env vars from `apps/worker/.env.example`.
 

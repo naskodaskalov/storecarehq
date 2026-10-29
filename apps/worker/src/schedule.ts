@@ -6,6 +6,7 @@ import { monthPeriod, previousPeriod } from '@storecare/reports';
 export type JobName = 'uptime' | 'storefront' | 'checkout' | 'speed' | 'site' | 'report';
 
 export type LastRuns = {
+  uptimeAt?: Date | null;
   snapshotAt: Date | null;
   checkoutAt: Date | null;
   speedAt: Date | null;
@@ -18,6 +19,7 @@ export type StoreForSchedule = { timezone: string; checkout_consent_at: Date | n
 
 const MIN = 60_000;
 export const STOREFRONT_EVERY_MS = 50 * MIN; // hourly, with slack for late runs
+export const UPTIME_EVERY_MS = 25 * MIN; // deduplicate primary and backup triggers
 export const DAILY_AFTER_HOUR = 6; // store-local time
 
 /** "2026-10-28" and the hour, in the store's timezone. */
@@ -66,7 +68,8 @@ function reportDue(store: StoreForSchedule, last: LastRuns, now: Date): boolean 
 }
 
 export function dueJobs(store: StoreForSchedule, last: LastRuns, now = new Date()): JobName[] {
-  const jobs: JobName[] = ['uptime'];
+  const jobs: JobName[] = [];
+  if (!last.uptimeAt || now.getTime() - last.uptimeAt.getTime() >= UPTIME_EVERY_MS) jobs.push('uptime');
   if (!last.snapshotAt || now.getTime() - last.snapshotAt.getTime() >= STOREFRONT_EVERY_MS) jobs.push('storefront');
   // The checkout test needs a product from the first snapshot, so it waits for one.
   if (store.checkout_consent_at && last.snapshotAt && dailyDue(store.timezone, last.checkoutAt, now)) jobs.push('checkout');

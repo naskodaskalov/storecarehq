@@ -8,6 +8,7 @@
 
 import { activeStores, createPool, type Db, type StoreRow } from './db.ts';
 import { dueJobs, type JobName, type LastRuns } from './schedule.ts';
+import { runStores } from './run-stores.ts';
 import { checkoutTask, reportTask, sendReportDigests, siteTask, speedTask, storefrontTask, takeDrafted, uptimeTask } from './tasks.ts';
 
 const TASKS: Record<JobName, (db: Db, storeId: string) => Promise<void>> = {
@@ -20,8 +21,9 @@ const TASKS: Record<JobName, (db: Db, storeId: string) => Promise<void>> = {
 };
 
 async function lastRuns(db: Db, storeId: string): Promise<LastRuns> {
-  const { rows } = await db.query<{ snapshot_at: Date | null; checkout_at: Date | null; speed_at: Date | null; site_at: Date | null; report_periods: string[] }>(
+  const { rows } = await db.query<{ uptime_at: Date | null; snapshot_at: Date | null; checkout_at: Date | null; speed_at: Date | null; site_at: Date | null; report_periods: string[] }>(
     `select
+       (select max(checked_at) from public.uptime_checks where store_id = $1) as uptime_at,
        (select max(taken_at) from public.storefront_snapshots where store_id = $1) as snapshot_at,
        (select max(ran_at) from public.checkout_runs where store_id = $1) as checkout_at,
        (select max(sampled_at) from public.speed_samples where store_id = $1) as speed_at,
@@ -29,7 +31,7 @@ async function lastRuns(db: Db, storeId: string): Promise<LastRuns> {
        array(select to_char(period, 'YYYY-MM-DD') from public.reports where store_id = $1 order by period desc limit 6) as report_periods`,
     [storeId],
   );
-  return { snapshotAt: rows[0].snapshot_at, checkoutAt: rows[0].checkout_at, speedAt: rows[0].speed_at, siteAt: rows[0].site_at, reportPeriods: rows[0].report_periods };
+  return { uptimeAt: rows[0].uptime_at, snapshotAt: rows[0].snapshot_at, checkoutAt: rows[0].checkout_at, speedAt: rows[0].speed_at, siteAt: rows[0].site_at, reportPeriods: rows[0].report_periods };
 }
 
 const FORCE = (process.env.FORCE ?? '').split(',').map((s) => s.trim()).filter((s): s is JobName => s in TASKS && s !== 'checkout');
@@ -49,6 +51,7 @@ async function runStore(db: Db, store: StoreRow, dryRun: boolean): Promise<strin
       // One failing job must not stop the others or the other stores.
       const msg = (e instanceof Error ? e.message : String(e)).split('\n')[0].slice(0, 200);
       // Speed data is nice to have; a Google quota or timeout should not mark the whole run failed.
+      if (job === 'speed') console.warn(`::warning::Speed check failed for store ${store.id}; it will retry on the next pass.`);
       results.push(job === 'speed' ? `speed skipped (${msg})` : `${job} FAILED: ${msg}`);
     }
   }
@@ -60,21 +63,14 @@ const pool = createPool();
 const started = Date.now();
 try {
   const stores = await activeStores(pool);
-  // A few stores at a time; each store's jobs stay in order.
-  const queue = [...stores];
-  const lines: string[] = [];
-  await Promise.all(
-    Array.from({ length: Math.min(4, queue.length) }, async () => {
-      for (let s = queue.shift(); s; s = queue.shift()) lines.push(await runStore(pool, s, dryRun));
-    }),
-  );
+  // Log each store immediately, preserving evidence if a later job or cleanup fails.
+  const lines = await runStores(stores, (store) => runStore(pool, store, dryRun));
   if (!dryRun) {
     // One "reports ready" message per agency for everything drafted in this pass.
     const digests = await sendReportDigests(pool, takeDrafted());
-    if (digests) lines.push(`reports ready: ${digests} notification${digests === 1 ? '' : 's'} sent`);
+    if (digests) console.log(`reports ready: ${digests} notification${digests === 1 ? '' : 's'} sent`);
     await pool.query('select public.prune_monitoring()');
   }
-  for (const l of lines.sort()) console.log(l);
   if (!dryRun && !process.env.PAGESPEED_API_KEY) {
     console.log('::warning::PAGESPEED_API_KEY is not set, so speed checks use Google\'s shared quota and usually fail.');
   }
