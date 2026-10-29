@@ -3,7 +3,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { host } from '@/lib/format';
 import { SubmitButton } from '@/components/submit-button';
 import { savePlan } from '../actions';
-import { OnboardingTop } from '../steps';
+import { OnboardingFrame } from '../steps';
 
 export default async function Step3({ searchParams }: { searchParams: Promise<{ store?: string }> }) {
   const { store: storeId } = await searchParams;
@@ -17,19 +17,18 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
   if (!store) redirect('/');
 
   return (
-    <div className="onb">
-      <OnboardingTop step={4} />
+    <OnboardingFrame step={4}>
       <section className="onb-card">
         <div>
           <span className="chip" style={{ color: 'var(--accent)', background: 'var(--accent-soft)', borderColor: 'transparent', fontWeight: 600 }}>
             Added: {host(store.public_url)}
           </span>
-          <h1 style={{ fontSize: 30, marginTop: 10 }}>What does this client pay you for?</h1>
-          <p className="muted" style={{ margin: '8px 0 0', fontSize: 16 }}>We use this to track hours against the plan and to word the monthly report.</p>
+          <h1 style={{ marginTop: 16 }}>Give this store a care plan.</h1>
+          <p className="setup-description">Set the hours you’ve agreed with your client. We’ll connect your work log to their monthly report.</p>
         </div>
         <form action={savePlan} style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
           <input type="hidden" name="store" value={store.id} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+          <div className="setup-plan-fields">
             <div className="field">
               <label htmlFor="plan">Plan name</label>
               <input id="plan" name="plan" type="text" defaultValue="Care Plan" />
@@ -70,10 +69,10 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
 
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
             <span className="small muted">First checks start within 30 minutes.</span>
-            <SubmitButton pendingText="Saving…">Finish</SubmitButton>
+            <SubmitButton pendingText="Saving…">Start caring for this store →</SubmitButton>
           </div>
         </form>
       </section>
-    </div>
+    </OnboardingFrame>
   );
 }

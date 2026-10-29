@@ -17,20 +17,21 @@ export function AddStoreForm({ error }: { error?: string }) {
 
   return (
     <>
-      <form action={runCheck} style={{ border: '2px solid var(--accent)', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {error && <div className="notice error" role="alert">{error}</div>}
+      <form action={runCheck} className="setup-store-check">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
           <div className="field" style={{ flex: '1 1 280px' }}>
             <label htmlFor="url">Store URL</label>
-            <input id="url" name="url" type="text" placeholder="clientstore.com" required className="mono" defaultValue={check?.url.replace(/^https:\/\//, '')} />
+            <input id="url" name="url" type="text" placeholder="clientstore.com" required autoCapitalize="none" autoCorrect="off" inputMode="url" defaultValue={check?.url.replace(/^https:\/\//, '')} />
           </div>
           <SubmitButton pending={checking} pendingText="Checking store…">Check store</SubmitButton>
         </div>
         {checking && (
           <div className="small muted" role="status">Reading the storefront: theme, products and apps. This takes a few seconds.</div>
         )}
-        {check && !check.ok && <div className="error">{check.message}</div>}
+        {check && !check.ok && <div className="error" role="alert">{check.message}</div>}
         {check?.ok && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
+          <div className="setup-check-result" role="status">
             <div><span className="tone-good" style={{ fontWeight: 700 }}>✓</span> Shopify store found{check.theme ? ` · theme ${check.theme}` : ''}</div>
             <div className="muted">
               {check.productsVisible ? `Products visible${check.productCount !== null ? ` (${check.productCount}${check.productCount >= 250 ? '+' : ''})` : ''}` : 'Products not visible'} · {check.apps} apps detected
@@ -70,7 +71,6 @@ export function AddStoreForm({ error }: { error?: string }) {
               <span>We look after this store, and the client agrees to a daily test visit to their checkout.</span>
             </label>
           </div>
-          {error && <div className="error">{error}</div>}
           <div className="row">
             <span className="small muted">StoreCare only reads the public storefront. No app to install.</span>
             <SubmitButton pendingText="Adding store…">Add store</SubmitButton>

@@ -6,7 +6,13 @@ import { demoClient, isDemo } from './demo';
 /** Supabase client for server components, actions and route handlers. Runs as the signed-in user, so RLS applies. */
 export async function supabaseServer() {
   // Demo mode returns an in-memory stand-in with the same query shape.
-  if (isDemo()) return demoClient() as unknown as Awaited<ReturnType<typeof realClient>>;
+  if (isDemo()) {
+    const client = demoClient();
+    if ((await cookies()).get('storecare-demo-signed-out')?.value === '1') {
+      return { ...client, auth: { ...client.auth, getUser: async () => ({ data: { user: null }, error: null }) } } as unknown as Awaited<ReturnType<typeof realClient>>;
+    }
+    return client as unknown as Awaited<ReturnType<typeof realClient>>;
+  }
   return realClient();
 }
 

@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation';
 import { billingState, checkoutTrial, PLAN_KEYS, PLANS, TRIAL_DAYS, TRIAL_STORE_LIMIT } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
-import { confirmCheckout, stripeEnabled } from '@/lib/stripe';
+import { confirmCheckout } from '@/lib/stripe';
 import { SubmitButton } from '@/components/submit-button';
+import { Icon } from '@/components/icon';
 import { choosePlan, openPortal } from './actions';
 
 type Search = { session_id?: string; changed?: string; error?: string; confirmed?: string };
@@ -21,27 +22,24 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
   const { count } = await supabase.from('stores').select('id', { count: 'exact', head: true }).eq('agency_id', agency.id);
   const stores = count ?? 0;
   const s = billingState(agency);
-  const connected = stripeEnabled();
   const firstPlan = 'trial_period_days' in checkoutTrial(agency); // never subscribed: 7 days free with a card
 
   return (
     <>
-      <div>
+      <div className="page-heading billing-heading">
+        <div>
         <h1>Plan and billing</h1>
-        <div className="muted">Every plan has every feature. Plans differ only by how many stores you look after.</div>
+        <p>A little care. A lot of peace of mind.</p>
+        </div>
+        <span className="billing-cadence"><Icon name="calendar" size={16} />Monthly billing · USD</span>
       </div>
 
       {q.error && <div className="notice error" role="alert">{q.error}</div>}
       {q.confirmed && <div className="notice" role="status" style={ok}>You&apos;re subscribed. Thank you! Monitoring carries on without a break.</div>}
       {q.changed && <div className="notice" role="status" style={ok}>Plan changed to {PLANS[q.changed as keyof typeof PLANS]?.name ?? q.changed}. The difference is prorated on your next invoice.</div>}
-      {!connected && (
-        <div className="notice" role="status">
-          Billing isn&apos;t connected yet (no Stripe key on this server), so plans can&apos;t be bought here.
-        </div>
-      )}
 
-      <section className="card">
-        <h2>Your plan</h2>
+      <section className="card subscription-summary">
+        <div className="subscription-kicker"><Icon name="billing" size={17} /><h2>Your workspace subscription</h2><span className="status-badge neutral">{s.onTrial ? 'Free trial' : s.paying ? 'Subscribed' : 'No active plan'}</span></div>
         {s.paying && s.plan ? (
           <>
             <p style={{ margin: 0, fontSize: 17 }}>
@@ -81,25 +79,27 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
         )}
       </section>
 
-      <section aria-labelledby="plans-title" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <h2 id="plans-title">{s.paying ? 'Change plan' : 'Choose a plan'}</h2>
-        <div className="plans">
+      <section aria-labelledby="plans-title" className="pricing-section">
+        <div className="pricing-intro"><span className="pricing-eyebrow">ROOM TO GROW</span><h2 id="plans-title">Every store deserves great care.</h2><p>All the tools, on every plan. Just choose the space your agency needs.</p></div>
+        <div className="plans pricing-plans">
           {PLAN_KEYS.map((key) => {
             const p = PLANS[key];
             const current = s.paying && s.plan === key && !s.endsAt;
             const tooSmall = stores > p.stores;
             return (
-              <form key={key} action={choosePlan} className={`plan${current ? ' plan-current' : ''}`}>
+              <form key={key} action={choosePlan} className={`plan pricing-plan pricing-${key}${current ? ' plan-current' : ''}`}>
                 <input type="hidden" name="plan" value={key} />
-                <h3>{p.name}</h3>
-                <div><span className="plan-price">${p.usd}</span> <span className="muted">a month</span></div>
-                <div style={{ fontWeight: 600 }}>Up to {p.stores} stores</div>
+                <div className="pricing-plan-top"><span className="pricing-plan-icon"><Icon name={key === 'solo' ? 'store' : key === 'agency' ? 'home' : 'work'} size={22} /></span>{key === 'agency' && <span className="pricing-recommendation">Built for agencies</span>}</div>
+                <div><h3>{p.name}</h3><p className="pricing-description">{key === 'solo' ? 'For your own corner of commerce.' : key === 'agency' ? 'For a growing client portfolio.' : 'For agencies thinking bigger.'}</p></div>
+                <div className="pricing-price"><span className="plan-price"><span className="pricing-currency">$</span>{p.usd}</span><span className="pricing-price-period">/ month</span></div>
+                <div className="pricing-capacity"><Icon name="store" size={18} /><strong>Up to {p.stores} client stores</strong></div>
+                <ul className="pricing-features">{['Storefront & uptime monitoring', 'Daily checkout tests', 'Changes & detected apps', 'Care plans & work logs', 'Branded monthly reports'].map((feature) => <li key={feature}><Icon name="check" size={15} />{feature}</li>)}</ul>
                 {current ? (
-                  <span className="plan-note">Your current plan</span>
+                  <span className="plan-note pricing-current"><Icon name="check" size={17} />Your current plan</span>
                 ) : tooSmall ? (
-                  <span className="plan-note muted">You have {stores} stores</span>
+                  <span className="plan-note muted pricing-unavailable">You have {stores} stores · limit {p.stores}</span>
                 ) : (
-                  <SubmitButton secondary={key !== 'agency'} pendingText={s.paying ? 'Changing…' : 'Opening checkout…'} disabled={!connected}>
+                  <SubmitButton secondary={key !== 'agency'} pendingText={s.paying ? 'Changing…' : 'Opening checkout…'}>
                     {s.paying ? `Switch to ${p.name}` : firstPlan ? 'Start free trial' : `Choose ${p.name}`}
                   </SubmitButton>
                 )}
@@ -107,7 +107,8 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
             );
           })}
         </div>
-        <p className="small muted" style={{ margin: 0 }}>
+        <div className="pricing-reassurance"><span><Icon name="check" size={15} />Every feature included</span><span><Icon name="calendar" size={15} />Billed monthly</span><span><Icon name="check" size={15} />Cancel any time</span></div>
+        <p className="small muted pricing-fineprint" style={{ margin: 0 }}>
           Prices in US dollars, billed monthly by Stripe. Cancel any time; your plan runs to the end of the month you paid for.
         </p>
       </section>

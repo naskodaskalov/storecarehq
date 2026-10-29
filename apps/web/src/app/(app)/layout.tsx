@@ -5,8 +5,10 @@ import { redirect } from 'next/navigation';
 import { billingState, PLANS } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
-import { NavLinks } from './nav-links';
-import { isDemo } from '@/lib/demo';
+import { NavLinks, WorkspaceHeader } from './nav-links';
+import { signOut } from '@/app/auth/actions';
+import { SubmitButton } from '@/components/submit-button';
+import { Icon } from '@/components/icon';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { agency } = await requireAgency();
@@ -23,21 +25,20 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <nav className="nav" aria-label="Main">
-        <div className="brand"><div className="mark">SC</div><span className="brand-name">StoreCare HQ</span></div>
+        <Link href="/" className="brand"><div className="mark">SC</div><span className="brand-name">StoreCare HQ</span></Link>
+        <div className="workspace-identity"><span className="nav-caption">Workspace</span><div className="workspace-name">{agency.name}</div></div>
         <NavLinks />
         <div className="nav-foot">
-          <div style={{ fontWeight: 600 }}>{agency.name}</div>
+          <div className="nav-account"><span className="account-avatar">{agency.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><div style={{ fontWeight: 600 }}>{agency.name}</div></div>
           <div className="small muted">
             {planLabel} · {count ?? 0} stores
           </div>
         </div>
+        <form action={signOut} className="signout-form"><SubmitButton secondary pendingText="Signing out…"><Icon name="logout" size={17} />Sign out</SubmitButton></form>
       </nav>
-      <main className="main">
-        {isDemo() && (
-          <div className="small" style={{ background: 'var(--accent-soft)', borderRadius: 8, padding: '8px 14px' }}>
-            <strong>Demo</strong> · Sample agency with made-up stores. Changes you make reset when the server restarts.
-          </div>
-        )}
+      <div className="workspace-body">
+      <WorkspaceHeader />
+      <main className="main" id="main-content">
         {!onBilling && billing.onTrial && billing.cardOnFile && billing.plan && (
           <div className="trial-bar" role="status">
             <span>
@@ -63,6 +64,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         )}
         {children}
       </main>
+      </div>
     </div>
   );
 }

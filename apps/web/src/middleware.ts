@@ -8,7 +8,16 @@ const PUBLIC = ['/login', '/auth', '/r/', '/welcome', '/api/stripe/webhook'];
 export async function middleware(request: NextRequest) {
   // Layouts read the path (the app layout sends lapsed agencies to /billing from any other page).
   request.headers.set('x-pathname', request.nextUrl.pathname);
-  if (process.env.STORECARE_DEMO === '1') return NextResponse.next({ request });
+  if (process.env.STORECARE_DEMO === '1') {
+    const path = request.nextUrl.pathname;
+    if (request.cookies.get('storecare-demo-signed-out')?.value === '1' && !PUBLIC.some((p) => path.startsWith(p))) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next({ request });
+  }
   let response = NextResponse.next({ request });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {

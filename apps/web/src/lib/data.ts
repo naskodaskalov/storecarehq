@@ -36,7 +36,7 @@ export function monthStart(d = new Date()): string {
 export async function dashboard(agencyId: string) {
   const supabase = await supabaseServer();
   const since7 = new Date(Date.now() - 7 * 864e5).toISOString();
-  const [stores, incidents, changes, work, checkouts] = await Promise.all([
+  const [stores, incidents, changes, work, checkouts, reports] = await Promise.all([
     supabase
       .from('stores')
       .select('id, name, public_url, status, limited_reason, health_score, care_plans(hours_included)')
@@ -56,6 +56,7 @@ export async function dashboard(agencyId: string) {
       .eq('agency_id', agencyId)
       .gte('ran_at', new Date(Date.now() - 864e5).toISOString())
       .order('ran_at', { ascending: false }),
+    supabase.from('reports').select('id, store_id, period, status').eq('agency_id', agencyId).order('period', { ascending: false }),
   ]);
   return {
     stores: (stores.data ?? []) as unknown as StoreSummary[],
@@ -63,5 +64,6 @@ export async function dashboard(agencyId: string) {
     changes: changes.data ?? [],
     work: work.data ?? [],
     checkouts: checkouts.data ?? [],
+    reports: reports.data ?? [],
   };
 }
