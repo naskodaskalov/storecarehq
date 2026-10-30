@@ -2,6 +2,8 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { headers } from 'next/headers';
+import { appLink } from '@/lib/domains';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, templateSummary, type MonthData } from '@storecare/reports';
 import { ReportView } from '@/components/report-view';
 import './landing.css';
@@ -88,7 +90,10 @@ function sampleFacts() {
   return buildFacts(data);
 }
 
-export default function Landing() {
+export default async function Landing() {
+  const host = (await headers()).get('host') ?? '';
+  const login = appLink(host, '/login');
+  const signup = appLink(host, '/login?trial=1');
   const facts = sampleFacts();
   return (
     <div className="lp">
@@ -100,8 +105,8 @@ export default function Landing() {
         <nav className="lp-nav" aria-label="Main">
           <a href="#how">How it works</a>
           <a href="#pricing">Pricing</a>
-          <Link href="/login">Sign in</Link>
-          <Link href="/login?trial=1" className="btn lp-btn-small">Start free trial</Link>
+          <a href={login}>Sign in</a>
+          <a href={signup} className="btn lp-btn-small">Start free trial</a>
         </nav>
       </header>
 
@@ -114,7 +119,7 @@ export default function Landing() {
               them. Your care plan, finally visible.
             </p>
             <div className="lp-cta">
-              <Link href="/login?trial=1" className="btn lp-btn-big">Start free trial</Link>
+              <a href={signup} className="btn lp-btn-big">Start free trial</a>
               <span className="lp-cta-note">7 days free, then from $29 a month. No Shopify access needed.</span>
             </div>
           </div>
@@ -193,7 +198,7 @@ export default function Landing() {
                 <div className="lp-price"><span className="lp-amount">${p.price}</span> a month</div>
                 <div className="lp-stores">Up to {p.stores} stores</div>
                 <p>{p.note}</p>
-                <Link href="/login?trial=1" className={`btn${p.name === 'Agency' ? '' : ' secondary'}`}>Start free trial</Link>
+                <a href={signup} className={`btn${p.name === 'Agency' ? '' : ' secondary'}`}>Start free trial</a>
               </div>
             ))}
           </div>
@@ -214,14 +219,14 @@ export default function Landing() {
 
         <section className="lp-end">
           <h2>Make your care plan visible.</h2>
-          <Link href="/login?trial=1" className="btn lp-btn-big">Start free trial</Link>
+          <a href={signup} className="btn lp-btn-big">Start free trial</a>
         </section>
       </main>
 
       <footer className="lp-foot">
         <span>© 2026 StoreCare HQ</span>
         <span>Not affiliated with Shopify.</span>
-        <Link href="/login">Sign in</Link>
+        <a href={login}>Sign in</a>
       </footer>
     </div>
   );

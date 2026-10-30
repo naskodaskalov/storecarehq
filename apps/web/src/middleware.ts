@@ -1,16 +1,27 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { APP_ORIGIN, hostRouting, isPublicPath, isWebsiteHost, sessionRouting } from './lib/domains';
 
 // /r/<token> is the client's report link: no account, the token is the key. /welcome is the landing page.
 // /api/stripe/webhook is called by Stripe and checks its own signature.
-const PUBLIC = ['/login', '/auth', '/r/', '/welcome', '/api/stripe/webhook'];
 
 export async function middleware(request: NextRequest) {
+  const host = request.headers.get('host') ?? request.nextUrl.host;
+  const path = request.nextUrl.pathname;
+  const routing = hostRouting(host, path, request.nextUrl.search, request.method);
+  if (routing?.kind === 'reject') return new NextResponse('This page has moved. Open https://app.storecarehq.com/login to continue.', { status: 409 });
+  if (routing?.kind === 'redirect') return NextResponse.redirect(routing.url);
+  if (routing?.kind === 'rewrite') {
+    const url = request.nextUrl.clone();
+    url.pathname = new URL(routing.url).pathname;
+    return NextResponse.rewrite(url);
+  }
+  // The public website never needs to read or refresh an agency session.
+  if ((isWebsiteHost(host) && path === '/welcome') || path === '/api/stripe/webhook' || path.startsWith('/r/')) return NextResponse.next();
   // Layouts read the path (the app layout sends lapsed agencies to /billing from any other page).
   request.headers.set('x-pathname', request.nextUrl.pathname);
   if (process.env.STORECARE_DEMO === '1') {
-    const path = request.nextUrl.pathname;
-    if (request.cookies.get('storecare-demo-signed-out')?.value === '1' && !PUBLIC.some((p) => path.startsWith(p))) {
+    if (request.cookies.get('storecare-demo-signed-out')?.value === '1' && !isPublicPath(path)) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       url.search = '';
@@ -40,17 +51,12 @@ export async function middleware(request: NextRequest) {
     return next;
   };
 
-  const path = request.nextUrl.pathname;
-  // Signed-out visitors to the home page see the landing page at the same address.
-  if (!user && path === '/') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/welcome';
-    return withSessionCookies(NextResponse.rewrite(url));
-  }
-  if (!user && !PUBLIC.some((p) => path.startsWith(p))) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return withSessionCookies(NextResponse.redirect(url));
+  const session = sessionRouting(host, path, !!user);
+  if (session) {
+    const url = host === 'app.storecarehq.com' ? new URL(APP_ORIGIN) : request.nextUrl.clone();
+    url.pathname = session.path;
+    url.search = request.nextUrl.search;
+    return withSessionCookies(session.kind === 'redirect' ? NextResponse.redirect(url) : NextResponse.rewrite(url));
   }
   return response;
 }

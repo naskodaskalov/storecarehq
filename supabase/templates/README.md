@@ -15,9 +15,9 @@ Management API fields; no credentials or unrelated authentication settings.
 ## Activation status
 
 **Active in the hosted StoreCare HQ project** as of 30 October 2026. Custom SMTP is configured
-using Resend with sender `StoreCare HQ <storecare@naskodaskalov.dev>`, host `smtp.resend.com`,
+using Resend with sender `StoreCare HQ <auth@storecarehq.com>`, host `smtp.resend.com`,
 port 465 and username `resend`. The dedicated `StoreCare HQ Auth` key has sending-only access
-restricted to the verified `naskodaskalov.dev` domain. Its value is stored in Supabase's SMTP
+restricted to the verified `storecarehq.com` domain. Its value is stored in Supabase's SMTP
 password setting, not in repository files. Existing keys for other projects were preserved.
 
 Confirmation, recovery and magic-link subjects/bodies were saved in Supabase, with the original
@@ -25,9 +25,22 @@ Confirmation, recovery and magic-link subjects/bodies were saved in Supabase, wi
 was sent from the local app; Resend reported it Delivered. This confirms SMTP delivery, not
 that the recipient opened the email or completed the password change.
 
-`naskodaskalov.dev` is the temporary sending domain. When the StoreCare domain is ready,
-verify it in Resend, create a correspondingly restricted sending key, and update the Supabase
-sender and SMTP password. The templates themselves do not depend on the sending domain.
+`storecarehq.com` is verified in Resend. Vercel DNS contains the Resend DKIM TXT,
+`rsend` and `send` CNAME records, and a DMARC monitoring policy. Receiving is disabled.
+The existing Auth key was restricted to the new domain without replacing the stored SMTP password.
+
+A separate sending-only `StoreCare HQ App` key, restricted to `storecarehq.com`, is stored
+as `RESEND_API_KEY` in Vercel Production and GitHub Actions. Production reports use
+`StoreCare HQ <reports@storecarehq.com>`; the monitoring workflow defaults to
+`StoreCare HQ <alerts@storecarehq.com>`. No credential values are stored in this repository.
+
+The public website is `https://www.storecarehq.com`; authentication and the agency app use
+`https://app.storecarehq.com`. Supabase Site URL is the app origin, with its exact
+`/auth/callback` URL allowed alongside the existing apex, www, Vercel and localhost callbacks.
+Login and email-link requests must start on the app host so PKCE and recovery-intent cookies
+remain on the callback host. Existing website sessions require one sign-in on the app domain.
+The earlier delivered reset test used the temporary sending domain; end-to-end inbox delivery
+from the new sending domain has not yet been tested.
 
 For a fresh project, configure SMTP under Authentication → Emails → SMTP Settings.
 Then set the subject and paste the corresponding HTML into each template's Source editor,

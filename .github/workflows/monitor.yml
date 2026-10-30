@@ -32,7 +32,7 @@ jobs:
       ALERTS_FROM: ${{ vars.ALERTS_FROM || 'StoreCare HQ <alerts@storecarehq.com>' }}
       # Optional: AI-written summaries for the reports drafted on the 1st (template summary without it).
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      APP_URL: https://storecarehq.vercel.app
+      APP_URL: https://app.storecarehq.com
       FORCE: ${{ inputs.force }}
     steps:
       # A monitoring job that cannot monitor must fail visibly.

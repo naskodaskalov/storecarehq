@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
 import { Icon } from './icon';
+import { headers } from 'next/headers';
+import { websiteLink } from '@/lib/domains';
 
-export function AuthShell({ children }: { children: ReactNode }) {
+export async function AuthShell({ children }: { children: ReactNode }) {
+  const home = websiteLink((await headers()).get('host') ?? '');
   return (
     <main className="login-shell">
       <aside className="login-story" aria-label="About StoreCare HQ">
-        <Link href="/welcome" className="brand"><span className="mark">SC</span>StoreCare HQ</Link>
+        <a href={home} className="brand"><span className="mark">SC</span>StoreCare HQ</a>
         <div className="login-story-content">
           <span className="login-eyebrow">BUILT FOR SHOPIFY AGENCIES</span>
           <h2>Great care.<br /><span>Clearly shown.</span></h2>
@@ -21,7 +23,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <div className="login-story-footer">Behind every thriving store is a team that cares.</div>
       </aside>
       <section className="login-entry" aria-labelledby="login-title">
-        <header className="login-entry-top"><Link href="/welcome">← Back to StoreCare</Link><span className="demo-badge">DEMO</span></header>
+        <header className="login-entry-top"><a href={home}>← Back to StoreCare</a><span className="demo-badge">DEMO</span></header>
         <div className="login-form-content">
           {children}
         </div>

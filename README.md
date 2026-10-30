@@ -57,6 +57,24 @@ Good for reviewing the UI and for showing the product to agencies.
 
 ## Deploy
 
+### Website and app domains
+
+The public site is `https://www.storecarehq.com`; the agency application is
+`https://app.storecarehq.com`. Both point to the same Vercel project. Marketing sign-in and trial
+buttons navigate directly to the app host. Opening the app checks the Supabase session and shows
+the user's workspace or login; accounts without an agency continue onboarding.
+
+Set Vercel Production `NEXT_PUBLIC_APP_URL=https://app.storecarehq.com`, Supabase Site URL to
+the same origin, and allow `https://app.storecarehq.com/auth/callback`. Keep existing old-domain
+and local callbacks during migration. Worker `APP_URL` also points to the app. Deploy these settings
+with the host-routing code. Local `.env.local` URLs must remain local.
+
+Sessions stay on the app host. Existing website sessions require one sign-in on the new host.
+Previously shared report links and Stripe webhooks remain valid on the old domain. See
+[domain architecture](system_architecture.md) for routing rules and verification.
+
+### Services
+
 - **Web:** Vercel, root `apps/web`, same env vars as `.env.example`.
 - **Worker (current): GitHub Actions.** `.github/workflows/monitor.yml` requests a run of `apps/worker/src/tick.ts` every
   30 minutes. GitHub's scheduled triggers are best effort and can be delayed or dropped; this is not a guaranteed monitoring interval.
