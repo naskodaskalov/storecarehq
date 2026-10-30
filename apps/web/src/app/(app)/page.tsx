@@ -36,20 +36,20 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   if (!d.stores.length) {
     return (
-      <>
-        <h1>Client stores</h1>
+      <div className="workspace-page overview-page">
+        <div className="page-heading"><h1>Client stores</h1></div>
         {deletedNotice}
-        <section className="card">
+        <section className="workspace-section">
           <h2>Add your first store</h2>
           <p className="muted" style={{ margin: 0 }}>Paste a client&apos;s store address and StoreCare starts watching it within 30 minutes.</p>
           <Link className="btn" href="/onboarding/store" style={{ alignSelf: 'flex-start' }}>Add store</Link>
         </section>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="workspace-page overview-page">
       <div className="page-heading">
         <div>
           <h1>Overview</h1>
@@ -108,6 +108,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       )}
 
       <StoreTable stores={storeRows} />
-    </>
+    </div>
   );
 }

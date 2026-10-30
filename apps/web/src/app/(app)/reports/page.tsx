@@ -5,6 +5,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { host } from '@/lib/format';
 import { SubmitButton } from '@/components/submit-button';
 import { draftReport } from './actions';
+import { Icon } from '@/components/icon';
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   draft: { label: 'Draft', tone: 'var(--text-2)' },
@@ -30,15 +31,20 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const toReview = (reports ?? []).filter((r) => r.status === 'draft' && r.auto_drafted_at).length;
 
   return (
-    <>
-      <div className="row" style={{ alignItems: 'flex-end' }}>
+    <div className="workspace-page reports-page">
+      <header className="page-heading">
         <div>
           <h1>Reports</h1>
-          <div className="muted">
-            Each store&apos;s report is drafted for you on the 1st of the month. Review it, approve it, then send the client a link.
-          </div>
+          <p>Client-ready reports. Care made visible.</p>
         </div>
-      </div>
+        <span className="workspace-period"><Icon name="report" size={16} />{period.label}</span>
+      </header>
+
+      <dl className="workspace-metrics">
+        <div><dt>Client stores</dt><dd>{stores?.length ?? 0}</dd></div>
+        <div><dt>Drafts to review</dt><dd>{(reports ?? []).filter((report) => report.status === 'draft').length}</dd></div>
+        <div><dt>Approved or sent</dt><dd>{done}<span> / {stores?.length ?? 0}</span></dd></div>
+      </dl>
 
       {error && <div className="notice error" role="alert">{error}</div>}
       {toReview > 0 && (
@@ -48,15 +54,15 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         </div>
       )}
 
-      <section className="card">
-        <div className="row">
-          <div className="row" style={{ gap: 12, justifyContent: 'flex-start' }}>
-            <Link href={`/reports?period=${prev.start.slice(0, 7)}`} aria-label={`Previous month, ${prev.label}`} className="btn secondary" style={{ height: 40, padding: '0 12px' }}>←</Link>
-            <h2 style={{ minWidth: 160, textAlign: 'center' }}>{period.label}</h2>
+      <section className="workspace-section workspace-table-section">
+        <div className="workspace-section-heading">
+          <div className="report-period-nav">
+            <Link href={`/reports?period=${prev.start.slice(0, 7)}`} aria-label={`Previous month, ${prev.label}`} title={`Previous month, ${prev.label}`} className="btn secondary workspace-icon-button"><Icon name="arrow" size={16} style={{ transform: 'rotate(180deg)' }} /></Link>
+            <h2>{period.label}</h2>
             {period.start < thisMonth.start ? (
-              <Link href={`/reports?period=${next.start.slice(0, 7)}`} aria-label={`Next month, ${next.label}`} className="btn secondary" style={{ height: 40, padding: '0 12px' }}>→</Link>
+              <Link href={`/reports?period=${next.start.slice(0, 7)}`} aria-label={`Next month, ${next.label}`} title={`Next month, ${next.label}`} className="btn secondary workspace-icon-button"><Icon name="arrow" size={16} /></Link>
             ) : (
-              <span style={{ width: 44 }} />
+              <span className="workspace-icon-spacer" />
             )}
           </div>
           <span className="small muted">
@@ -120,6 +126,6 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
           </div>
         )}
       </section>
-    </>
+    </div>
   );
 }

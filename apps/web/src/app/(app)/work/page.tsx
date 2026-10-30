@@ -3,8 +3,9 @@ import { redirect } from 'next/navigation';
 import { workEntryExplains } from '@storecare/storefront';
 import { requireAgency, monthStart } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
-import { hours } from '@/lib/format';
+import { hours, monthStartLabel } from '@/lib/format';
 import { SubmitButton } from '@/components/submit-button';
+import { Icon } from '@/components/icon';
 
 async function logWork(formData: FormData) {
   'use server';
@@ -70,17 +71,24 @@ export default async function Work({ searchParams }: { searchParams: Promise<{ s
       .order('work_date', { ascending: false })
       .order('created_at', { ascending: false }),
   ]);
+  const totalMinutes = (entries ?? []).reduce((total, entry) => total + entry.minutes, 0);
+  const planMinutes = (entries ?? []).filter((entry) => entry.counts_to_plan).reduce((total, entry) => total + entry.minutes, 0);
 
   return (
-    <>
-      <h1>Work log</h1>
-      <section className="card">
-        <h2>Log time</h2>
+    <div className="workspace-page work-page">
+      <header className="page-heading"><div><h1>Work log</h1><p>Your team&apos;s care, recorded.</p></div><span className="workspace-period"><Icon name="calendar" size={16} />{monthStartLabel()}</span></header>
+      <dl className="workspace-metrics">
+        <div><dt>Hours logged</dt><dd>{hours(totalMinutes)}<span> h</span></dd></div>
+        <div><dt>Toward care plans</dt><dd>{hours(planMinutes)}<span> h</span></dd></div>
+        <div><dt>Work entries</dt><dd>{entries?.length ?? 0}</dd></div>
+      </dl>
+      <section className="workspace-section" aria-labelledby="log-time-title">
+        <div className="workspace-section-heading"><h2 id="log-time-title">Log time</h2><Icon name="clock" size={18} /></div>
         {!stores?.length ? (
           <p className="muted" style={{ margin: 0 }}>Add a store first.</p>
         ) : (
-          <form action={logWork} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+          <form action={logWork} className="work-entry-form">
+            <div className="work-entry-basics">
               <div className="field">
                 <label htmlFor="store">Store</label>
                 <select id="store" name="store" defaultValue={selected ?? stores[0].id}>
@@ -104,18 +112,18 @@ export default async function Work({ searchParams }: { searchParams: Promise<{ s
               <label htmlFor="client_text">How to describe it to the client <span className="muted" style={{ fontWeight: 400 }}>(optional, used in the report)</span></label>
               <textarea id="client_text" name="client_text" />
             </div>
-            <div className="row">
+            <div className="row work-entry-footer">
               <label className="check" style={{ alignItems: 'center' }}><input type="checkbox" name="counts" defaultChecked style={{ marginTop: 0 }} /> Counts toward the care plan</label>
-              <SubmitButton pendingText="Saving…">Save entry</SubmitButton>
+              <SubmitButton pendingText="Saving…"><Icon name="plus" size={16} />Save entry</SubmitButton>
             </div>
-            {saved && <div className="small tone-good">Saved. Matching detected changes were linked to it.</div>}
-            {error && <div className="error">Add a description and the time spent.</div>}
+            {saved && <div className="small tone-good work-entry-footer" role="status">Saved. Matching detected changes were linked to it.</div>}
+            {error && <div className="error work-entry-footer" role="alert">Add a description and the time spent.</div>}
           </form>
         )}
       </section>
 
-      <section className="card">
-        <h2>This month</h2>
+      <section className="workspace-section workspace-table-section" aria-labelledby="work-entries-title">
+        <div className="workspace-section-heading"><h2 id="work-entries-title">This month <span className="section-count">{entries?.length ?? 0}</span></h2></div>
         <div className="table-wrap">
           <table style={{ minWidth: 640 }}>
             <thead><tr><th>Date</th><th>Store</th><th>Work</th><th>Hours</th></tr></thead>
@@ -133,6 +141,6 @@ export default async function Work({ searchParams }: { searchParams: Promise<{ s
           </table>
         </div>
       </section>
-    </>
+    </div>
   );
 }

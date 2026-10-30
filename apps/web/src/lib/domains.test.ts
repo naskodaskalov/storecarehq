@@ -49,6 +49,15 @@ test('local and preview origins retain their own links and callback cookies', ()
   assert.equal(authCallbackUrl('storecarehq-preview.vercel.app', APP_ORIGIN, 'storecarehq-preview.vercel.app'), 'https://storecarehq-preview.vercel.app/auth/callback');
 });
 
+test('contact submissions stay on their original host without requiring a session', () => {
+  for (const host of ['www.storecarehq.com', 'storecarehq.com', 'app.storecarehq.com', 'localhost:3000']) {
+    assert.equal(hostRouting(host, '/api/contact', '', 'POST'), null);
+    assert.equal(sessionRouting(host, '/api/contact', false), null);
+  }
+  assert.equal(isPublicPath('/api/contact/other'), false);
+  assert.deepEqual(hostRouting('www.storecarehq.com', '/welcome', '', 'POST'), { kind: 'reject' });
+});
+
 test('auth callback destinations cannot be supplied through an arbitrary Host header', () => {
   assert.equal(authCallbackUrl('app.storecarehq.com', WEBSITE_ORIGIN), `${APP_ORIGIN}/auth/callback`);
   for (const host of ['evil.example', 'app.storecarehq.com.evil.example', 'unrelated.vercel.app', 'localhost:9999']) {

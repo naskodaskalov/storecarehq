@@ -7,6 +7,7 @@ import { monthStart } from '@/lib/data';
 import { SubmitButton } from '@/components/submit-button';
 import { daysUntil, isOutOfStock, type ProductLite } from '@storecare/storefront';
 import { HealthCheckStatus, type HealthCheck } from '@/components/health-check-status';
+import { Icon } from '@/components/icon';
 
 type Search = { filter?: string; welcome?: string; change?: string };
 
@@ -30,7 +31,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
     .single();
   if (!store) notFound();
   const scan = await supabase.from('health_check_requests').select('id,source,status,requested_at,started_at,finished_at,phase,results')
-    .eq('store_id',id).order('requested_at',{ ascending: false }).limit(1).maybeSingle();
+    .eq('store_id', id).order('requested_at', { ascending: false }).limit(1).maybeSingle();
 
   // Fetch the requested change separately: it may be older than the feed's latest 30 rows.
   // Both store scope and the signed-in user's RLS apply to this lookup.
@@ -93,26 +94,35 @@ export default async function StorePage({ params, searchParams }: { params: Prom
   const apps = (snap?.apps ?? []) as { key: string; name: string; known: boolean }[];
 
   return (
-    <>
-      <Link href="/" style={{ fontSize: 14, textDecoration: 'none' }}>← All stores</Link>
+    <div className="store-details">
+      <Link href="/#client-stores" className="store-back"><Icon name="arrow" size={15} style={{ transform: 'rotate(180deg)' }} />Client stores</Link>
       {welcome && (
         <div className="notice">
           <strong>{store.name} is being set up.</strong> Its first health check is queued and will start when a worker is available.
           Changes appear from the second snapshot onwards.
         </div>
       )}
-      <div className="row" style={{ alignItems: 'flex-end', marginTop: -12 }}>
-        <div>
-          <h1>{store.name}</h1>
-          <div className="muted">
-            {host(store.public_url)}{plan ? ` · ${plan.name} · ${plan.hours_included} h/month` : ''}{store.client_contact_name ? ` · contact: ${store.client_contact_name}` : ''}
+      <header className="store-detail-header">
+        <div className="store-detail-identity">
+          <span className="store-detail-avatar" aria-hidden="true">{store.name.slice(0, 2).toUpperCase()}</span>
+          <div>
+            <div className="store-title-row"><h1>{store.name}</h1><span className={`store-monitor-status ${store.status === 'active' ? 'is-active' : ''}`}><span />{store.status === 'active' ? 'Monitoring active' : store.status === 'paused' ? 'Paused' : 'Limited monitoring'}</span></div>
+            <div className="store-detail-meta">
+              <a href={store.public_url} target="_blank" rel="noreferrer">{host(store.public_url)}<Icon name="arrow" size={13} style={{ transform: 'rotate(-45deg)' }} /></a>
+              {plan && <span>{plan.name} · {plan.hours_included} h/month</span>}
+              {store.client_contact_name && <span>{store.client_contact_name}</span>}
+            </div>
           </div>
         </div>
-        <div className="row" style={{ gap: 10 }}>
+        <div className="store-detail-actions">
           <Link className="btn secondary" href={`/stores/${store.id}/settings`}>Settings</Link>
-          <Link className="btn secondary" href={`/work?store=${store.id}`}>Log time</Link>
+          <Link className="btn" href={`/work?store=${store.id}`}><Icon name="plus" size={16} />Log time</Link>
         </div>
-      </div>
+      </header>
+
+      <nav className="store-section-nav" aria-label="Store sections">
+        <a href="#store-overview">Overview</a><a href="#site-checks">Site checks</a><a href="#change-feed">Change feed</a><a href="#checkout-test">Checkout</a>
+      </nav>
 
       {store.status === 'paused' && (
         <div className="notice">
@@ -140,126 +150,146 @@ export default async function StorePage({ params, searchParams }: { params: Prom
         </>}
       </section>}
 
-      <HealthCheckStatus key={id} storeId={id} initial={scan.data as HealthCheck | null} initialTime={Date.now()} paused={store.status === 'paused'} unavailable={!!scan.error} />
-
-      <div className="kpis">
-        <div className="kpi">
-          <div className="small muted">Health score</div>
-          <div className={`value tone-${h.tone}`}>{store.health_score ?? '—'}</div>
+      <section className="store-overview" id="store-overview" aria-label="Store overview">
+        <div className="store-metric">
+          <div className="store-metric-label"><Icon name="check" size={16} />Health score</div>
+          <div className={`value tone-${h.tone}`}>{store.health_score ?? '—'}<span className="store-metric-unit"> / 100</span></div>
           <div className="small muted">{h.tone === 'none' ? h.text : h.text.split(' · ')[1]}</div>
         </div>
-        <div className="kpi">
-          <div className="small muted">Uptime, 30 days</div>
+        <div className="store-metric">
+          <div className="store-metric-label"><Icon name="clock" size={16} />Uptime</div>
           <div className="value">{uptimePct === null ? '—' : `${uptimePct.toFixed(2)}%`}</div>
-          <div className="small muted">Checked every 30 min</div>
+          <div className="small muted">Last 30 days · every 30 min</div>
         </div>
-        <div className="kpi">
-          <div className="small muted">Mobile LCP (home)</div>
-          <div className="value">{latestSpeed?.lcp_ms ? `${(latestSpeed.lcp_ms / 1000).toFixed(1)}s` : '—'}</div>
+        <div className="store-metric">
+          <div className="store-metric-label"><Icon name="arrow" size={16} />Mobile load time</div>
+          <div className={`value${latestSpeed?.lcp_ms && latestSpeed.lcp_ms > 4000 ? ' warn' : ''}`}>{latestSpeed?.lcp_ms ? `${(latestSpeed.lcp_ms / 1000).toFixed(1)}s` : '—'}</div>
           <div className="small muted">
             {latestSpeed && prevSpeed?.lcp_ms && latestSpeed.lcp_ms
               ? `${latestSpeed.lcp_ms <= prevSpeed.lcp_ms ? '−' : '+'}${(Math.abs(latestSpeed.lcp_ms - prevSpeed.lcp_ms) / 1000).toFixed(1)}s vs previous`
               : 'Daily, PageSpeed Insights'}
           </div>
         </div>
-        <div className="kpi">
-          <div className="small muted">Hours this month</div>
-          <div className="value">{hours(usedMin)}<span className="muted" style={{ fontSize: 15 }}> / {plan?.hours_included ?? 0}</span></div>
+        <div className="store-metric">
+          <div className="store-metric-label"><Icon name="work" size={16} />Care plan hours</div>
+          <div className="value">{hours(usedMin)}<span className="store-metric-unit"> / {plan?.hours_included ?? 0} h</span></div>
           <div className="small muted">{monthStartLabel()}</div>
-        </div>
-      </div>
-
-      <section className="card">
-        <h2>Site checks</h2>
-        <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-          <Check
-            label="Real visitors' load"
-            value={latestSpeed?.field_lcp_ms ? `${(latestSpeed.field_lcp_ms / 1000).toFixed(1)}s` : '—'}
-            note={
-              latestSpeed?.field_lcp_ms
-                ? `Chrome visitors, 28 days${latestSpeed.field_category ? ` · ${FIELD[latestSpeed.field_category] ?? latestSpeed.field_category}` : ''}${latestSpeed.field_scope === 'origin' ? ' (whole site)' : ''}`
-                : latestSpeed
-                  ? 'Not enough Chrome traffic for Google to report'
-                  : 'Daily, from Google'
-            }
-            warn={latestSpeed?.field_category === 'SLOW'}
-          />
-          <Check label="Response time" value={responseMs ? `${responseMs} ms` : '—'} note="Average, last 24 hours" warn={!!responseMs && responseMs > 1500} />
-          <Check
-            label="Stock"
-            value={stockTracked ? `${soldOut.length} sold out` : '—'}
-            note={stockTracked ? `of ${products!.length} products${soldOut.length ? `: ${soldOut.slice(0, 2).map((p) => p.title).join(', ')}${soldOut.length > 2 ? '…' : ''}` : ''}` : 'From the next snapshot'}
-          />
-          <Check
-            label="Broken links"
-            value={siteCheck ? String(broken.length) : '—'}
-            note={siteCheck ? (broken.length ? broken.slice(0, 2).map((b) => b.url.replace(/^https?:\/\/[^/]+/, '')).join(', ') : `${siteCheck.pages_checked} pages checked`) : 'Daily'}
-            warn={broken.length > 0}
-          />
-          <Check
-            label="SSL certificate"
-            value={sslDays !== null ? `${sslDays} days` : '—'}
-            note={sslDays !== null ? `left${siteCheck?.ssl_issuer ? ` · ${siteCheck.ssl_issuer}` : ''}` : siteCheck?.ssl_error ? 'Could not read' : 'Daily'}
-            warn={sslDays !== null && sslDays <= 14}
-          />
-          <Check
-            label="Domain"
-            value={domainDays !== null ? `${domainDays} days` : '—'}
-            note={domainDays !== null ? `until ${siteCheck?.domain} expires` : siteCheck?.domain_error ? 'Expiry not published for this domain' : 'Daily'}
-            warn={domainDays !== null && domainDays <= 30}
-          />
-          <Check
-            label="Google audit"
-            value={latestSpeed?.seo_score != null ? `SEO ${latestSpeed.seo_score}` : '—'}
-            note={latestSpeed?.accessibility_score != null ? `Accessibility ${latestSpeed.accessibility_score} · Best practices ${latestSpeed.best_practices_score ?? '—'}` : 'Daily'}
-            warn={latestSpeed?.accessibility_score != null && latestSpeed.accessibility_score < 80}
-          />
+          {!!plan?.hours_included && <progress value={usedMin / 60} max={plan.hours_included} aria-label="Monthly care plan hours used" />}
         </div>
       </section>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
-        <section className="card" id="change-feed" style={{ flex: '3 1 460px', minWidth: 0, scrollMarginTop: 24 }}>
-          <div className="row">
-            <h2>Change feed</h2>
-            <div className="row small" style={{ gap: 8, justifyContent: 'flex-end' }}>
+      <HealthCheckStatus key={id} storeId={id} initial={scan.data as HealthCheck | null} initialTime={Date.now()} paused={store.status === 'paused'} unavailable={!!scan.error} />
+
+      <div className="store-detail-grid">
+        <div className="store-detail-primary">
+
+          <section className="site-checks" id="site-checks" aria-labelledby="site-checks-title">
+            <div className="store-section-heading"><h2 id="site-checks-title">Site checks</h2><span className="small muted">{siteCheck?.checked_at ? `Checked ${when(siteCheck.checked_at, store.timezone).date}` : 'Awaiting first check'}</span></div>
+            <div className="site-checks-groups">
+              <div className="site-checks-group">
+                <h3>Performance</h3>
+                <dl>
+                  <Check
+                    label="Real visitors' load"
+                    value={latestSpeed?.field_lcp_ms ? `${(latestSpeed.field_lcp_ms / 1000).toFixed(1)}s` : '—'}
+                    note={
+                      latestSpeed?.field_lcp_ms
+                        ? `Chrome visitors, 28 days${latestSpeed.field_category ? ` · ${FIELD[latestSpeed.field_category] ?? latestSpeed.field_category}` : ''}${latestSpeed.field_scope === 'origin' ? ' (whole site)' : ''}`
+                        : latestSpeed
+                          ? 'Not enough Chrome traffic for Google to report'
+                          : 'Daily, from Google'
+                    }
+                    warn={latestSpeed?.field_category === 'SLOW'}
+                  />
+                  <Check label="Response time" value={responseMs ? `${responseMs} ms` : '—'} note="Average, last 24 hours" warn={!!responseMs && responseMs > 1500} />
+                </dl>
+              </div>
+              <div className="site-checks-group">
+                <h3>Storefront</h3>
+                <dl>
+                  <Check
+                    label="Stock"
+                    value={stockTracked ? `${soldOut.length} sold out` : '—'}
+                    note={stockTracked ? `of ${products!.length} products${soldOut.length ? `: ${soldOut.slice(0, 2).map((p) => p.title).join(', ')}${soldOut.length > 2 ? '…' : ''}` : ''}` : 'From the next snapshot'}
+                  />
+                  <Check
+                    label="Broken links"
+                    value={siteCheck ? String(broken.length) : '—'}
+                    note={siteCheck ? (broken.length ? broken.slice(0, 2).map((b) => b.url.replace(/^https?:\/\/[^/]+/, '')).join(', ') : `${siteCheck.pages_checked} pages checked`) : 'Daily'}
+                    warn={broken.length > 0}
+                  />
+                </dl>
+              </div>
+              <div className="site-checks-group">
+                <h3>Security &amp; domain</h3>
+                <dl>
+                  <Check
+                    label="SSL certificate"
+                    value={sslDays !== null ? `${sslDays} days` : '—'}
+                    note={sslDays !== null ? `left${siteCheck?.ssl_issuer ? ` · ${siteCheck.ssl_issuer}` : ''}` : siteCheck?.ssl_error ? 'Could not read' : 'Daily'}
+                    warn={sslDays !== null && sslDays <= 14}
+                  />
+                  <Check
+                    label="Domain"
+                    value={domainDays !== null ? `${domainDays} days` : '—'}
+                    note={domainDays !== null ? `until ${siteCheck?.domain} expires` : siteCheck?.domain_error ? 'Expiry not published for this domain' : 'Daily'}
+                    warn={domainDays !== null && domainDays <= 30}
+                  />
+                </dl>
+              </div>
+            </div>
+            <div className="site-checks-audit">
+              <h3>Google audit<span className="small muted">Daily · PageSpeed Insights</span></h3>
+              <dl>
+                <Check label="SEO" value={latestSpeed?.seo_score != null ? String(latestSpeed.seo_score) : '—'} />
+                <Check label="Accessibility" value={latestSpeed?.accessibility_score != null ? String(latestSpeed.accessibility_score) : '—'} warn={latestSpeed?.accessibility_score != null && latestSpeed.accessibility_score < 80} />
+                <Check label="Best practices" value={latestSpeed?.best_practices_score != null ? String(latestSpeed.best_practices_score) : '—'} />
+              </dl>
+            </div>
+          </section>
+
+          <section className="store-activity" id="change-feed" aria-labelledby="change-feed-title">
+            <div className="store-section-heading">
+              <h2 id="change-feed-title">Change feed <span className="section-count">{changes.data?.length ?? 0}</span></h2>
+            </div>
+            <nav className="store-feed-filters" aria-label="Change feed filters">
               {[
                 ['all', 'All'],
                 ['unexplained', 'Not in work log'],
                 ['matched', 'Matched to work log'],
               ].map(([key, label]) => (
-                <Link key={key} href={`/stores/${id}?filter=${key}`} className="chip" aria-current={filter === key ? 'true' : undefined}
-                  style={filter === key ? { background: 'var(--accent-soft)', borderColor: 'transparent', color: 'var(--text)' } : { color: 'var(--text-2)', textDecoration: 'none' }}>
+                <Link key={key} href={`/stores/${id}?filter=${key}#change-feed`} aria-current={filter === key ? 'true' : undefined}>
                   {label}
                 </Link>
               ))}
-            </div>
-          </div>
-          <div className="small muted">Changes are detected on the live storefront, so we can&apos;t see who made them. Changes that match your work log are linked to it.</div>
-          <div className="feed">
-            {(changes.data ?? []).length === 0 && <div className="muted" style={{ padding: '14px 0' }}>No changes detected yet.</div>}
-            {(changes.data ?? []).map((c) => {
-              const t = when(c.occurred_at, store.timezone);
-              const entry = c.work_entries as unknown as { title: string } | null;
-              const note = (c.details as { note?: string })?.note;
-              return (
-                <div key={c.id} className="feed-item">
-                  <div className="feed-when">{t.date}<br />{t.time}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Link href={`/stores/${id}?change=${c.id}#change-details`} style={{ fontWeight: 600 }}>{c.summary}</Link>
-                    <div className={`small ${c.risky && !entry ? 'warn' : 'muted'}`} style={{ fontSize: 14 }}>
-                      Detected · {entry ? `matched to work log: ${entry.title}` : 'not in work log'}{note ? ` · ${note}` : ''}
+            </nav>
+            <div className="feed">
+              {(changes.data ?? []).length === 0 && <div className="muted" style={{ padding: '14px 0' }}>No changes detected yet.</div>}
+              {(changes.data ?? []).map((c) => {
+                const t = when(c.occurred_at, store.timezone);
+                const entry = c.work_entries as unknown as { title: string } | null;
+                const note = (c.details as { note?: string })?.note;
+                return (
+                  <div key={c.id} className="feed-item">
+                    <div className="feed-when"><strong>{t.date}</strong><span>{t.time}</span></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Link href={`/stores/${id}?filter=${encodeURIComponent(filter)}&change=${c.id}#change-details`} className="store-change-link">{c.summary}</Link>
+                      <div className={`small ${c.risky && !entry ? 'warn' : 'muted'}`}>
+                        Detected · {entry ? `matched to work log: ${entry.title}` : 'not in work log'}{note ? ` · ${note}` : ''}
+                      </div>
                     </div>
+                    <span className={`store-change-kind${c.risky ? ' is-risky' : ''}`}>{KIND_LABEL[c.kind] ?? c.kind}</span>
                   </div>
-                  <div className={`small ${c.risky ? 'warn' : ''}`} style={{ fontWeight: 600 }}>{KIND_LABEL[c.kind] ?? c.kind}</div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                );
+              })}
+            </div>
+            <p className="store-activity-note">Detected on the public storefront. Changes can be matched to your work log, but not attributed to a person.</p>
+          </section>
+        </div>
 
-        <div style={{ flex: '2 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <section className="card">
-            <h2>Checkout test</h2>
+        <aside className="store-detail-sidebar" aria-label="Store monitoring details">
+          <section className="store-side-section" id="checkout-test">
+            <div className="store-section-heading"><h2>Checkout test</h2><Icon name="store" size={18} /></div>
             {!store.checkout_consent_at ? (
               <form action={enableCheckout} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <input type="hidden" name="store" value={store.id} />
@@ -271,25 +301,26 @@ export default async function StorePage({ params, searchParams }: { params: Prom
               <>
                 <div>
                   {lastRun ? (
-                    <><span className={lastRun.result === 'pass' ? 'tone-good' : 'warn'} style={{ fontWeight: 600 }}>{RESULT[lastRun.result]}</span> {when(lastRun.ran_at, store.timezone).date} at {when(lastRun.ran_at, store.timezone).time} · {lastRun.device}{lastRun.failed_step ? ` · failed at ${lastRun.failed_step.replace('_', ' ')}` : ''}</>
+                    <><div className={`store-checkout-result ${lastRun.result === 'pass' ? 'tone-good' : 'warn'}`}><Icon name={lastRun.result === 'pass' ? 'check' : 'alert'} size={18} />{RESULT[lastRun.result]}</div><div className="small muted">{when(lastRun.ran_at, store.timezone).date} at {when(lastRun.ran_at, store.timezone).time} · {lastRun.device}{lastRun.failed_step ? ` · failed at ${lastRun.failed_step.replace('_', ' ')}` : ''}</div></>
                   ) : (
                     <span className="muted">First run at 06:00 store time.</span>
                   )}
                 </div>
                 {runList.length > 0 && (
-                  <div role="img" aria-label={`Last 14 days: ${runList.filter((r) => r.result === 'pass').length} passed, ${runList.filter((r) => r.result === 'fail').length} failed`}
+                  <div role="img" aria-label={`Latest ${Math.min(runList.length, 14)} runs: ${runList.slice(-14).filter((r) => r.result === 'pass').length} passed, ${runList.slice(-14).filter((r) => r.result === 'fail').length} failed`}
                     style={{ display: 'grid', gridTemplateColumns: 'repeat(14, minmax(0, 1fr))', gap: 4 }}>
                     {runList.slice(-14).map((r, i) => (
-                      <div key={i} style={{ height: 22, borderRadius: 4, background: r.result === 'pass' ? 'var(--accent-mid)' : r.result === 'fail' ? 'var(--warn)' : 'var(--border-strong)' }} />
+                      <div key={i} title={`${when(r.ran_at, store.timezone).date} · ${RESULT[r.result] ?? r.result}`} style={{ height: 28, borderRadius: 3, background: r.result === 'pass' ? 'var(--accent-mid)' : r.result === 'fail' ? 'var(--warn)' : 'var(--border-strong)' }} />
                     ))}
                   </div>
                 )}
+                {runList.length > 0 && <div className="store-history-caption"><span>Latest {Math.min(runList.length, 14)} runs</span><span>{store.timezone}</span></div>}
               </>
             )}
           </section>
 
           {lastIncident && (
-            <section className="card" style={{ background: lastIncident.resolved_at ? 'var(--surface)' : 'var(--warn-bg)', borderColor: lastIncident.resolved_at ? 'var(--border)' : 'var(--warn-border)' }}>
+            <section className={`store-side-section${lastIncident.resolved_at ? '' : ' store-incident-open'}`}>
               <h2 style={{ fontSize: 16 }} className={lastIncident.resolved_at ? '' : 'warn'}>
                 {lastIncident.resolved_at ? 'Last incident · resolved' : 'Open incident'}
               </h2>
@@ -300,19 +331,20 @@ export default async function StorePage({ params, searchParams }: { params: Prom
             </section>
           )}
 
-          <section className="card">
-            <div className="row"><h2>Apps detected</h2><span className="mono muted">{apps.length}</span></div>
+          <section className="store-side-section">
+            <div className="store-section-heading"><h2>Theme &amp; apps</h2><span className="section-count">{apps.length} apps</span></div>
             {snap?.theme && (
-              <div className="small">Theme: <strong>{(snap.theme as { name?: string }).name}</strong> {(snap.theme as { schemaName?: string; schemaVersion?: string }).schemaName} {(snap.theme as { schemaVersion?: string }).schemaVersion}</div>
+              <div className="store-theme"><span className="small muted">Published theme</span><strong>{(snap.theme as { name?: string }).name}</strong><span className="small muted">{(snap.theme as { schemaName?: string; schemaVersion?: string }).schemaName} {(snap.theme as { schemaVersion?: string }).schemaVersion}</span></div>
             )}
             <div className="small" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {apps.map((a) => <span key={a.key} className="chip" style={{ fontFamily: 'inherit', fontSize: 13 }}>{a.name}</span>)}
-              {!apps.length && <span className="muted">Waiting for the first snapshot.</span>}
+              {!apps.length && <span className="muted">{snap ? 'No apps detected in the latest snapshot.' : 'Waiting for the first snapshot.'}</span>}
             </div>
+            {snap?.taken_at && <div className="store-snapshot-time">Snapshot · {when(snap.taken_at, store.timezone).date} at {when(snap.taken_at, store.timezone).time}</div>}
           </section>
-        </div>
+        </aside>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -360,12 +392,12 @@ function ChangeEvidence({ details }: { details: unknown }) {
   </>;
 }
 
-function Check({ label, value, note, warn }: { label: string; value: string; note: string; warn?: boolean }) {
+function Check({ label, value, note, warn }: { label: string; value: string; note?: string; warn?: boolean }) {
   return (
-    <div className="kpi" style={{ padding: 14 }}>
-      <div className="small muted">{label}</div>
-      <div className={`mono ${warn ? 'warn' : ''}`} style={{ fontSize: 22 }}>{value}</div>
-      <div className="small muted">{note}</div>
+    <div className={`site-check${warn ? ' site-check-warning' : ''}`}>
+      <dt>{label}{warn && <span className="site-check-alert">Needs attention</span>}</dt>
+      <dd className="site-check-value">{value}</dd>
+      {note && <dd className="site-check-note">{note}</dd>}
     </div>
   );
 }

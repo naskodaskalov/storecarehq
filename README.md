@@ -73,6 +73,22 @@ Sessions stay on the app host. Existing website sessions require one sign-in on 
 Previously shared report links and Stripe webhooks remain valid on the old domain. See
 [domain architecture](system_architecture.md) for routing rules and verification.
 
+### Contact Forms
+
+The landing page's Contact section and the app's `/contact` page share a form and same-origin
+`POST /api/contact` endpoint. App contact stays available to signed-in agencies with expired plans.
+Set `RESEND_API_KEY`, `CONTACT_TO` (the receiving inbox), and `CONTACT_FROM` (a sender verified in
+Resend) in the web deployment. `REPORTS_FROM` is used when `CONTACT_FROM` is unset. Restart the
+local dev server after changing environment variables. Without configuration the form reports
+unavailability rather than claiming delivery. Replies go to the visitor's email address; messages
+are sent as plain text and are not stored in the application database.
+
+The endpoint validates field sizes, limits request bodies, rejects cross-origin submissions, and
+discards honeypot spam. A bounded, per-instance limiter allows five attempts per ten minutes per
+Vercel client IP (one shared bucket outside Vercel). This is not a distributed abuse limit: configure
+Vercel Firewall rate limiting for `/api/contact` before exposing it to significant public traffic.
+Contact tests use a mocked provider and never send email.
+
 ### Services
 
 - **Web:** Vercel, root `apps/web`, same env vars as `.env.example`.

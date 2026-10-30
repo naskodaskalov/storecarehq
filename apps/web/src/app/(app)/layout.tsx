@@ -17,9 +17,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const billing = billingState(agency);
   const path = (await headers()).get('x-pathname') ?? '';
   const onBilling = path.startsWith('/billing');
-  // Trial over and no plan: everything but billing waits until they choose one. Data is kept.
+  const onContact = path === '/contact';
+  // Trial over and no plan: billing and contact stay available. Data is kept.
   // A new agency that never finished checkout goes back to the sign-up trial step.
-  if (!billing.hasAccess && !onBilling) redirect(agency.stripe_subscription_id || agency.trial_ends_at ? '/billing' : '/onboarding/trial');
+  if (!billing.hasAccess && !onBilling && !onContact) redirect(agency.stripe_subscription_id || agency.trial_ends_at ? '/billing' : '/onboarding/trial');
   const planLabel = billing.plan ? `${PLANS[billing.plan].name} plan${billing.cardOnFile ? ', trial' : ''}` : billing.onTrial ? 'Free trial' : 'No plan';
 
   return (
@@ -38,33 +39,33 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <form action={signOut} className="signout-form"><SubmitButton secondary pendingText="Signing out…"><Icon name="logout" size={17} />Sign out</SubmitButton></form>
       </nav>
       <div className="workspace-body">
-      <WorkspaceHeader />
-      <main className="main" id="main-content">
-        {!onBilling && billing.onTrial && billing.cardOnFile && billing.plan && (
-          <div className="trial-bar" role="status">
-            <span>
-              Free trial: <strong>{billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? '' : 's'} left</strong>. Your {PLANS[billing.plan].name} plan
-              {billing.endsAt ? ' is cancelled and ends with the trial.' : ` starts on ${new Date(billing.trialEndsAt!).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} at $${PLANS[billing.plan].usd} a month.`}
-            </span>
-            <Link href="/billing">Manage plan</Link>
-          </div>
-        )}
-        {!onBilling && billing.onTrial && !billing.cardOnFile && (
-          <div className={`trial-bar${billing.trialDaysLeft <= 2 ? ' warn-bar' : ''}`} role="status">
-            <span>
-              Free trial: <strong>{billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? '' : 's'} left</strong>. Choose a plan to keep monitoring after that.
-            </span>
-            <Link href="/billing">Choose a plan</Link>
-          </div>
-        )}
-        {!onBilling && billing.pastDue && (
-          <div className="trial-bar warn-bar" role="alert">
-            <span>Your last payment failed. Update your card so monitoring keeps running.</span>
-            <Link href="/billing">Update card</Link>
-          </div>
-        )}
-        {children}
-      </main>
+        <WorkspaceHeader />
+        <main className="main" id="main-content">
+          {!onBilling && billing.onTrial && billing.cardOnFile && billing.plan && (
+            <div className="trial-bar" role="status">
+              <span>
+                Free trial: <strong>{billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? '' : 's'} left</strong>. Your {PLANS[billing.plan].name} plan
+                {billing.endsAt ? ' is cancelled and ends with the trial.' : ` starts on ${new Date(billing.trialEndsAt!).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} at $${PLANS[billing.plan].usd} a month.`}
+              </span>
+              <Link href="/billing">Manage plan</Link>
+            </div>
+          )}
+          {!onBilling && billing.onTrial && !billing.cardOnFile && (
+            <div className={`trial-bar${billing.trialDaysLeft <= 2 ? ' warn-bar' : ''}`} role="status">
+              <span>
+                Free trial: <strong>{billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? '' : 's'} left</strong>. Choose a plan to keep monitoring after that.
+              </span>
+              <Link href="/billing">Choose a plan</Link>
+            </div>
+          )}
+          {!onBilling && billing.pastDue && (
+            <div className="trial-bar warn-bar" role="alert">
+              <span>Your last payment failed. Update your card so monitoring keeps running.</span>
+              <Link href="/billing">Update card</Link>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );

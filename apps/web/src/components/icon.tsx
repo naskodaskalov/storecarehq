@@ -7,6 +7,7 @@ const paths = {
   work: 'M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1',
   report: 'M14 2H5v20h14V7ZM14 2v6h5M8 12h8M8 16h6',
   billing: 'M3 5h18v14H3ZM3 10h18M7 15h3',
+  mail: 'M3 5h18v14H3ZM3 5l9 7 9-7',
   clock: 'M12 8v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
   alert: 'M12 8v5M12 17h.01M12 2 1 21h22Z',
   check: 'm5 12 4 4L19 6',

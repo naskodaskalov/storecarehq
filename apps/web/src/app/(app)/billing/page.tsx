@@ -25,11 +25,11 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
   const firstPlan = 'trial_period_days' in checkoutTrial(agency); // never subscribed: 7 days free with a card
 
   return (
-    <>
+    <div className="workspace-page billing-page">
       <div className="page-heading billing-heading">
         <div>
-        <h1>Plan and billing</h1>
-        <p>A little care. A lot of peace of mind.</p>
+          <h1>Plan and billing</h1>
+          <p>A little care. A lot of peace of mind.</p>
         </div>
         <span className="billing-cadence"><Icon name="calendar" size={16} />Monthly billing · USD</span>
       </div>
@@ -38,7 +38,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
       {q.confirmed && <div className="notice" role="status" style={ok}>You&apos;re subscribed. Thank you! Monitoring carries on without a break.</div>}
       {q.changed && <div className="notice" role="status" style={ok}>Plan changed to {PLANS[q.changed as keyof typeof PLANS]?.name ?? q.changed}. The difference is prorated on your next invoice.</div>}
 
-      <section className="card subscription-summary">
+      <section className="workspace-section subscription-summary">
         <div className="subscription-kicker"><Icon name="billing" size={17} /><h2>Your workspace subscription</h2><span className="status-badge neutral">{s.onTrial ? 'Free trial' : s.paying ? 'Subscribed' : 'No active plan'}</span></div>
         {s.paying && s.plan ? (
           <>
@@ -80,7 +80,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
       </section>
 
       <section aria-labelledby="plans-title" className="pricing-section">
-        <div className="pricing-intro"><span className="pricing-eyebrow">ROOM TO GROW</span><h2 id="plans-title">Every store deserves great care.</h2><p>All the tools, on every plan. Just choose the space your agency needs.</p></div>
+        <div className="pricing-intro"><h2 id="plans-title">Choose your plan</h2><p>Every feature included. Choose the capacity your agency needs.</p></div>
         <div className="plans pricing-plans">
           {PLAN_KEYS.map((key) => {
             const p = PLANS[key];
@@ -112,6 +112,6 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
           Prices in US dollars, billed monthly by Stripe. Cancel any time; your plan runs to the end of the month you paid for.
         </p>
       </section>
-    </>
+    </div>
   );
 }

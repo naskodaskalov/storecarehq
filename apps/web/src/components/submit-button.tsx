@@ -9,6 +9,7 @@ export function SubmitButton({
   children,
   pendingText,
   secondary,
+  danger,
   style,
   pending: pendingOverride,
   name,
@@ -18,6 +19,7 @@ export function SubmitButton({
   children: ReactNode;
   pendingText: string;
   secondary?: boolean;
+  danger?: boolean;
   style?: CSSProperties;
   /** For forms driven by useActionState, pass its pending flag. */
   pending?: boolean;
@@ -35,7 +37,7 @@ export function SubmitButton({
   return (
     <button
       type="submit"
-      className={`btn${secondary ? ' secondary' : ''}`}
+      className={`btn${secondary ? ' secondary' : ''}${danger ? ' danger' : ''}`}
       disabled={pending || disabled}
       aria-busy={busy}
       style={style}

@@ -6,6 +6,7 @@ import { SubmitButton } from '@/components/submit-button';
 import { CopyButton } from '@/components/copy-button';
 import { ReportView } from '@/components/report-view';
 import { draftReport, reopenReport, saveReport, sendReport } from '../actions';
+import { Icon } from '@/components/icon';
 
 const SECTION_LABELS: Record<keyof Sections, string> = {
   summary: 'Summary',
@@ -39,20 +40,20 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
   )}`;
 
   return (
-    <>
-      <Link href={`/reports?period=${facts.period.start.slice(0, 7)}`} style={{ fontSize: 14, textDecoration: 'none' }}>← Reports · {facts.period.label}</Link>
-      <div className="row" style={{ alignItems: 'flex-end', marginTop: -12 }}>
+    <div className="workspace-page report-builder-page">
+      <Link href={`/reports?period=${facts.period.start.slice(0, 7)}`} className="store-back"><Icon name="arrow" size={15} style={{ transform: 'rotate(180deg)' }} />Reports · {facts.period.label}</Link>
+      <header className="page-heading">
         <div>
           <h1>{facts.storeName}</h1>
-          <div className="muted">
+          <p>
             {facts.period.label} report ·{' '}
             <strong style={{ color: draft ? 'var(--text-2)' : 'var(--accent)' }}>
               {report.status === 'draft' ? 'Draft' : report.status === 'approved' ? 'Approved' : `Sent${report.sent_to ? ` to ${report.sent_to}` : ''}`}
             </strong>
-          </div>
+          </p>
         </div>
         {store && <Link href={`/stores/${store.id}`} className="btn secondary">Store page</Link>}
-      </div>
+      </header>
 
       {q.error && <div className="notice error" role="alert">{q.error}</div>}
       {q.drafted && (
@@ -72,11 +73,11 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
       {q.approved && <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>Approved. The client link below now works; send it when you&apos;re ready.</div>}
       {q.sent && <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>Marked as sent.</div>}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
-        <div style={{ flex: '1 1 340px', minWidth: 0, maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="report-builder-layout">
+        <div className="report-builder-controls">
           {draft ? (
             <>
-              <form action={saveReport} className="card">
+              <form action={saveReport} className="workspace-section">
                 <input type="hidden" name="report" value={report.id} />
                 <input type="hidden" name="version" value={report.updated_at} />
                 <h2>Edit</h2>
@@ -106,7 +107,7 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
                   <SubmitButton pendingText="Approving…" name="intent" value="approve">Approve</SubmitButton>
                 </div>
               </form>
-              <form action={draftReport} className="card">
+              <form action={draftReport} className="workspace-section workspace-secondary-section">
                 <input type="hidden" name="store" value={report.store_id} />
                 <input type="hidden" name="version" value={report.updated_at} />
                 <input type="hidden" name="period" value={facts.period.start} />
@@ -119,7 +120,7 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
             </>
           ) : (
             <>
-              <section className="card">
+              <section className="workspace-section">
                 <h2>Client link</h2>
                 <p className="small muted" style={{ margin: 0 }}>Anyone with this link can read the report. It doesn&apos;t need a login.</p>
                 <input type="text" readOnly value={link} className="mono small" aria-label="Client link" />
@@ -129,7 +130,7 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
                 </div>
               </section>
 
-              <section className="card">
+              <section className="workspace-section">
                 <h2>{report.status === 'sent' ? 'Send again' : 'Send to client'}</h2>
                 <form action={sendReport} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <input type="hidden" name="report" value={report.id} />
@@ -152,7 +153,7 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
                 </form>
               </section>
 
-              <form action={reopenReport} className="card">
+              <form action={reopenReport} className="workspace-section workspace-secondary-section">
                 <input type="hidden" name="report" value={report.id} />
                 <input type="hidden" name="version" value={report.updated_at} />
                 <h2>Need a change?</h2>
@@ -163,11 +164,11 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
           )}
         </div>
 
-        <div style={{ flex: '2 1 520px', minWidth: 0 }}>
+        <div className="report-builder-preview">
           <div className="small muted" style={{ marginBottom: 8 }}>Preview: exactly what the client sees</div>
           <ReportView facts={facts} summary={report.summary_text ?? ''} sections={sections} logoUrl={agency?.logo_url} />
         </div>
       </div>
-    </>
+    </div>
   );
 }

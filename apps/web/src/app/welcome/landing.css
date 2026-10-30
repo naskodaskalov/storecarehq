@@ -83,6 +83,18 @@
 .lp-end { max-width: var(--lp-max); margin: 110px auto 0; padding: 56px 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .lp-end h2 { max-width: 20ch; }
 
+.lp-contact { margin-top: 96px; padding: 48px 24px; background: var(--surface); border-block: 1px solid var(--border); scroll-margin-top: 24px; }
+.lp-contact-inner { max-width: calc(var(--lp-max) - 48px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 72px; align-items: start; }
+.lp .lp-contact h2 { font-size: 30px; letter-spacing: 0; line-height: 1.2; }
+.lp-contact-copy p { margin: 16px 0 0; max-width: 35ch; color: var(--muted); font-size: 16px; line-height: 1.6; }
+@media (max-width: 900px) {
+  .lp-contact-inner { grid-template-columns: 1fr; gap: 28px; }
+}
+@media (max-width: 640px) {
+  .lp-contact { padding: 32px 16px; margin-top: 72px; }
+  .lp .lp-contact h2 { font-size: 26px; }
+}
+
 .lp-foot { max-width: var(--lp-max); margin: 0 auto; padding: 28px 24px 48px; display: flex; gap: 24px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
 .lp-foot a { color: var(--muted); margin-left: auto; }
 

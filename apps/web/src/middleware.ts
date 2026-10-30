@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
   // The public website never needs to read or refresh an agency session.
-  if ((isWebsiteHost(host) && path === '/welcome') || path === '/api/stripe/webhook' || path.startsWith('/r/')) return NextResponse.next();
+  if ((isWebsiteHost(host) && path === '/welcome') || path === '/api/contact' || path === '/api/stripe/webhook' || path.startsWith('/r/')) return NextResponse.next();
   // Layouts read the path (the app layout sends lapsed agencies to /billing from any other page).
   request.headers.set('x-pathname', request.nextUrl.pathname);
   if (process.env.STORECARE_DEMO === '1') {

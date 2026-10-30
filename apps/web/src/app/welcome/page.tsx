@@ -6,6 +6,7 @@ import { headers } from 'next/headers';
 import { appLink } from '@/lib/domains';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, templateSummary, type MonthData } from '@storecare/reports';
 import { ReportView } from '@/components/report-view';
+import { ContactForm } from '@/components/contact-form';
 import './landing.css';
 
 export const metadata: Metadata = {
@@ -105,6 +106,7 @@ export default async function Landing() {
         <nav className="lp-nav" aria-label="Main">
           <a href="#how">How it works</a>
           <a href="#pricing">Pricing</a>
+          <a href="#contact">Contact</a>
           <a href={login}>Sign in</a>
           <a href={signup} className="btn lp-btn-small">Start free trial</a>
         </nav>
@@ -214,6 +216,16 @@ export default async function Landing() {
                 <p>{f.a}</p>
               </details>
             ))}
+          </div>
+        </section>
+
+        <section id="contact" className="lp-contact" aria-labelledby="landing-contact-title">
+          <div className="lp-contact-inner">
+            <div className="lp-contact-copy">
+              <h2 id="landing-contact-title">Contact StoreCare HQ</h2>
+              <p>A question about your stores, a plan, or something we can improve? We&apos;d like to hear from you.</p>
+            </div>
+            <ContactForm source="website" />
           </div>
         </section>
 

@@ -19,7 +19,7 @@ export function websiteLink(host: string) {
 
 const matches = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
 export function isPublicPath(path: string) {
-  return ['/login', '/auth', '/r', '/welcome'].some(root => matches(path, root)) || path === '/api/stripe/webhook';
+  return ['/login', '/auth', '/r', '/welcome'].some(root => matches(path, root)) || path === '/api/stripe/webhook' || path === '/api/contact';
 }
 
 type Routing = { kind: 'redirect' | 'rewrite'; url: string } | { kind: 'reject' } | null;
@@ -38,7 +38,7 @@ export function hostRouting(host: string, path: string, search = '', method = 'G
     return path === '/' ? { kind: 'rewrite', url: destination(WEBSITE_ORIGIN, '/welcome', search) } : null;
   }
   // Keep already-shared reports, signed Stripe deliveries and in-flight recovery links working.
-  if (path === '/api/stripe/webhook' || matches(path, '/r') || path === '/auth/callback' || path === '/auth/password') return null;
+  if (path === '/api/contact' || path === '/api/stripe/webhook' || matches(path, '/r') || path === '/auth/callback' || path === '/auth/password') return null;
   if (website || host === 'storecarehq.vercel.app') {
     if (method !== 'GET' && method !== 'HEAD') return { kind: 'reject' };
     return { kind: 'redirect', url: destination(APP_ORIGIN, path, search) };

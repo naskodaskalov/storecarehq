@@ -10,6 +10,7 @@ const LINKS = [
   { href: '/work', label: 'Work log', icon: 'work', match: (p: string) => p.startsWith('/work') },
   { href: '/reports', label: 'Reports', icon: 'report', match: (p: string) => p.startsWith('/reports') },
   { href: '/billing', label: 'Billing', icon: 'billing', match: (p: string) => p.startsWith('/billing') },
+  { href: '/contact', label: 'Contact', icon: 'mail', match: (p: string) => p === '/contact' },
 ];
 
 export function NavLinks() {
