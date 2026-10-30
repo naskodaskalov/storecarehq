@@ -7,7 +7,7 @@ import { monthStart } from '@/lib/data';
 import { SubmitButton } from '@/components/submit-button';
 import { daysUntil, isOutOfStock, type ProductLite } from '@storecare/storefront';
 
-type Search = { filter?: string; welcome?: string };
+type Search = { filter?: string; welcome?: string; change?: string };
 
 async function enableCheckout(formData: FormData) {
   'use server';
@@ -19,7 +19,7 @@ async function enableCheckout(formData: FormData) {
 
 export default async function StorePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const { id } = await params;
-  const { filter = 'all', welcome } = await searchParams;
+  const { filter = 'all', welcome, change } = await searchParams;
   const supabase = await supabaseServer();
 
   const { data: store } = await supabase
@@ -28,6 +28,13 @@ export default async function StorePage({ params, searchParams }: { params: Prom
     .eq('id', id)
     .single();
   if (!store) notFound();
+
+  // Fetch the requested change separately: it may be older than the feed's latest 30 rows.
+  // Both store scope and the signed-in user's RLS apply to this lookup.
+  const selected = change && /^[1-9]\d{0,18}$/.test(change) && BigInt(change) <= 9223372036854775807n
+    ? await supabase.from('changes').select('id, occurred_at, kind, summary, risky, details, work_entry_id, work_entries(title)').eq('store_id', id).eq('id', change).maybeSingle()
+    : null;
+  const selectedChange = selected?.data;
 
   const since30 = new Date(Date.now() - 30 * 864e5).toISOString();
   const since14 = new Date(Date.now() - 14 * 864e5).toISOString();
@@ -113,6 +120,23 @@ export default async function StorePage({ params, searchParams }: { params: Prom
         <div className="notice"><strong>Limited monitoring.</strong> {LIMITED_REASONS[store.limited_reason] ?? store.limited_reason}</div>
       )}
 
+      {change && <section className="card change-detail-card" id="change-details" aria-labelledby="change-details-title" tabIndex={-1}>
+        <div className="row"><span className="small muted">CHANGE DETAILS</span><Link className="small" href={`/stores/${id}?filter=${encodeURIComponent(filter)}#change-feed`}>Back to change feed</Link></div>
+        {selectedChange ? <>
+          <h2 id="change-details-title">{selectedChange.summary}</h2>
+          <div className="small muted">{KIND_LABEL[selectedChange.kind] ?? selectedChange.kind} · {when(selectedChange.occurred_at, store.timezone).date} at {when(selectedChange.occurred_at, store.timezone).time} ({store.timezone})</div>
+          <p style={{ margin: 0 }} className={selectedChange.risky && !selectedChange.work_entry_id ? 'warn' : 'muted'}>
+            {selectedChange.work_entry_id ? `Matched to work log: ${(selectedChange.work_entries as unknown as { title: string } | null)?.title ?? 'Linked work entry'}` : 'Not in your work log.'}
+            {selectedChange.risky ? ' Flagged for review.' : ''}
+          </p>
+          <ChangeEvidence details={selectedChange.details} />
+          <p className="small muted" style={{ margin: 0 }}>Detected on the public storefront. StoreCare can show what changed, but cannot identify who made the change.</p>
+        </> : <>
+          <h2 id="change-details-title">{selected?.error ? 'Could not load this change' : 'Change unavailable'}</h2>
+          <p className="muted" style={{ margin: 0 }}>{selected?.error ? 'Please refresh the page to try again.' : 'This change could not be found for this store. You can still browse its change feed below.'}</p>
+        </>}
+      </section>}
+
       <div className="kpis">
         <div className="kpi">
           <div className="small muted">Health score</div>
@@ -189,7 +213,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
       </section>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
-        <section className="card" style={{ flex: '3 1 460px', minWidth: 0 }}>
+        <section className="card" id="change-feed" style={{ flex: '3 1 460px', minWidth: 0, scrollMarginTop: 24 }}>
           <div className="row">
             <h2>Change feed</h2>
             <div className="row small" style={{ gap: 8, justifyContent: 'flex-end' }}>
@@ -216,7 +240,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
                 <div key={c.id} className="feed-item">
                   <div className="feed-when">{t.date}<br />{t.time}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600 }}>{c.summary}</div>
+                    <Link href={`/stores/${id}?change=${c.id}#change-details`} style={{ fontWeight: 600 }}>{c.summary}</Link>
                     <div className={`small ${c.risky && !entry ? 'warn' : 'muted'}`} style={{ fontSize: 14 }}>
                       Detected · {entry ? `matched to work log: ${entry.title}` : 'not in work log'}{note ? ` · ${note}` : ''}
                     </div>
@@ -299,6 +323,37 @@ const KIND_LABEL: Record<string, string> = {
   stock_back: 'Stock',
 };
 const FIELD: Record<string, string> = { FAST: 'good', AVERAGE: 'needs improvement', SLOW: 'poor' };
+
+const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+const text = (value: unknown) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+function changeValue(value: unknown) {
+  const theme = record(value);
+  return text(value) || [text(theme.name) || text(theme.schemaName), text(theme.schemaVersion)].filter(Boolean).join(' · ') || (theme.id ? `Theme ${text(theme.id)}` : 'Not recorded');
+}
+
+function ChangeEvidence({ details }: { details: unknown }) {
+  const d = record(details);
+  const edits = Array.isArray(d.edits) ? d.edits.map(record) : [];
+  const products = Array.isArray(d.products) ? d.products.map(record) : [];
+  const evidence = Array.isArray(d.evidence) ? d.evidence.map(text).filter(Boolean) : [];
+  const comparison = 'from' in d || 'to' in d;
+  return <>
+    {text(d.note) && <div className="notice" style={{ margin: 0 }}>{text(d.note)}</div>}
+    {comparison && <div className="change-comparison">
+      <div><span className="small muted">BEFORE</span><strong>{changeValue(d.from)}</strong></div>
+      <div><span className="small muted">AFTER</span><strong>{changeValue(d.to)}</strong></div>
+    </div>}
+    {text(d.app) && <div><span className="small muted">App detected</span><p style={{ margin: '4px 0 0', overflowWrap: 'anywhere' }}>{text(d.app)}</p></div>}
+    {evidence.length > 0 && <details><summary>Detection evidence</summary><ul className="small">{evidence.map((item, i) => <li key={i} style={{ overflowWrap: 'anywhere' }}>{item}</li>)}</ul></details>}
+    {edits.length > 0 && <div className="change-evidence-scroll" tabIndex={0} role="region" aria-label="Recorded price changes">
+      <table><caption className="small muted" style={{ textAlign: 'left', paddingBottom: 10 }}>Recorded price changes · values as reported by the storefront</caption><thead><tr><th scope="col">Product</th><th scope="col">Variant ID</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+        <tbody>{edits.map((edit, i) => <tr key={i}><td>{text(edit.title) || `Product ${text(edit.id)}`}</td><td>{text(edit.variant)}</td><td>{text(edit.from)}</td><td>{text(edit.to)}</td></tr>)}</tbody>
+      </table>
+    </div>}
+    {products.length > 0 && <div className="change-evidence-scroll" tabIndex={0} role="region" aria-label="Affected products"><strong>Affected products ({products.length})</strong><ul>{products.map((product, i) => <li key={i}>{text(product.title) || `Product ${text(product.id)}`}</li>)}</ul></div>}
+    {!text(d.note) && !comparison && !text(d.app) && !edits.length && !products.length && <p className="muted" style={{ margin: 0 }}>No additional detail was recorded for this change.</p>}
+  </>;
+}
 
 function Check({ label, value, note, warn }: { label: string; value: string; note: string; warn?: boolean }) {
   return (

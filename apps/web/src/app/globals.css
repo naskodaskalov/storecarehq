@@ -152,6 +152,11 @@ th:first-child, td:first-child { padding-left: 0; }
 .feed { display: flex; flex-direction: column; }
 .feed-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
 .feed-item:last-child { border-bottom: 0; }
+.change-detail-card { scroll-margin-top: 24px; border-color: #d8b66c; background: #fffdf8; }
+.change-detail-card:target { outline: 2px solid #d8b66c; outline-offset: 3px; }
+.change-comparison { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.change-comparison > div { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: white; border: 1px solid var(--rule); border-radius: 8px; overflow-wrap: anywhere; }
+.change-evidence-scroll { max-height: 360px; overflow: auto; border: 1px solid var(--rule); border-radius: 8px; padding: 14px; }
 .feed-when { flex: 0 0 74px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
 
 .tone-good { color: var(--accent); }

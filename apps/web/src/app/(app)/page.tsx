@@ -101,7 +101,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <div key={c.id} className="attention-row change-row">
               <span className="attention-icon warning"><Icon name="alert" /></span>
               <div className="attention-copy"><strong>{storeName.get(c.store_id)}</strong><span>{c.summary} · Not in your work log</span></div>
-              <Link className="btn secondary" href={`/stores/${c.store_id}`}>View change</Link>
+              <Link className="btn secondary" href={`/stores/${c.store_id}?change=${c.id}#change-details`}>View change</Link>
             </div>
           ))}
         </section>
