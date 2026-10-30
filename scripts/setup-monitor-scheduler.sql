@@ -93,3 +93,8 @@ select cron.schedule('storecare-monitor-health', '*/5 * * * *',
 select cron.alter_job(jobid, active := false) from cron.job
   where jobname in ('storecare-monitor-dispatch', 'storecare-monitor-health');
 commit;
+
+-- After deploying health-check request support (migration 20261030132924):
+-- update storecare_ops.health_check_dispatch_state set enabled=true;
+-- The migration creates a one-minute queue watchdog, throttled to one dispatch per two minutes.
+-- Do not rerun this entire setup to enable it: the block above disables the original scheduler.

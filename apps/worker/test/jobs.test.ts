@@ -161,6 +161,17 @@ describe('jobs against Postgres', { skip: !process.env.TEST_DATABASE_URL && 'TES
     assert.deepEqual(daily.changes.map((c) => c.kind), ['prices_changed']);
   });
 
+  test('an explicitly requested storefront scan refreshes products even when the daily feed is not due',async()=>{
+    const store=await seedStore(db!.pool);const asked:boolean[]=[];
+    const probe=(price:string)=>async(_url:string,opts:{skipProducts:boolean})=>{
+      asked.push(opts.skipProducts);
+      return probeResult({productFeed:{status:'ok',pages:1,truncated:false,products:[{id:1,handle:'candle',title:'Candle',updatedAt:null,prices:{'11':price}}]}});
+    };
+    await runStorefrontDiff(db!.pool,store,probe('28.00'));
+    const manual=await runStorefrontDiff(db!.pool,store,probe('29.00'),{forceProducts:true});
+    assert.deepEqual(asked,[false,false]);assert.deepEqual(manual.changes.map(c=>c.kind),['prices_changed']);
+  });
+
   test('uptime: two failures open one incident, recovery resolves it, a bot challenge never does', async () => {
     const store = await seedStore(db!.pool, { public_url: 'https://down.example' });
     assert.equal((await runUptime(db!.pool, store, async () => fetchResult(502))).opened, null);

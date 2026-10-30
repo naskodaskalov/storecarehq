@@ -10,6 +10,8 @@ import { activeStores, createPool, type Db, type StoreRow } from './db.ts';
 import { dueJobs, type JobName, type LastRuns } from './schedule.ts';
 import { runStores } from './run-stores.ts';
 import { deliverAlerts } from './alert-outbox.ts';
+import { processHealthCheckRequests } from './health-check-requests.ts';
+import { withStoreLock } from './store-lock.ts';
 import { checkoutTask, reportTask, sendReportDigests, siteTask, speedTask, storefrontTask, takeDrafted, uptimeTask } from './tasks.ts';
 
 const TASKS: Record<JobName, (db: Db, storeId: string) => Promise<void>> = {
@@ -64,14 +66,20 @@ const pool = createPool();
 const started = Date.now();
 try {
   if (!dryRun) console.log(`Queued alerts accepted: ${await deliverAlerts(pool)}`);
+  if (!dryRun) await processHealthCheckRequests(pool,1);
   const stores = await activeStores(pool);
   // Log each store immediately, preserving evidence if a later job or cleanup fails.
-  const lines = await runStores(stores, (store) => runStore(pool, store, dryRun));
+  const lines = await runStores(stores, async store => {
+    if (dryRun) return runStore(pool,store,true);
+    const result = await withStoreLock(pool,store.id,db => runStore(db,store,false));
+    return result.acquired ? result.value : `${store.name}: scan already running`;
+  });
   if (!dryRun) {
     // One "reports ready" message per agency for everything drafted in this pass.
     const digests = await sendReportDigests(pool, takeDrafted());
     if (digests) console.log(`reports ready: ${digests} notification${digests === 1 ? '' : 's'} sent`);
     console.log(`Queued alerts accepted: ${await deliverAlerts(pool)}`);
+    if (Date.now()-started < 12*60_000) await processHealthCheckRequests(pool,1);
     await pool.query('select public.prune_monitoring()');
   }
   if (!dryRun && !process.env.PAGESPEED_API_KEY) {

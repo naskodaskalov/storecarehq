@@ -6,6 +6,7 @@ import { healthLabel, host, hours, LIMITED_REASONS, monthStartLabel, when } from
 import { monthStart } from '@/lib/data';
 import { SubmitButton } from '@/components/submit-button';
 import { daysUntil, isOutOfStock, type ProductLite } from '@storecare/storefront';
+import { HealthCheckStatus, type HealthCheck } from '@/components/health-check-status';
 
 type Search = { filter?: string; welcome?: string; change?: string };
 
@@ -28,6 +29,8 @@ export default async function StorePage({ params, searchParams }: { params: Prom
     .eq('id', id)
     .single();
   if (!store) notFound();
+  const scan = await supabase.from('health_check_requests').select('id,source,status,requested_at,started_at,finished_at,phase,results')
+    .eq('store_id',id).order('requested_at',{ ascending: false }).limit(1).maybeSingle();
 
   // Fetch the requested change separately: it may be older than the feed's latest 30 rows.
   // Both store scope and the signed-in user's RLS apply to this lookup.
@@ -94,7 +97,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
       <Link href="/" style={{ fontSize: 14, textDecoration: 'none' }}>← All stores</Link>
       {welcome && (
         <div className="notice">
-          <strong>{store.name} is being set up.</strong> The first storefront snapshot, uptime check and speed sample arrive within 30 minutes.
+          <strong>{store.name} is being set up.</strong> Its first health check is queued and will start when a worker is available.
           Changes appear from the second snapshot onwards.
         </div>
       )}
@@ -136,6 +139,8 @@ export default async function StorePage({ params, searchParams }: { params: Prom
           <p className="muted" style={{ margin: 0 }}>{selected?.error ? 'Please refresh the page to try again.' : 'This change could not be found for this store. You can still browse its change feed below.'}</p>
         </>}
       </section>}
+
+      <HealthCheckStatus key={id} storeId={id} initial={scan.data as HealthCheck | null} initialTime={Date.now()} paused={store.status === 'paused'} unavailable={!!scan.error} />
 
       <div className="kpis">
         <div className="kpi">

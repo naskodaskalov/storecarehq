@@ -1,5 +1,48 @@
 # Monitoring operations
 
+## Requested health checks
+
+New stores atomically create an `initial` row in `public.health_check_requests`. The store page's
+**Run health check** action calls `request_health_check(uuid)` as the signed-in user. The RPC
+checks membership, monitoring access and paused state; it reuses an active request and enforces
+a five-minute per-store cooldown under a store-row lock. Agency members can read status/results,
+but cannot change worker status, read lease tokens or request another agency's stores.
+
+Each scan refreshes the product feed even when its normal daily refresh is not due. It runs uptime,
+storefront, speed and site checks, followed by checkout only when consent,
+devices and a usable product are present. It does not generate reports. A completed phase means
+the check ran; it does not mean the store is healthy. Provider errors produce partial/failed scan
+status and safe messages while retaining existing metrics. The first snapshot is a baseline.
+
+The GitHub tick processes one requested scan before scheduled work and, if under twelve minutes
+elapsed, one more afterwards. Both requested scans and scheduled work hold the same per-store
+session advisory lock on a dedicated database connection. The pg-boss worker also drains requests
+on its five-minute tick. Requests use `FOR UPDATE SKIP LOCKED`, a unique lease token, fifteen-minute
+leases refreshed between phases and at most two worker attempts. Recovery resumes completed phases;
+an exhausted interrupted scan ends with a visible failure. Storefront checks and Slack alerts can
+still have their existing external-side-effect limitations after a process crash.
+
+The private `storecare_ops.dispatch_health_checks()` reuses the existing Vault-backed GitHub
+dispatch function. New requests wake it immediately; a one-minute Cron watchdog retries pending
+work and expired leases. A private singleton throttles dispatches to at most one per two minutes.
+Requests remain durable on dispatch failure and normal scheduled ticks also drain them. GitHub
+queueing/build time and other scans can delay starting; the UI shows queued status, not a promise
+of immediate execution. No GitHub token is stored in the browser or Vercel app.
+
+Rollout: apply migration `20261030132924_health_check_requests.sql` (dispatch starts disabled),
+push the tested worker/app to main, then enable `storecare_ops.health_check_dispatch_state.enabled`
+and deploy the app. The private dispatch-state table deliberately has deny-all RLS and no public
+API grants. The authenticated SECURITY DEFINER RPC is intentional and enforces membership and
+billing internally; see the [Supabase function-grant advisory](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+No existing stores are backfilled with artificial initial requests.
+
+Verification: thirteen dedicated scan tests plus monitoring/alert/report regression tests passed
+against isolated PostgreSQL databases, including automatic insert rollback, agency isolation,
+direct-write denial, deduplication/cooldown, consent, partial results, concurrent workers,
+store-lock contention, abandoned/stale leases, eligibility changes and dispatch failures. Web
+request tests cover authentication, scoped RPC calls and safe errors. Live UI/run verification
+is recorded in `task.md` after activation.
+
 ## Investigation: 29 October 2026
 
 The configured GitHub schedule is `7,37 * * * *` on main. Scheduled runs were created at

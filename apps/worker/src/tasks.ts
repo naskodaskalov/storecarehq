@@ -16,13 +16,16 @@ import { createHash } from 'node:crypto';
 const APP = () => process.env.APP_URL ?? 'https://app.storecarehq.com';
 const appUrl = (storeId: string) => `${APP()}/stores/${storeId}`;
 
-export async function storefrontTask(db: Db, storeId: string) {
+export async function storefrontTask(db: Db, storeId: string, options: { forceProducts?: boolean; requireFresh?: boolean } = {}) {
   const store = await getStore(db, storeId);
   if (!store || store.status === 'paused') return;
-  await runStorefrontDiff(db, store);
+  const scan = await runStorefrontDiff(db, store, undefined, options);
   await recomputeHealth(db, store.id);
   // Database triggers save risky-change alerts atomically with each change.
   await deliverAlerts(db);
+  if (options.requireFresh && (scan.result.home.blocked || scan.result.home.status !== 200 || scan.result.productFeed.status !== 'ok')) {
+    throw new Error('Some storefront data could not be read.');
+  }
 }
 
 export async function uptimeTask(db: Db, storeId: string) {

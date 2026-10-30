@@ -71,7 +71,7 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
           </div>
 
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
-            <span className="small muted">First checks start within 30 minutes.</span>
+            <span className="small muted">Your first health check is queued automatically. Follow its progress on the store page.</span>
             <SubmitButton disabled={!!planReadError} pendingText="Saving…">Start caring for this store →</SubmitButton>
           </div>
         </form>

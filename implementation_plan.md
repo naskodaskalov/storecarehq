@@ -46,3 +46,32 @@ Verify with web typecheck, production build, existing tests, and desktop/mobile 
 ### Validation
 
 Run web tests, worker typecheck, web typecheck and production build. Verify marketing stays public, app entry redirects signed-out users to login, existing app sessions reach the dashboard, login/recovery callbacks stay on the app host, logout clears the app session, onboarding/billing guards still work, shared report links and webhook routes remain usable, and localhost is unaffected. Authenticated browser verification requires an available user session; do not change a password or send test emails without the corresponding user authorization.
+
+## Automatic first scan and manual health checks — proposed 30 October 2026
+
+### Product behavior
+
+- Adding a store atomically queues its first health check. Dispatch the existing GitHub worker promptly instead of waiting for its regular 30-minute schedule.
+- Add **Run health check** beside Settings/Log time on the store page. It queues a scan for that store only, with visible queued/running/completed/partial/failed status, current phase, timestamps and retry guidance.
+- Run uptime, storefront snapshot, mobile speed and site checks (certificate, domain and links). Run checkout only with existing consent and a usable snapshot/product. Do not draft monthly reports as part of a manual health check.
+- Preserve existing health-score calculations, monitoring history and incident/alert handling. The first snapshot establishes a baseline; change detection needs a later snapshot.
+- Deduplicate repeated clicks, allow one pending/running scan per store, and enforce a five-minute cooldown in the database. Paused stores and agencies without monitoring access cannot request scans.
+- Keep the request durable if dispatch fails or GitHub is slow. The existing scheduled worker can pick it up. Show queued status honestly; do not promise immediate completion or show success before checks finish.
+- Automatically refresh scan progress while queued/running, then refresh the displayed metrics on completion. Provide a clear partial result when a provider such as PageSpeed is unavailable.
+
+### Implementation
+
+- [NEW] CLI-generated Supabase migration: `health_check_requests` with agency-scoped read access; constrained statuses, attempt/lease bookkeeping and per-phase results; a protected request RPC that checks membership, billing, paused state, deduplication and cooldown; an insert trigger that queues initial scans atomically with store creation. Users cannot write worker status or read dispatch credentials.
+- [MODIFY] `scripts/setup-monitor-scheduler.sql`: reuse the private `storecare_ops.dispatch_monitor()` and its existing Vault credential through a narrowly scoped internal dispatch path. No GitHub token goes into the web app. Throttle dispatch requests and keep durable requests available to scheduled runs.
+- [NEW] `apps/worker/src/health-check-requests.ts`: claim requests with a lease, run checks in dependency order, save per-check status, record final outcome, recover abandoned leases with bounded retries, and skip stores that became ineligible.
+- [MODIFY] `apps/worker/src/tick.ts`, `apps/worker/src/index.ts`: process requested scans through both worker modes, coordinate execution to avoid overlapping scans, and let normal due-job logic use the resulting fresh timestamps.
+- [NEW] `apps/web/src/app/(app)/stores/[id]/health-check-actions.ts`: authenticated request action using the user-scoped Supabase client; render useful request/cooldown errors without exposing provider responses.
+- [NEW] `apps/web/src/components/health-check-status.tsx`: run button and accessible progress panel; poll only active requests, stop on completion and refresh metrics.
+- [MODIFY] `apps/web/src/app/(app)/stores/[id]/page.tsx`, `apps/web/src/app/globals.css`: place the run control, display latest scan progress/results and show a waiting-for-first-scan state.
+- [MODIFY] `apps/web/src/app/onboarding/plan/page.tsx` and relevant onboarding success copy: explain the queued first scan and baseline behavior without claiming a completed check.
+- [NEW/MODIFY] Worker unit/database tests and web action tests: agency isolation, initial queue creation, duplicate/cooldown races, consent, partial failures, abandoned leases, paused/access changes, and preservation of scheduled monitoring behavior.
+- [MODIFY] `docs/monitoring-operations.md`, `system_architecture.md`, `task.md`: document dispatch, timing, retries, permissions, rollout and checks.
+
+### Rollout and verification
+
+Inspect the live scheduler function and table policies before finalizing the migration. Test queue/RPC security against an isolated database and run relevant worker/web tests, typechecks and the production build. Deploy worker support before enabling live request dispatch/UI; apply the migration and private dispatch wiring, then deploy the app. Verify one user-authorized scan of an existing store through the real button and confirm queued → running → final status, updated monitoring timestamps, and duplicate-click protection. Preserve existing stores and do not manufacture incidents or send client reports to test the feature.

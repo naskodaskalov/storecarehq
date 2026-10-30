@@ -5,6 +5,8 @@ import { activeStores, createPool, dbConfig, type StoreRow } from './db.ts';
 import { checkoutTask, reportTask, sendReportDigests, siteTask, speedTask, storefrontTask, takeDrafted, uptimeTask } from './tasks.ts';
 import { localDateHour, REPORT_LAST_DAY } from './schedule.ts';
 import { deliverAlerts } from './alert-outbox.ts';
+import { processHealthCheckRequests } from './health-check-requests.ts';
+import { withStoreLock } from './store-lock.ts';
 
 const pool = createPool();
 const boss = new PgBoss({ ...dbConfig(), schema: 'pgboss', max: 3 });
@@ -48,6 +50,7 @@ const fanOut = async (queue: keyof typeof QUEUES, stores: StoreRow[]) => {
 };
 
 await boss.work('tick-5min', async () => {
+  await processHealthCheckRequests(pool,1);
   await deliverAlerts(pool);
   const stores = await activeStores(pool);
   await fanOut('uptime', stores);
@@ -79,7 +82,7 @@ for (const [queue, task] of Object.entries(QUEUES)) {
   // Browser work is heavy: one checkout at a time per worker; light jobs a few at once.
   const batchSize = queue === 'checkout' ? 1 : 4;
   await boss.work<PerStore>(queue, { batchSize }, async (jobs) => {
-    for (const job of jobs) await task(pool, job.data.storeId);
+    for (const job of jobs) await withStoreLock(pool,job.data.storeId,db => task(db,job.data.storeId));
     if (queue === 'report') await sendReportDigests(pool, takeDrafted());
   });
 }

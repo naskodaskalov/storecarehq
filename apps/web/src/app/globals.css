@@ -157,6 +157,10 @@ th:first-child, td:first-child { padding-left: 0; }
 .change-comparison { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .change-comparison > div { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: white; border: 1px solid var(--rule); border-radius: 8px; overflow-wrap: anywhere; }
 .change-evidence-scroll { max-height: 360px; overflow: auto; border: 1px solid var(--rule); border-radius: 8px; padding: 14px; }
+.health-scan-heading h2 { margin: 6px 0 0; }
+.health-scan-phases { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.health-scan-phases li { border: 1px solid var(--rule); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.health-scan-phases li p { width: 100%; margin: 0; }
 .feed-when { flex: 0 0 74px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
 
 .tone-good { color: var(--accent); }

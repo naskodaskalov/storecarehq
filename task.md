@@ -21,3 +21,18 @@ to the website. Rendered cross-domain links and the login screen were verified i
 No authenticated user session was available on the new app host: dashboard and logout browser
 verification requires the user's first sign-in. Existing session validation and agency/RLS guards
 are preserved; authenticated/unauthenticated routing branches are covered by tests.
+
+## Health checks (approved)
+- [x] Implement durable requests, permissions, dispatch and automatic initial queueing.
+- [x] Implement worker claims, recovery, consent and scheduled-job coordination.
+- [x] Implement run button, progress, results and onboarding copy.
+- [ ] Verify isolation, concurrency, failures and UI; run typechecks/build.
+- [ ] Apply migration, push/deploy, enable dispatch and verify a live manual check.
+
+Pre-rollout: 52 selected worker/database tests and 28 web tests passed; added authenticated-insert
+and forced-product-refresh cases also passed with the affected suites. One opt-in host-routing
+integration test was skipped because its local server was not running. All workspace typechecks
+and the production build passed. Live migration applied with dispatch disabled. Verified status
+reads are allowed, lease reads/status writes are denied, and anonymous RPC execution is denied.
+The Supabase advisor's new RPC execution warning is intentional (membership/billing-checked);
+the private dispatcher state deliberately has deny-all RLS. Existing unrelated findings remain.

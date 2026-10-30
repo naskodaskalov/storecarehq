@@ -37,6 +37,7 @@ export async function runStorefrontDiff(
   db: Db,
   store: StoreRow,
   probe: Probe = (u, o) => probeStore(u, { skipProducts: o.skipProducts, skipCart: true }),
+  options: { forceProducts?: boolean } = {},
 ) {
   const { rows: prevRows } = await db.query<PrevRow>(
     `select taken_at, theme, apps, null::jsonb as products from public.storefront_snapshots
@@ -50,7 +51,7 @@ export async function runStorefrontDiff(
     [store.id],
   );
   const lastProducts = prevProductRows[0];
-  const skipProducts = !!lastProducts && Date.now() - lastProducts.taken_at.getTime() < PRODUCTS_EVERY_MS;
+  const skipProducts = !options.forceProducts && !!lastProducts && Date.now() - lastProducts.taken_at.getTime() < PRODUCTS_EVERY_MS;
 
   const result = await probe(store.public_url, { skipProducts });
   const next = toSnapshot(result);
