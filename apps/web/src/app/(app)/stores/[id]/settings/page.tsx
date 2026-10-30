@@ -3,10 +3,11 @@ import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase';
 import { host } from '@/lib/format';
 import { SubmitButton } from '@/components/submit-button';
-import { deleteStore, saveStore, setPaused } from './actions';
+import { deleteStore, saveStore, setPaused, retryAlert } from './actions';
 
 const SAVED: Record<string, string> = {
   '1': 'Saved.',
+  alert: 'Alert queued again. It will be retried on the next monitoring run.',
   url: 'Saved. The address changed, so monitoring starts fresh with a new snapshot on the next run.',
   paused: 'Monitoring paused. No checks run for this store until you resume it.',
   resumed: 'Monitoring resumed. Checks start again on the next run.',
@@ -29,10 +30,12 @@ export default async function StoreSettings({
   const { id } = await params;
   const { saved, error } = await searchParams;
   const supabase = await supabaseServer();
-  const [{ data: store }, { data: plan }, { data: slack }] = await Promise.all([
+  const [{ data: store }, { data: plan }, { data: slack }, deliveriesResult] = await Promise.all([
     supabase.from('stores').select('*').eq('id', id).single(),
     supabase.from('care_plans').select('name, hours_included, rollover_rule').eq('store_id', id).single(),
     supabase.from('alert_routes').select('target').eq('store_id', id).eq('channel', 'slack').limit(1),
+    supabase.from('alert_deliveries').select('id, channel, subject, status, attempts, created_at, next_attempt_at, sent_at, last_error')
+      .eq('store_id', id).order('created_at', { ascending: false }).limit(12),
   ]);
   if (!store) notFound();
   const paused = store.status === 'paused';
@@ -151,6 +154,28 @@ export default async function StoreSettings({
           <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
         </div>
       </form>
+
+      <section className="card">
+        <h2>Alert delivery history</h2>
+        <p className="small muted" style={{ margin: 0 }}>Failed requests retry automatically on a monitoring run, up to six attempts. Accepted means the email or Slack provider accepted the message; it does not confirm it was read.</p>
+        {deliveriesResult.error ? <p role="status" className="warn">Delivery history could not be loaded. Please try again shortly.</p>
+          : !deliveriesResult.data?.length ? <p className="muted">No alerts have been sent for this store yet.</p>
+          : <div style={{ overflowX: 'auto' }}><table>
+            <thead><tr><th>Alert</th><th>Channel</th><th>Status</th><th>Attempts</th><th>Created</th></tr></thead>
+            <tbody>{deliveriesResult.data.map((d) => <tr key={d.id}>
+              <td>{d.subject}{d.last_error && <div className="small warn">{d.last_error}</div>}
+                {d.status === 'failed' && <form action={retryAlert} style={{ marginTop: 8 }}>
+                  <input type="hidden" name="store" value={id} /><input type="hidden" name="delivery" value={d.id} />
+                  <SubmitButton secondary pendingText="Queuing…">Retry alert</SubmitButton>
+                </form>}</td>
+              <td>{d.channel === 'email' ? 'Email' : 'Slack'}</td>
+              <td>{({ pending: 'Queued', sending: 'Sending', retry: 'Retry scheduled', sent: 'Accepted', failed: 'Needs attention', cancelled: 'Route removed or changed' } as Record<string,string>)[d.status] ?? d.status}
+                {d.status === 'retry' && <div className="small muted">From {new Date(d.next_attempt_at).toLocaleString('en-GB', { timeZone: store.timezone })} ({store.timezone})</div>}</td>
+              <td>{d.attempts} / 6</td>
+              <td className="small muted">{new Date(d.created_at).toLocaleString('en-GB', { timeZone: store.timezone })}</td>
+            </tr>)}</tbody>
+          </table></div>}
+      </section>
 
       <section className="card">
         <h2>{paused ? 'Monitoring is paused' : 'Pause monitoring'}</h2>

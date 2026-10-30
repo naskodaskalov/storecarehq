@@ -49,7 +49,10 @@ export function dbConfig(url = process.env.DATABASE_URL): { connectionString: st
 }
 
 export function createPool(url = process.env.DATABASE_URL): pg.Pool {
-  return new pg.Pool({ ...dbConfig(url), max: 5, connectionTimeoutMillis: 15_000, statement_timeout: 60_000 });
+  // pg-pool awaits this hook before lending the connection; avoid pooler startup-option restrictions.
+  const config = { ...dbConfig(url), max: 5, connectionTimeoutMillis: 15_000, statement_timeout: 60_000,
+    onConnect: async (client: pg.Client) => { await client.query("set storecare.alert_outbox='on'"); } };
+  return new pg.Pool(config);
 }
 
 export type StoreRow = {

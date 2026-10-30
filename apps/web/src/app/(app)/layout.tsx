@@ -34,6 +34,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             {planLabel} · {count ?? 0} stores
           </div>
         </div>
+        <Link href="/auth/password" className="small" style={{ color: '#cbd9df' }}>Set or change password</Link>
         <form action={signOut} className="signout-form"><SubmitButton secondary pendingText="Signing out…"><Icon name="logout" size={17} />Sign out</SubmitButton></form>
       </nav>
       <div className="workspace-body">

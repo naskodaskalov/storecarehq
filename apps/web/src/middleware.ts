@@ -34,21 +34,27 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Keep refreshed session cookies when middleware rewrites or redirects a request.
+  const withSessionCookies = (next: NextResponse) => {
+    for (const cookie of response.cookies.getAll()) next.cookies.set(cookie);
+    return next;
+  };
+
   const path = request.nextUrl.pathname;
   // Signed-out visitors to the home page see the landing page at the same address.
   if (!user && path === '/') {
     const url = request.nextUrl.clone();
     url.pathname = '/welcome';
-    return NextResponse.rewrite(url);
+    return withSessionCookies(NextResponse.rewrite(url));
   }
   if (!user && !PUBLIC.some((p) => path.startsWith(p))) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    return withSessionCookies(NextResponse.redirect(url));
   }
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico$|icon\\.svg$|apple-icon\\.png$).*)'],
 };

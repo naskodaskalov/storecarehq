@@ -4,6 +4,18 @@ import { redirect } from 'next/navigation';
 import { normalizeStoreUrl, probeStore } from '@storecare/storefront';
 import { supabaseServer } from '@/lib/supabase';
 
+async function ensureEmailAlerts(supabase: Awaited<ReturnType<typeof supabaseServer>>, agencyId: string, email?: string) {
+  if (!email) return 'An account email is needed for incident alerts.';
+  const { count, error } = await supabase.from('alert_routes').select('id', { count: 'exact', head: true })
+    .eq('agency_id', agencyId).eq('channel', 'email').is('store_id', null);
+  if (error) return 'Could not check your email alert settings. Please try again.';
+  if (!count) {
+    const { error: insertError } = await supabase.from('alert_routes').insert({ agency_id: agencyId, channel: 'email', target: email, min_severity: 'incident' });
+    if (insertError) return 'Could not save your email alert settings. Please try again.';
+  }
+  return null;
+}
+
 export async function createWorkspace(formData: FormData) {
   const name = String(formData.get('agency') ?? '').trim();
   if (!name) redirect('/onboarding?error=name');
@@ -56,7 +68,11 @@ export async function addStore(formData: FormData) {
   const agencyId = agencies?.[0]?.id;
   if (!agencyId) redirect('/onboarding');
 
-  const url = normalizeStoreUrl(String(formData.get('url')));
+  let url: string;
+  try { url = normalizeStoreUrl(String(formData.get('url') ?? '')); }
+  catch { redirect('/onboarding/store?error=' + encodeURIComponent('Enter a valid public store address.')); }
+  const contactEmail = String(formData.get('contact_email') ?? '').trim();
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) redirect('/onboarding/store?error=' + encodeURIComponent('Enter a valid client email address.'));
   const consent = formData.get('consent') === 'on';
   const { data: store, error } = await supabase
     .from('stores')
@@ -65,7 +81,7 @@ export async function addStore(formData: FormData) {
       name: String(formData.get('name') || new URL(url).host),
       public_url: url,
       client_contact_name: String(formData.get('contact_name') ?? '') || null,
-      client_contact_email: String(formData.get('contact_email') ?? '') || null,
+      client_contact_email: contactEmail || null,
       checkout_consent_at: consent ? new Date().toISOString() : null,
       checkout_product_handle: String(formData.get('handle') ?? '') || null,
       timezone: String(formData.get('tz') ?? '') || 'UTC',
@@ -74,38 +90,56 @@ export async function addStore(formData: FormData) {
     .single();
   // Store limit or ended trial (database trigger): explain on the billing page, where the fix is.
   if (error?.hint === 'billing') redirect(`/billing?error=${encodeURIComponent(error.message)}`);
-  if (error) redirect(`/onboarding/store?error=${encodeURIComponent(error.message)}`);
+  if (error || !store) redirect(`/onboarding/store?error=${encodeURIComponent(error?.message ?? 'Could not add the store. Please try again.')}`);
 
-  await supabase.from('care_plans').insert({ store_id: store.id, agency_id: agencyId });
-  if (user.email) {
-    const { count } = await supabase.from('alert_routes').select('id', { count: 'exact', head: true }).eq('agency_id', agencyId);
-    if (!count) await supabase.from('alert_routes').insert({ agency_id: agencyId, channel: 'email', target: user.email, min_severity: 'incident' });
-  }
+  const { error: planError } = await supabase.from('care_plans').insert({ store_id: store.id, agency_id: agencyId });
+  const alertProblem = await ensureEmailAlerts(supabase, agencyId, user.email);
+  if (planError || alertProblem) redirect(`/onboarding/plan?store=${store.id}&error=${encodeURIComponent(alertProblem ?? 'Your store was added, but its care plan could not be saved. Complete this step to retry.')}`);
   redirect(`/onboarding/plan?store=${store.id}`);
 }
 
 export async function savePlan(formData: FormData) {
   const supabase = await supabaseServer();
   const storeId = String(formData.get('store'));
-  const { data: store } = await supabase.from('stores').select('id, agency_id').eq('id', storeId).single();
+  const { data: store } = await supabase.from('stores').select('id, agency_id, checkout_consent_at').eq('id', storeId).single();
   if (!store) redirect('/');
-
-  await supabase
-    .from('care_plans')
-    .update({
-      name: String(formData.get('plan') || 'Care plan'),
-      hours_included: Number(formData.get('hours') || 0),
-      rollover_rule: formData.get('rollover') === 'expire' ? 'expire' : 'one_month',
-    })
-    .eq('store_id', storeId);
-  await supabase
-    .from('stores')
-    .update({ checkout_mobile: formData.get('mobile') === 'on', checkout_desktop: formData.get('desktop') === 'on' })
-    .eq('id', storeId);
-
+  const fail = (message: string): never => redirect(`/onboarding/plan?store=${storeId}&error=${encodeURIComponent(message)}`);
+  const hours = Number(formData.get('hours') || 0);
+  if (!Number.isFinite(hours) || hours < 0 || hours > 999) fail('Hours must be between 0 and 999.');
+  const mobile = formData.get('mobile') === 'on';
+  const desktop = formData.get('desktop') === 'on';
+  if (store.checkout_consent_at && !mobile && !desktop) fail('Select at least one device for the checkout test.');
   const slack = String(formData.get('slack') ?? '').trim();
-  if (slack.startsWith('https://hooks.slack.com/')) {
-    await supabase.from('alert_routes').insert({ agency_id: store.agency_id, store_id: storeId, channel: 'slack', target: slack, min_severity: 'risky' });
+  if (slack && !/^https:\/\/hooks\.slack\.com\/services\/[^\s?#]+$/.test(slack)) fail('Enter a valid Slack incoming-webhook URL, or leave the field empty.');
+
+  const planValues = {
+      name: String(formData.get('plan') || 'Care plan'),
+      hours_included: hours,
+      rollover_rule: formData.get('rollover') === 'expire' ? 'expire' : 'one_month',
+    };
+  const { data: existingPlans, error: readPlanError } = await supabase.from('care_plans').select('store_id').eq('store_id', storeId).limit(1);
+  if (readPlanError) fail('Could not load the care plan. Please try again.');
+  const planWrite = existingPlans?.length
+    ? supabase.from('care_plans').update(planValues).eq('store_id', storeId)
+    : supabase.from('care_plans').insert({ store_id: storeId, agency_id: store.agency_id, ...planValues });
+  const { data: savedPlan, error: planError } = await planWrite.select('store_id').single();
+  if (planError || !savedPlan) fail('The care plan could not be saved. Please try again.');
+  const { data: savedStore, error: deviceError } = await supabase
+    .from('stores')
+    .update({ checkout_mobile: mobile, checkout_desktop: desktop })
+    .eq('id', storeId).select('id').single();
+  if (deviceError || !savedStore) fail('Your care plan was saved, but checkout settings could not be saved. Please try again.');
+
+  if (slack) {
+    const { data: routes, error: routeError } = await supabase.from('alert_routes').select('id').eq('store_id', storeId).eq('channel', 'slack').eq('target', slack).limit(1);
+    if (routeError) fail('Could not check the Slack alert settings. Please try again.');
+    if (!routes?.length) {
+      const { error: slackError } = await supabase.from('alert_routes').insert({ agency_id: store.agency_id, store_id: storeId, channel: 'slack', target: slack, min_severity: 'risky' });
+      if (slackError) fail('Could not save Slack alerts. Please try again.');
+    }
   }
+  const { data: { user } } = await supabase.auth.getUser();
+  const alertProblem = await ensureEmailAlerts(supabase, store.agency_id, user?.email);
+  if (alertProblem) fail(alertProblem);
   redirect(`/stores/${storeId}?welcome=1`);
 }

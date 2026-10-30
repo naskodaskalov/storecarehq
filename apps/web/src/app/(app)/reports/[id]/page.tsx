@@ -78,6 +78,7 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
             <>
               <form action={saveReport} className="card">
                 <input type="hidden" name="report" value={report.id} />
+                <input type="hidden" name="version" value={report.updated_at} />
                 <h2>Edit</h2>
                 <div className="field">
                   <label htmlFor="summary">
@@ -107,6 +108,7 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
               </form>
               <form action={draftReport} className="card">
                 <input type="hidden" name="store" value={report.store_id} />
+                <input type="hidden" name="version" value={report.updated_at} />
                 <input type="hidden" name="period" value={facts.period.start} />
                 <h2>Refresh data</h2>
                 <p className="small muted" style={{ margin: 0 }}>
@@ -152,6 +154,7 @@ export default async function ReportBuilder({ params, searchParams }: { params: 
 
               <form action={reopenReport} className="card">
                 <input type="hidden" name="report" value={report.id} />
+                <input type="hidden" name="version" value={report.updated_at} />
                 <h2>Need a change?</h2>
                 <p className="small muted" style={{ margin: 0 }}>Reopening turns the report back into a draft. The client link stops working until you approve it again.</p>
                 <SubmitButton secondary pendingText="Reopening…" style={{ alignSelf: 'flex-start' }}>Reopen for edits</SubmitButton>

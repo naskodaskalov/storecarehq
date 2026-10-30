@@ -10,6 +10,8 @@ import { runUptime } from './jobs/uptime.ts';
 import { draftMonthlyReport } from './jobs/report.ts';
 import { defaultSenders, notify, type Alert, type Senders } from './notify.ts';
 import { reportPeriodFor } from './schedule.ts';
+import { enqueueDelivery, deliverAlerts } from './alert-outbox.ts';
+import { createHash } from 'node:crypto';
 
 const APP = () => process.env.APP_URL ?? 'https://app.storecarehq.com';
 const appUrl = (storeId: string) => `${APP()}/stores/${storeId}`;
@@ -17,22 +19,17 @@ const appUrl = (storeId: string) => `${APP()}/stores/${storeId}`;
 export async function storefrontTask(db: Db, storeId: string) {
   const store = await getStore(db, storeId);
   if (!store || store.status === 'paused') return;
-  const { changes } = await runStorefrontDiff(db, store);
+  await runStorefrontDiff(db, store);
   await recomputeHealth(db, store.id);
-  const alerts: Alert[] = changes
-    .filter((c) => c.risky)
-    .map((c) => ({ severity: 'risky', title: c.summary, body: 'Detected on the live storefront.', link: appUrl(store.id) }));
-  await notify(db, store, alerts);
+  // Database triggers save risky-change alerts atomically with each change.
+  await deliverAlerts(db);
 }
 
 export async function uptimeTask(db: Db, storeId: string) {
   const store = await getStore(db, storeId);
   if (!store || store.status === 'paused') return;
   const r = await runUptime(db, store);
-  const alerts: Alert[] = [];
-  if (r.opened) alerts.push({ severity: 'incident', title: 'Store is down', body: 'Two checks in a row failed.', link: appUrl(store.id) });
-  if (r.resolved) alerts.push({ severity: 'incident', title: 'Store is back up', body: 'The latest check passed.', link: appUrl(store.id) });
-  await notify(db, store, alerts);
+  if (r.opened || r.resolved) await deliverAlerts(db);
   if (r.opened || r.resolved) await recomputeHealth(db, store.id);
 }
 
@@ -42,10 +39,7 @@ export async function checkoutTask(db: Db, storeId: string) {
   const r = await runCheckout(db, store);
   if ('skipped' in r) return;
   await recomputeHealth(db, store.id);
-  if (r.opened) {
-    const failed = r.results.filter((x) => x.result === 'fail').map((x) => `${x.device}: failed at ${x.failedStep}`).join(', ');
-    await notify(db, store, [{ severity: 'incident', title: 'Checkout test failed', body: failed, link: appUrl(store.id) }]);
-  }
+  await deliverAlerts(db);
 }
 
 export async function speedTask(db: Db, storeId: string) {
@@ -59,7 +53,7 @@ export async function siteTask(db: Db, storeId: string) {
   const store = await getStore(db, storeId);
   if (!store || store.status === 'paused') return;
   const r = await runSite(db, store);
-  const alerts: Alert[] = expiryAlerts(r).map((a) => ({ severity: 'incident', title: a.title, body: a.body, link: appUrl(store.id) }));
+  const alerts: Alert[] = expiryAlerts(r).map((a) => ({ key: `expiry/${store.id}/${new Date().toISOString().slice(0,10)}/${a.title}`, severity: 'incident', title: a.title, body: a.body, link: appUrl(store.id) }));
   await notify(db, store, alerts);
 }
 
@@ -89,8 +83,8 @@ export async function sendReportDigests(db: Db, items: Drafted[], senders: Sende
   for (const d of items) byAgency.set(d.agencyId, [...(byAgency.get(d.agencyId) ?? []), d]);
   let sent = 0;
   for (const [agencyId, list] of byAgency) {
-    const { rows: routes } = await db.query<{ channel: string; target: string }>(
-      `select distinct channel, target from public.alert_routes where agency_id = $1 and channel in ('email', 'slack')`,
+    const { rows: routes } = await db.query<{ id: string; channel: 'email' | 'slack'; target: string }>(
+      `select distinct on (channel,target) id, channel, target from public.alert_routes where agency_id = $1 and channel in ('email', 'slack') order by channel,target,id`,
       [agencyId],
     );
     const labels = [...new Set(list.map((d) => d.periodLabel))].join(' / ');
@@ -100,15 +94,14 @@ export async function sendReportDigests(db: Db, items: Drafted[], senders: Sende
       .sort((a, b) => a.storeName.localeCompare(b.storeName))
       .map((d) => `• ${d.storeName}: ${APP()}/reports/${d.reportId}`);
     const text = `${subject}.\nThey were drafted from last month's checks, changes and work log. Nothing goes to clients until you approve and send.\n\n${lines.join('\n')}\n\nAll reports: ${APP()}/reports?period=${list[0].periodStart.slice(0, 7)}`;
+    const ids: string[] = [];
+    const eventKey = `reports/${createHash('sha256').update(list.map(d => d.reportId).sort().join(',')).digest('hex')}`;
     for (const r of routes) {
-      try {
-        if (r.channel === 'email') await senders.email(r.target, subject, text);
-        else await senders.slack(r.target, text);
-        sent++;
-      } catch (e) {
-        console.error(`[report] ${r.channel} to ${r.target} failed`, e);
-      }
+      const id = await enqueueDelivery(db, { agencyId, routeId: r.id, eventKey, channel: r.channel,
+        target: r.target, subject, body: text });
+      if (id) ids.push(id);
     }
+    sent += await deliverAlerts(db, senders, ids);
   }
   return sent;
 }

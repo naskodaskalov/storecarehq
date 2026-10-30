@@ -22,12 +22,12 @@ Changing the cron expression alone does not establish reliable monitoring.
 - Completed stores are logged immediately, preserving diagnostics if a later operation fails.
 - Speed failures produce workflow warnings and retry on the next pass while other checks continue.
 
-## Supabase scheduler installed; activation pending
+## Supabase scheduler active
 
 The approved Supabase scheduler has been installed in project `jiuxvhzsxhidsmuptfka`.
 Deployment SQL is saved in `scripts/setup-monitor-scheduler.sql` (operations setup, not an
 application migration: ordinary local Postgres/CI does not have Supabase Cron and Vault).
-Both jobs remain inactive pending credentials and a verified real dispatch:
+Both jobs were activated on 29 October 2026 after a verified real dispatch:
 
 - `storecare-monitor-dispatch`: `7,37 * * * *` UTC.
 - `storecare-monitor-health`: every five minutes; fails in Cron history on missing/rejected
@@ -97,4 +97,12 @@ They do not simulate GitHub's scheduler or validate live database credentials.
 Verified on 29 October: 14 worker tests and worker typecheck passed. Live SQL checks passed
 for missing-token handling, missing-dispatch handling, and a synthetic HTTP 401 response.
 The synthetic rows were rolled back. Job schedules, inactive state, table RLS and function
-access restrictions were checked in the live database. A real GitHub dispatch is pending the token.
+access restrictions were checked in the live database.
+
+Activation verified on 29 October 2026: Supabase dispatch request 1 returned HTTP 200 and
+created [monitoring run 40919369904](https://github.com/naskodaskalov/storecarehq/actions/runs/40919369904).
+The run completed successfully in 29 seconds on main commit `8110c1b`. Both eligible stores
+wrote uptime records at 17:14:35 UTC and snapshots at 17:14:37 UTC. The health assertion passed;
+both Cron jobs were activated and their active state verified. The credential remained in Vault.
+Local worker hardening changes still need to be committed and pushed separately; the live
+timing fix uses the existing main-branch workflow's dispatch entry point.

@@ -33,6 +33,12 @@ export async function loadMonthData(supabase: Client, storeId: string, period: P
     supabase.from('site_checks').select('ssl_expires_at, domain_expires_at, domain, pages_checked, broken').eq('store_id', storeId).gte('checked_at', from).lt('checked_at', to).order('checked_at', { ascending: false }).limit(1),
   ]);
 
+  // A failed query is not an empty month. Never turn unavailable monitoring data into a client report.
+  const required = [agency, upStats, incidents, runs, speed, changes, work, prevWork, snap, stockSnap, quality, site];
+  if (required.some(result => result.error) || (plan.error && plan.error.code !== 'PGRST116')) {
+    throw new Error('Report data is temporarily unavailable.');
+  }
+
   const rows: MonthRows = {
     store,
     agency: agency.data,

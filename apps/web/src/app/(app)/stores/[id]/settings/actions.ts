@@ -8,6 +8,15 @@ import { supabaseServer } from '@/lib/supabase';
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 const back = (id: string, q: string) => redirect(`/stores/${id}/settings?${q}`);
 
+export async function retryAlert(formData: FormData) {
+  const id = str(formData, 'store');
+  const supabase = await supabaseServer();
+  const { error } = await supabase.rpc('retry_alert_delivery', { delivery_id: str(formData, 'delivery') });
+  if (error) back(id, 'error=' + encodeURIComponent('Could not retry this alert. Check that its destination is still configured.'));
+  revalidatePath(`/stores/${id}/settings`);
+  back(id, 'saved=alert');
+}
+
 export async function saveStore(formData: FormData) {
   const id = str(formData, 'store');
   const supabase = await supabaseServer();
@@ -31,8 +40,15 @@ export async function saveStore(formData: FormData) {
 
   const email = str(formData, 'contact_email');
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) back(id, 'error=' + encodeURIComponent('That client email does not look right.'));
+  const slack = str(formData, 'slack');
+  if (slack && !/^https:\/\/hooks\.slack\.com\/services\/[^\s?#]+$/.test(slack)) {
+    back(id, 'error=' + encodeURIComponent('Enter a Slack incoming-webhook URL starting with https://hooks.slack.com/services/'));
+  }
 
   const consent = formData.get('consent') === 'on';
+  if (consent && formData.get('mobile') !== 'on' && formData.get('desktop') !== 'on') {
+    back(id, 'error=' + encodeURIComponent('Select at least one device for the checkout test.'));
+  }
   const handle = str(formData, 'handle').replace(/^\/?products\//, '').replace(/[?#].*$/, '');
 
   const { error } = await supabase
@@ -66,13 +82,18 @@ export async function saveStore(formData: FormData) {
     .eq('store_id', id);
 
   // One Slack webhook per store; an empty field removes it.
-  const slack = str(formData, 'slack');
-  if (slack && !slack.startsWith('https://hooks.slack.com/')) {
-    back(id, 'error=' + encodeURIComponent('Slack webhook URLs start with https://hooks.slack.com/'));
+  const { data: existing, error: routeReadError } = await supabase.from('alert_routes').select('id,target').eq('store_id', id).eq('channel', 'slack');
+  if (routeReadError) back(id, 'error=' + encodeURIComponent('Could not load alert settings. Please try again.'));
+  // Preserve unchanged route IDs: queued messages reference them.
+  const unchanged = existing?.find(r => r.target === slack);
+  const remove = existing?.filter(r => r.id !== unchanged?.id).map(r => r.id) ?? [];
+  if (remove.length) {
+    const { error: deleteError } = await supabase.from('alert_routes').delete().in('id', remove).eq('store_id', id);
+    if (deleteError) back(id, 'error=' + encodeURIComponent('Could not update alert settings. Please try again.'));
   }
-  await supabase.from('alert_routes').delete().eq('store_id', id).eq('channel', 'slack');
-  if (slack) {
-    await supabase.from('alert_routes').insert({ agency_id: store.agency_id, store_id: id, channel: 'slack', target: slack, min_severity: 'risky' });
+  if (slack && !unchanged) {
+    const { error: insertError } = await supabase.from('alert_routes').insert({ agency_id: store.agency_id, store_id: id, channel: 'slack', target: slack, min_severity: 'risky' });
+    if (insertError) back(id, 'error=' + encodeURIComponent('Could not save the Slack alert destination. Please try again.'));
   }
 
   revalidatePath(`/stores/${id}`);

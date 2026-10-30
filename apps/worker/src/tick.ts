@@ -9,6 +9,7 @@
 import { activeStores, createPool, type Db, type StoreRow } from './db.ts';
 import { dueJobs, type JobName, type LastRuns } from './schedule.ts';
 import { runStores } from './run-stores.ts';
+import { deliverAlerts } from './alert-outbox.ts';
 import { checkoutTask, reportTask, sendReportDigests, siteTask, speedTask, storefrontTask, takeDrafted, uptimeTask } from './tasks.ts';
 
 const TASKS: Record<JobName, (db: Db, storeId: string) => Promise<void>> = {
@@ -62,6 +63,7 @@ const dryRun = process.argv.includes('--dry-run');
 const pool = createPool();
 const started = Date.now();
 try {
+  if (!dryRun) console.log(`Queued alerts accepted: ${await deliverAlerts(pool)}`);
   const stores = await activeStores(pool);
   // Log each store immediately, preserving evidence if a later job or cleanup fails.
   const lines = await runStores(stores, (store) => runStore(pool, store, dryRun));
@@ -69,6 +71,7 @@ try {
     // One "reports ready" message per agency for everything drafted in this pass.
     const digests = await sendReportDigests(pool, takeDrafted());
     if (digests) console.log(`reports ready: ${digests} notification${digests === 1 ? '' : 's'} sent`);
+    console.log(`Queued alerts accepted: ${await deliverAlerts(pool)}`);
     await pool.query('select public.prune_monitoring()');
   }
   if (!dryRun && !process.env.PAGESPEED_API_KEY) {

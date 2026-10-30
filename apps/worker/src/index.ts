@@ -4,6 +4,7 @@ import PgBoss from 'pg-boss';
 import { activeStores, createPool, dbConfig, type StoreRow } from './db.ts';
 import { checkoutTask, reportTask, sendReportDigests, siteTask, speedTask, storefrontTask, takeDrafted, uptimeTask } from './tasks.ts';
 import { localDateHour, REPORT_LAST_DAY } from './schedule.ts';
+import { deliverAlerts } from './alert-outbox.ts';
 
 const pool = createPool();
 const boss = new PgBoss({ ...dbConfig(), schema: 'pgboss', max: 3 });
@@ -47,6 +48,7 @@ const fanOut = async (queue: keyof typeof QUEUES, stores: StoreRow[]) => {
 };
 
 await boss.work('tick-5min', async () => {
+  await deliverAlerts(pool);
   const stores = await activeStores(pool);
   await fanOut('uptime', stores);
   // Stores added since the last hourly tick get their first snapshot within 5 minutes.
