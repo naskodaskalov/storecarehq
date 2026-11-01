@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <div className="workspace-identity"><span className="nav-caption">Workspace</span><div className="workspace-name">{agency.name}</div></div>
         <NavLinks />
         <div className="nav-foot">
-          <div className="nav-account"><span className="account-avatar">{agency.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><div style={{ fontWeight: 600 }}>{agency.name}</div></div>
+          <Link href="/settings" className="nav-account" title="Agency settings" aria-label={`${agency.name}: agency settings`}><span className="account-avatar">{agency.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><div style={{ fontWeight: 600 }}>{agency.name}</div></Link>
           <div className="small muted">
             {planLabel} · {count ?? 0} stores
           </div>
