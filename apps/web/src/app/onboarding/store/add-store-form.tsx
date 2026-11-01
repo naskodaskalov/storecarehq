@@ -10,7 +10,7 @@ const LIMITED: Record<string, string> = {
   no_product_feed: 'The store hides its product feed, so product and price changes will not be tracked.',
 };
 
-export function AddStoreForm({ error }: { error?: string }) {
+export function AddStoreForm({ error, initialUrl }: { error?: string; initialUrl?: string }) {
   const [check, runCheck, checking] = useActionState<StoreCheck | null, FormData>(checkStore, null);
   const [tz, setTz] = useState('UTC');
   useEffect(() => setTz(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'), []);
@@ -22,7 +22,7 @@ export function AddStoreForm({ error }: { error?: string }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
           <div className="field" style={{ flex: '1 1 280px' }}>
             <label htmlFor="url">Store URL</label>
-            <input id="url" name="url" type="text" placeholder="clientstore.com" required autoCapitalize="none" autoCorrect="off" inputMode="url" defaultValue={check?.url.replace(/^https:\/\//, '')} />
+            <input id="url" name="url" type="text" placeholder="clientstore.com" required autoCapitalize="none" autoCorrect="off" inputMode="url" defaultValue={check?.url.replace(/^https:\/\//, '') ?? initialUrl} />
           </div>
           <SubmitButton pending={checking} pendingText="Checking store…">Check store</SubmitButton>
         </div>

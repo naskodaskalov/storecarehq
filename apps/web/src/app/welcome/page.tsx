@@ -5,8 +5,12 @@ import Link from 'next/link';
 import { headers } from 'next/headers';
 import { appLink } from '@/lib/domains';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, templateSummary, type MonthData } from '@storecare/reports';
-import { ReportView } from '@/components/report-view';
 import { ContactForm } from '@/components/contact-form';
+import { StoreScan } from './store-scan';
+import { BrandReport } from './brand-report';
+import { LiveLog, type LogLine } from './live-log';
+import { ValueCalculator } from './value-calculator';
+import { MobileMenu } from './mobile-menu';
 import './landing.css';
 
 export const metadata: Metadata = {
@@ -21,15 +25,31 @@ const PLANS = [
   { name: 'Pro', price: 149, stores: 50, note: 'For agencies with a full maintenance book.' },
 ];
 
-// What the change log shows, in the product's own words.
-const LOG: { when: string; store: string; text: string; tone: 'risk' | 'good' | 'plain' }[] = [
-  { when: '06:02', store: 'Ferro Coffee', text: 'Checkout test failed on mobile: stuck at the shipping step', tone: 'risk' },
-  { when: '06:31', store: 'Ferro Coffee', text: 'Checkout test passed again, fixed in 29 min', tone: 'good' },
-  { when: '09:14', store: 'Juniper & Ash', text: 'New live theme: “Dawn – Autumn”, matched to your work log', tone: 'plain' },
-  { when: '11:40', store: 'Bloom Botanics', text: 'Prices changed on 42 products, not in your work log', tone: 'risk' },
-  { when: '13:05', store: 'Kite & Kin', text: 'Smile.io added to the storefront', tone: 'plain' },
-  { when: '15:22', store: 'Saltgrass Swim', text: 'Out of stock: Coastline One-Piece, all sizes', tone: 'plain' },
-  { when: '18:47', store: 'Ferro Coffee', text: 'Domain ferrocoffee.co expires in 14 days', tone: 'risk' },
+// What the change log shows, in the product's own words. The first seven are the opening state; the rest tick in live.
+const LOG: LogLine[] = [
+  { store: 'Ferro Coffee', text: 'Checkout test failed on mobile: stuck at the shipping step', tone: 'risk' },
+  { store: 'Ferro Coffee', text: 'Checkout test passed again, fixed in 29 min', tone: 'good' },
+  { store: 'Juniper & Ash', text: 'New live theme: “Dawn – Autumn”, matched to your work log', tone: 'plain' },
+  { store: 'Bloom Botanics', text: 'Prices changed on 42 products, not in your work log', tone: 'risk' },
+  { store: 'Kite & Kin', text: 'Smile.io added to the storefront', tone: 'plain' },
+  { store: 'Saltgrass Swim', text: 'Out of stock: Coastline One-Piece, all sizes', tone: 'plain' },
+  { store: 'Ferro Coffee', text: 'Domain ferrocoffee.co expires in 14 days', tone: 'risk' },
+  { store: 'Oak & Ember', text: 'Mobile speed score dropped from 71 to 52 after a new hero video', tone: 'risk' },
+  { store: 'Juniper & Ash', text: 'Klaviyo pop-up removed, matched to your work log', tone: 'good' },
+  { store: 'Saltgrass Swim', text: 'Store unreachable for 4 min (503), back up', tone: 'risk' },
+  { store: 'Kite & Kin', text: '12 new products in “Winter Knits”', tone: 'plain' },
+  { store: 'Bloom Botanics', text: 'SSL certificate renewed, valid until February', tone: 'good' },
+  { store: 'Oak & Ember', text: 'Unknown script added: cdn.trackify.io', tone: 'risk' },
+  { store: 'Ferro Coffee', text: 'Checkout test passed on mobile and desktop', tone: 'good' },
+];
+const LOG_TIMES = ['06:02', '06:31', '09:14', '11:40', '13:05', '15:22', '18:47'];
+
+// The usual care-plan toolkit, side by side with what replaces it.
+const OLD_WAY = [
+  { before: 'An uptime monitor that only knows the home page loads', after: 'Uptime, a daily checkout test, speed, SSL and domain expiry in one place' },
+  { before: 'Finding out about a broken checkout from the client', after: 'An alert after two failed checks, usually before the client notices' },
+  { before: 'A spreadsheet of hours nobody else sees', after: 'A work log matched to the real changes on the store' },
+  { before: 'A report rewritten in Google Docs every month', after: 'A branded report drafted on the 1st, ready to approve' },
 ];
 
 const FAQ = [
@@ -96,6 +116,15 @@ export default async function Landing() {
   const login = appLink(host, '/login');
   const signup = appLink(host, '/login?trial=1');
   const facts = sampleFacts();
+  const nav = (
+    <>
+      <a href="#check">Check a store</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#contact">Contact</a>
+      <a href={login}>Sign in</a>
+    </>
+  );
   return (
     <div className="lp">
       <header className="lp-top">
@@ -104,35 +133,45 @@ export default async function Landing() {
           StoreCare HQ
         </Link>
         <nav className="lp-nav" aria-label="Main">
-          <a href="#how">How it works</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#contact">Contact</a>
-          <a href={login}>Sign in</a>
+          <div className="lp-nav-links">{nav}</div>
           <a href={signup} className="btn lp-btn-small">Start free trial</a>
+          <MobileMenu>{nav}</MobileMenu>
         </nav>
       </header>
 
       <main>
         <section className="lp-hero">
           <div className="lp-hero-copy">
+            <p className="lp-eyebrow">For Shopify freelancers and agencies with care plans</p>
             <h1>Know what changed on every client store before your client does.</h1>
             <p className="lp-lede">
-              StoreCare HQ watches your clients’ Shopify stores around the clock and drafts the monthly report you send
-              them. Your care plan, finally visible.
+              StoreCare HQ watches your clients’ stores around the clock and drafts the monthly report that proves your
+              care plan is worth it.
             </p>
-            <div className="lp-cta">
-              <a href={signup} className="btn lp-btn-big">Start free trial</a>
-              <span className="lp-cta-note">7 days free, then from $29 a month. No Shopify access needed.</span>
-            </div>
+            <StoreScan signup={signup} />
+            <p className="lp-cta-note">
+              <a href={signup}>Or start your 7-day free trial →</a> From $29 a month. No Shopify access, no app to install.
+            </p>
           </div>
-          <figure className="lp-hero-report">
-            <div className="lp-report-frame" aria-label="Example client report">
-              <ReportView facts={facts} summary={templateSummary(facts)} sections={{ ...DEFAULT_SECTIONS, changes: false, site: false }} />
+          <BrandReport facts={facts} summary={templateSummary(facts)} sections={{ ...DEFAULT_SECTIONS, changes: false, site: false }} />
+        </section>
+
+        <section className="lp-oldway" aria-labelledby="oldway-title">
+          <div className="lp-oldway-head">
+            <h2 id="oldway-title">Most care plans run on four tools and a lot of trust.</h2>
+            <p>Clients pay every month for work they can’t see. StoreCare HQ puts it in one place they can.</p>
+          </div>
+          <div className="lp-compare" role="table" aria-label="Care plans before and with StoreCare HQ">
+            <div className="lp-compare-row lp-compare-labels" role="row">
+              <span role="columnheader">The usual way</span><span role="columnheader">With StoreCare HQ</span>
             </div>
-            <figcaption>
-              An example report, drafted on 1 November for a fictional agency and store. Your clients see your agency’s name.
-            </figcaption>
-          </figure>
+            {OLD_WAY.map((r) => (
+              <div key={r.before} className="lp-compare-row" role="row">
+                <span role="cell" className="lp-before">{r.before}</span>
+                <span role="cell" className="lp-after">{r.after}</span>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="lp-log" aria-labelledby="log-title">
@@ -147,15 +186,7 @@ export default async function Landing() {
               before the client asks why sales dipped.
             </p>
           </div>
-          <ol className="lp-feed" aria-label="Example day in the change log">
-            {LOG.map((l, i) => (
-              <li key={i} className={`lp-feed-item lp-${l.tone}`}>
-                <time className="lp-feed-when">{l.when}</time>
-                <span className="lp-feed-store">{l.store}</span>
-                <span className="lp-feed-text">{l.text}</span>
-              </li>
-            ))}
-          </ol>
+          <LiveLog lines={LOG} times={LOG_TIMES} />
         </section>
 
         <section className="lp-watch" aria-labelledby="watch-title">
@@ -168,6 +199,14 @@ export default async function Landing() {
             <div><dt>Products and stock</dt><dd>New products, price changes and what sold out.</dd></div>
             <div><dt>Renewals and links</dt><dd>SSL certificate and domain expiry, and broken links from the home page.</dd></div>
           </dl>
+        </section>
+
+        <section className="lp-value" aria-labelledby="value-title">
+          <div className="lp-value-head">
+            <h2 id="value-title">What a care client is worth to you</h2>
+            <p>Care plans are cancelled quietly, when a client stops seeing what they pay for. Move the sliders.</p>
+          </div>
+          <ValueCalculator signup={signup} />
         </section>
 
         <section id="how" className="lp-how" aria-labelledby="how-title">
@@ -198,7 +237,7 @@ export default async function Landing() {
               <div key={p.name} className={`lp-plan${p.name === 'Agency' ? ' lp-plan-mid' : ''}`}>
                 <h3>{p.name}</h3>
                 <div className="lp-price"><span className="lp-amount">${p.price}</span> a month</div>
-                <div className="lp-stores">Up to {p.stores} stores</div>
+                <div className="lp-stores">Up to {p.stores} stores · {`$${(p.price / p.stores).toFixed(2)}`} per store</div>
                 <p>{p.note}</p>
                 <a href={signup} className={`btn${p.name === 'Agency' ? '' : ' secondary'}`}>Start free trial</a>
               </div>
@@ -219,19 +258,25 @@ export default async function Landing() {
           </div>
         </section>
 
-        <section id="contact" className="lp-contact" aria-labelledby="landing-contact-title">
-          <div className="lp-contact-inner">
-            <div className="lp-contact-copy">
-              <h2 id="landing-contact-title">Contact StoreCare HQ</h2>
-              <p>A question about your stores, a plan, or something we can improve? We&apos;d like to hear from you.</p>
-            </div>
-            <ContactForm source="website" />
+        <section className="lp-end">
+          <div>
+            <h2>Make your care plan visible.</h2>
+            <p>Add your first client store in two minutes. Your first report drafts itself on the 1st.</p>
+          </div>
+          <div className="lp-end-cta">
+            <a href={signup} className="btn lp-btn-big">Start free trial</a>
+            <a href="#check" className="lp-end-alt">Or check a store first</a>
           </div>
         </section>
 
-        <section className="lp-end">
-          <h2>Make your care plan visible.</h2>
-          <a href={signup} className="btn lp-btn-big">Start free trial</a>
+        <section id="contact" className="lp-contact" aria-labelledby="landing-contact-title">
+          <div className="lp-contact-inner">
+            <div className="lp-contact-copy">
+              <h2 id="landing-contact-title">Still deciding?</h2>
+              <p>Ask us anything about your stores, a plan, or how it would fit your agency. We read every message.</p>
+            </div>
+            <ContactForm source="website" />
+          </div>
         </section>
       </main>
 

@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { normalizeStoreUrl } from '@storecare/storefront';
 import { billingState } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { OnboardingFrame } from '../steps';
@@ -9,6 +11,10 @@ export default async function Step2({ searchParams }: { searchParams: Promise<{ 
   const { error } = await searchParams;
   const { agency } = await requireAgency();
   if (!billingState(agency).hasAccess) redirect('/onboarding/trial');
+  // A store the visitor checked on the landing page before signing up (cookie shared by the website and app).
+  const pending = (await cookies()).get('sc_store')?.value;
+  let initialUrl: string | undefined;
+  try { initialUrl = pending ? normalizeStoreUrl(pending).replace(/^https:\/\//, '') : undefined; } catch { initialUrl = undefined; }
   return (
     <OnboardingFrame step={3}>
       <section className="onb-card">
@@ -18,7 +24,7 @@ export default async function Step2({ searchParams }: { searchParams: Promise<{ 
             Paste a Shopify storefront address. We’ll check what’s visible before you add it.
           </p>
         </div>
-        <AddStoreForm error={error} />
+        <AddStoreForm error={error} initialUrl={initialUrl} />
         <div className="panel setup-monitoring">
           <strong style={{ fontSize: 15 }}>A little visibility goes a long way.</strong>
           <div className="small" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px 20px', color: 'var(--text-2)' }}>
