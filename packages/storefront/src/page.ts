@@ -50,6 +50,26 @@ export function parseTheme(html: string): ThemeInfo | null {
   }
 }
 
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+const decodeEntities = (s: string) =>
+  s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
+    if (e[0] !== '#') return ENTITIES[e.toLowerCase()] ?? m;
+    const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : m;
+  });
+
+/** The store's own name, as its theme publishes it for link previews (og:site_name). */
+export function parseSiteName(html: string): string | null {
+  const tag = html.slice(0, 300_000).match(/<meta\b[^>]*\bproperty\s*=\s*["']og:site_name["'][^>]*>/i)?.[0];
+  const content = tag?.match(/\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+  if (!content) return null;
+  const name = decodeEntities(content[1] ?? content[2] ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return name ? name.slice(0, 80) : null;
+}
+
 function absolutize(src: string, base: string): string | null {
   try {
     return new URL(src.replace(/&amp;/g, '&'), base).toString();

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
-import { APP_ORIGIN, WEBSITE_ORIGIN, appLink, websiteLink, hostRouting, sessionRouting, authCallbackUrl, isPublicPath } from './domains.ts';
+import { APP_ORIGIN, WEBSITE_ORIGIN, SHARE_IMAGE_PATH, appLink, websiteLink, hostRouting, sessionRouting, authCallbackUrl, isPublicPath } from './domains.ts';
 
 test('production website is always marketing; application links use the app host', () => {
   for (const host of ['storecarehq.com', 'www.storecarehq.com']) {
@@ -104,4 +104,14 @@ test('landing store scans stay on the website host without requiring a session',
     assert.equal(sessionRouting(host, '/api/scan', false), null);
   }
   assert.equal(isPublicPath('/api/scan/other'), false);
+});
+
+test('the landing page’s share image is served from the website host, read-only and without a session', () => {
+  for (const host of ['www.storecarehq.com', 'storecarehq.com']) {
+    assert.equal(hostRouting(host, SHARE_IMAGE_PATH, '?4b2e3e66'), null);
+    assert.deepEqual(hostRouting(host, SHARE_IMAGE_PATH, '', 'POST'), { kind: 'reject' });
+    assert.equal(sessionRouting(host, SHARE_IMAGE_PATH, false), null);
+    // Nothing else under the landing page becomes reachable on the website host.
+    assert.equal(hostRouting(host, '/welcome/other')?.kind, 'redirect');
+  }
 });

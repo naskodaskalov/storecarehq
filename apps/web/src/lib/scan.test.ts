@@ -45,6 +45,39 @@ test('summary lists the theme, known apps first and product counts, without page
   assert.ok(!JSON.stringify(s).includes('<'));
 });
 
+test('summary carries the store name and a fingerprint of keys and counts for next time', () => {
+  const s = summarize(probe({
+    siteName: 'Shop & Co',
+    productFeed: { status: 'ok', products: [
+      { id: 11, handle: 'a', title: 'Coastline One-Piece', updatedAt: null, prices: { '1': '80.00', '2': '80.00' }, soldOut: ['1', '2'] },
+      { id: 12, handle: 'b', title: 'Tide Bikini', updatedAt: null, prices: { '3': '60.00' }, soldOut: [] },
+    ], pages: 1, truncated: false },
+  }));
+  assert.ok(s.ok);
+  assert.equal(s.siteName, 'Shop & Co');
+  assert.equal(s.fp.at, '2026-11-01T00:00:00Z');
+  assert.equal(s.fp.home, true);
+  assert.deepEqual(s.fp.theme, { id: 1, name: 'Autumn', schema: 'Dawn', version: '15.0.0' });
+  assert.deepEqual(s.fp.apps, [['x', 'cdn.unknown.io'], ['klaviyo', 'Klaviyo']]);
+  assert.equal(s.fp.feed?.all, true);
+  assert.deepEqual(s.fp.feed?.p['11'].slice(1), [2, 2]);
+  assert.deepEqual(s.fp.feed?.out, { '11': 'Coastline One-Piece' }, 'only fully sold-out products keep a title');
+  assert.ok(!JSON.stringify(s.fp).includes('60.00'), 'prices travel as keys, not values');
+});
+
+test('price keys change with any variant price and ignore variant order', async () => {
+  const { priceKey } = await import('./scan.ts');
+  assert.equal(priceKey({ '1': '10.00', '2': '12.00' }), priceKey({ '2': '12.00', '1': '10.00' }));
+  assert.notEqual(priceKey({ '1': '10.00', '2': '12.00' }), priceKey({ '1': '10.00', '2': '12.50' }));
+});
+
+test('a blocked visit is fingerprinted as unreadable, so it is never mistaken for removed apps', () => {
+  const s = summarize(probe({ home: { status: 403, ms: 300, blocked: true }, theme: null, apps: [], productFeed: { status: 'skipped', reason: 'home page not readable' } }));
+  assert.ok(s.ok);
+  assert.equal(s.fp.home, false);
+  assert.equal(s.fp.feed, null);
+});
+
 test('non-Shopify and unreachable stores get a plain error', () => {
   assert.equal(summarize(probe({ isShopify: false })).ok, false);
   assert.equal(summarize(probe({ home: { status: 0, ms: 0, blocked: false, error: 'ENOTFOUND' } })).ok, false);

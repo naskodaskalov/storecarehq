@@ -1,5 +1,7 @@
 export const APP_ORIGIN = 'https://app.storecarehq.com';
 export const WEBSITE_ORIGIN = 'https://www.storecarehq.com';
+/** The landing page's link-preview image, served from the website host like the page itself. */
+export const SHARE_IMAGE_PATH = '/welcome/opengraph-image';
 
 export function isWebsiteHost(host: string) {
   return host === 'www.storecarehq.com' || host === 'storecarehq.com';
@@ -33,7 +35,7 @@ function destination(origin: string, path: string, search: string) {
 /** Decide host boundaries before reading any session. Never replay POST bodies across hosts. */
 export function hostRouting(host: string, path: string, search = '', method = 'GET'): Routing {
   const website = isWebsiteHost(host);
-  if (website && (path === '/' || path === '/welcome')) {
+  if (website && (path === '/' || path === '/welcome' || path === SHARE_IMAGE_PATH)) {
     if (method !== 'GET' && method !== 'HEAD') return { kind: 'reject' };
     return path === '/' ? { kind: 'rewrite', url: destination(WEBSITE_ORIGIN, '/welcome', search) } : null;
   }

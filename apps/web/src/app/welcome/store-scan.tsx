@@ -2,10 +2,14 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { ScanReply, ScanSummary } from '@/lib/scan';
-import { checkupNote, findings } from '@/lib/scan-findings';
-import { useBrand } from './brand-context';
+import { checkupNote, findings, parseStoreList } from '@/lib/scan-findings';
+import { forgetStore, forgetStores, loadStores, remember, saveStore, STORES_EVENT, whenLabel, type StoreMemory } from '@/lib/store-memory';
+import { storeName } from '@/lib/store-preview';
+import { useBrand, type CheckedStore } from './brand-context';
 
 const STEPS = ['Reading robots.txt', 'Loading the home page', 'Spotting the theme and apps', 'Reading the product list'];
+/** A store checked less than an hour ago isn't worth a "welcome back". */
+const WELCOME_AFTER_MS = 60 * 60_000;
 
 /** Remember the scanned store for onboarding. The cookie is shared by www. and app. in production. */
 export function rememberStore(host: string) {
@@ -14,28 +18,65 @@ export function rememberStore(host: string) {
   document.cookie = `sc_store=${encodeURIComponent(host)}; path=/; max-age=${7 * 86400}; samesite=lax${domain}${secure}`;
 }
 
+/** Fold a successful check into what this browser remembers about the store, and say what changed since last time. */
+export function recordCheck(scan: ScanSummary): CheckedStore {
+  const prev = loadStores().find((m) => m.host === scan.host);
+  const { memory, found } = remember(prev, scan.host, scan.siteName, scan.fp);
+  saveStore(memory);
+  const saved = loadStores().some((m) => m.host === scan.host);
+  return { scan, memory, found, seenBefore: prev ? prev.looks.at(-1)! : null, saved };
+}
+
+/** The stores this browser remembers, kept current when another part of the page (or another tab) checks one. */
+export function useRememberedStores(): StoreMemory[] {
+  const [stores, setStores] = useState<StoreMemory[]>([]);
+  useEffect(() => {
+    const load = () => setStores(loadStores());
+    load();
+    window.addEventListener(STORES_EVENT, load);
+    window.addEventListener('storage', load);
+    return () => {
+      window.removeEventListener(STORES_EVENT, load);
+      window.removeEventListener('storage', load);
+    };
+  }, []);
+  return stores;
+}
+
 export function StoreScan({ signup }: { signup: string }) {
+  const { setChecked } = useBrand();
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<ScanReply | null>(null);
+  const [checked, setLocal] = useState<CheckedStore | null>(null);
+  const remembered = useRememberedStores();
   const resultRef = useRef<HTMLDivElement>(null);
+  const typed = parseStoreList(url).stores[0];
+  const known = !!typed && remembered.some((m) => m.host === typed);
+  const steps = known ? [...STEPS, 'Comparing with your last check'] : STEPS;
 
   useEffect(() => {
     if (!busy) return;
     setStep(0);
-    const t = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 1100);
+    const t = setInterval(() => setStep((s) => Math.min(s + 1, steps.length - 1)), 1100);
     return () => clearInterval(t);
-  }, [busy]);
+  }, [busy, steps.length]);
 
-  async function scan(e: FormEvent) {
-    e.preventDefault();
-    if (!url.trim() || busy) return;
+  async function run(target: string) {
+    if (!target.trim() || busy) return;
     setBusy(true);
     setResult(null);
+    setLocal(null);
     try {
-      const res = await fetch('/api/scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }) });
-      setResult((await res.json()) as ScanReply);
+      const res = await fetch('/api/scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: target }) });
+      const reply = (await res.json()) as ScanReply;
+      if (reply.ok && reply.fp) {
+        const c = recordCheck(reply);
+        setLocal(c);
+        setChecked(c);
+      }
+      setResult(reply);
     } catch {
       setResult({ ok: false, error: 'The check did not finish. Please try again in a moment.' });
     } finally {
@@ -44,37 +85,77 @@ export function StoreScan({ signup }: { signup: string }) {
     }
   }
 
+  function scan(e: FormEvent) {
+    e.preventDefault();
+    run(url);
+  }
+
+  function again(host: string) {
+    setUrl(host);
+    run(host);
+  }
+
+  const last = remembered[0];
+  const welcome = !result && !busy && last && Date.now() - Date.parse(last.looks.at(-1)!) > WELCOME_AFTER_MS ? last : null;
+
   return (
     <div className="lp-scan" id="check">
+      {welcome && (
+        <div className="lp-back">
+          <p>
+            <span className="lp-back-dot" aria-hidden="true" />
+            Welcome back. You checked <strong>{welcome.name ?? welcome.host}</strong> {whenLabel(welcome.looks.at(-1)!)}. Want to see what changed since?
+          </p>
+          <div className="lp-back-actions">
+            <button type="button" className="btn" onClick={() => again(welcome.host)}>Check {welcome.host} again</button>
+            {remembered.slice(1, 4).map((m) => (
+              <button key={m.host} type="button" className="lp-back-chip" onClick={() => again(m.host)}>{m.host}</button>
+            ))}
+            <button type="button" className="lp-link-btn" onClick={() => forgetStores()}>Forget these</button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={scan} className="lp-scan-form" aria-label="Check a Shopify store">
-        <label htmlFor="scan-url" className="lp-scan-label">Try it on a client’s store, no sign-up</label>
+        <label htmlFor="scan-url" className="lp-scan-label">Try it on a client’s store: see the report you’d send, no sign-up</label>
         <div className="lp-scan-row">
           <span className="lp-scan-prefix" aria-hidden="true">https://</span>
           <input id="scan-url" type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}
             placeholder="clientstore.com" value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} />
           <button type="submit" className="btn" disabled={busy || !url.trim()} aria-busy={busy}>
-            {busy ? <><span className="spinner" aria-hidden="true" />Checking…</> : 'Check store'}
+            {busy ? <><span className="spinner" aria-hidden="true" />Checking…</> : known ? 'Check again' : 'Check store'}
           </button>
         </div>
       </form>
 
       {busy && (
         <ol className="lp-scan-steps" role="status" aria-live="polite">
-          {STEPS.map((s, i) => <li key={s} className={i < step ? 'done' : i === step ? 'now' : ''}>{s}</li>)}
+          {steps.map((s, i) => <li key={s} className={i < step ? 'done' : i === step ? 'now' : ''}>{s}</li>)}
         </ol>
       )}
 
       <div ref={resultRef} tabIndex={-1} className="lp-scan-out" aria-live="polite">
         {result && !result.ok && <p className="lp-scan-error" role="alert">{result.error}</p>}
-        {result?.ok && <ScanCard r={result} signup={signup} onAgain={() => { setResult(null); setUrl(''); }} />}
+        {result?.ok && checked && (
+          <ScanCard c={checked} signup={signup} onAgain={() => { setResult(null); setLocal(null); setUrl(''); }} />
+        )}
       </div>
     </div>
   );
 }
 
-function ScanCard({ r, signup, onAgain }: { r: ScanSummary; signup: string; onAgain: () => void }) {
+function ScanCard({ c, signup, onAgain }: { c: CheckedStore; signup: string; onAgain: () => void }) {
+  const { name: agency } = useBrand();
+  const [forgotten, setForgotten] = useState(false);
+  const r = c.scan;
   const speed = r.responseMs < 800 ? 'quick' : r.responseMs < 2000 ? 'ok' : 'slow';
-  const list = findings(r);
+  const name = storeName(r, c.memory);
+
+  function showReport() {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById('hero-report')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }
+
   return (
     <section className="lp-scan-card" aria-label={`Check results for ${r.host}`}>
       <header>
@@ -82,30 +163,65 @@ function ScanCard({ r, signup, onAgain }: { r: ScanSummary; signup: string; onAg
         <strong>{r.host}</strong>
         <span className="lp-scan-sub">is online · first page in {(r.responseMs / 1000).toFixed(1)}s ({speed})</span>
       </header>
-      <dl className="lp-scan-facts">
-        <div><dt>Live theme</dt><dd>{r.theme ?? 'Not visible'}</dd></div>
-        <div><dt>Products</dt><dd>{r.products ? `${r.products.count}${r.products.more ? '+' : ''} visible${r.soldOut ? `, ${r.soldOut} with sold-out sizes` : ''}` : 'Not public'}</dd></div>
-        <div className="wide"><dt>Apps on the storefront ({r.appCount})</dt>
-          <dd>{r.apps.length ? <ul className="lp-chips">{r.apps.map((a) => <li key={a}>{a}</li>)}{r.appCount > r.apps.length && <li className="more">+{r.appCount - r.apps.length} more</li>}</ul> : 'None detected'}</dd>
-        </div>
-      </dl>
-      {r.note && <p className="lp-scan-note">{r.note}</p>}
-      {list.length > 0 && (
-        <div className="lp-findings">
-          <h3>What one look shows</h3>
-          <ul>{list.map((f) => <li key={f.text} className={`lp-finding-${f.tone}`}>{f.text}</li>)}</ul>
-        </div>
+
+      {c.seenBefore ? <Since c={c} /> : (
+        <p className="lp-saved">
+          <strong>{name}’s report has started</strong>
+          {agency.trim() ? `, under ${agency.trim()}’s name. ` : '. Type your agency name above it to put it under yours. '}
+          {!c.saved ? 'Your browser isn’t letting this page keep anything, so this check won’t be remembered next time.' : forgotten ? 'Forgotten: nothing about it is kept in this browser now.' : (
+            <>
+              This check is saved in your browser and nowhere else: check {r.host} again in a few days and you’ll see
+              what changed in between.{' '}
+              <button type="button" className="lp-link-btn" onClick={() => { forgetStore(r.host); setForgotten(true); }}>Forget it</button>
+            </>
+          )}
+        </p>
       )}
-      <Pitch r={r} list={list} />
-      <p className="lp-scan-pitch">
-        That’s one look. StoreCare HQ looks every 30 minutes, tests the checkout every morning, and writes down the moment
-        the theme, an app or {r.products ? `any of those ${r.products.count}${r.products.more ? '+' : ''} products` : 'the catalogue'} changes.
-      </p>
+
+      <button type="button" className="lp-see-report" onClick={showReport}>See {name}’s report ↓</button>
+
       <div className="lp-scan-actions">
         <a href={signup} className="btn" onClick={() => rememberStore(r.host)}>Watch {r.host} free for 7 days</a>
         <button type="button" className="lp-link-btn" onClick={onAgain}>Check another store</button>
       </div>
+      <Pitch r={r} list={findings(r)} />
     </section>
+  );
+}
+
+/** What changed since this visitor last checked the store: the product's change log, in miniature. */
+function Since({ c }: { c: CheckedStore }) {
+  const when = whenLabel(c.seenBefore!);
+  const r = c.scan;
+  if (!r.fp.home) {
+    return (
+      <div className="lp-since">
+        <h3>Since your last check {when}</h3>
+        <p>The store’s firewall turned this check away, so there was nothing to compare. StoreCare records blocked visits and keeps checking.</p>
+      </div>
+    );
+  }
+  if (!c.found.length) {
+    const same = [
+      c.memory.last.theme && 'same theme',
+      r.appCount && `same ${r.appCount} apps`,
+      r.products && !r.products.more && `same ${r.products.count} products`,
+    ].filter(Boolean).join(', ');
+    return (
+      <div className="lp-since">
+        <h3>Since your last check {when}</h3>
+        <p>Nothing changed{same ? `: ${same}` : ''}. A quiet stretch like this still goes in the report: it’s what the client is paying for.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="lp-since has">
+      <h3>Since your last check {when}: {c.found.length} change{c.found.length === 1 ? '' : 's'}</h3>
+      <ul>
+        {c.found.map((ch, i) => <li key={i} className={ch.risky ? 'risky' : undefined}>{ch.summary}</li>)}
+      </ul>
+      <p>Did the client mention any of this? StoreCare would have told you within the hour.</p>
+    </div>
   );
 }
 

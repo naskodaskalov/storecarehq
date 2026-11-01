@@ -3,7 +3,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { headers } from 'next/headers';
-import { appLink } from '@/lib/domains';
+import { appLink, WEBSITE_ORIGIN } from '@/lib/domains';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, templateSummary, type MonthData } from '@storecare/reports';
 import { ContactForm } from '@/components/contact-form';
 import { StoreScan } from './store-scan';
@@ -12,15 +12,34 @@ import { LiveLog, type LogLine } from './live-log';
 import { ValueCalculator } from './value-calculator';
 import { MobileMenu } from './mobile-menu';
 import { BrandProvider } from './brand-context';
+import { SampleReportLink } from './sample-report-link';
 import { PortfolioCheck } from './portfolio-check';
 import { StickyCta } from './sticky-cta';
 import { MonthReplay, type ReplayDay, type ReplayEvent } from './month-replay';
 import './landing.css';
 
+const TITLE = 'StoreCare HQ: monitoring and monthly reports for Shopify care plans';
+const DESCRIPTION =
+  'StoreCare HQ watches your clients’ Shopify stores every day (uptime, checkout, speed, apps and theme changes) and drafts the monthly report you send them. No store access needed. 7 days free.';
+
 export const metadata: Metadata = {
-  title: 'StoreCare HQ: monitoring and monthly reports for Shopify care plans',
-  description:
-    'StoreCare HQ watches your clients’ Shopify stores every day (uptime, checkout, speed, apps and theme changes) and drafts the monthly report you send them. No store access needed. 7 days free.',
+  metadataBase: new URL(WEBSITE_ORIGIN),
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    url: '/',
+    siteName: 'StoreCare HQ',
+    title: 'Know what changed on every client store before your client does.',
+    description: 'Monitoring and white-label monthly reports for Shopify care plans. Check any store free, no sign-up.',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Know what changed on every client store before your client does.',
+    description: 'Monitoring and white-label monthly reports for Shopify care plans. Check any store free, no sign-up.',
+  },
 };
 
 const PLANS = [
@@ -108,6 +127,10 @@ const FAQ = [
     a: 'No. Checks are light, identify themselves as StoreCareBot and follow the store’s robots.txt. The checkout test is optional, only runs with your consent, and stops at the checkout page before any payment.',
   },
   {
+    q: 'Does the free store check on this page keep anything?',
+    a: 'Not on our side. It reads the public storefront once, the way a visitor’s browser does. Your own browser keeps a small summary of each store you check (theme, apps, and keys for prices and stock, not the pages themselves), so your next check can show what changed. “Forget” clears it.',
+  },
+  {
     q: 'Who writes the monthly report?',
     a: 'StoreCare HQ drafts it on the 1st from the month’s checks, the changes it saw and the work you logged. You read it, edit anything, approve it, and send your client a link or a PDF. Nothing reaches a client until you approve it.',
   },
@@ -157,6 +180,38 @@ function sampleFacts() {
   return buildFacts(data);
 }
 
+/** "1 December": when a store added today gets its first report. */
+function nextReportDate(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+}
+
+/** What search engines read: the product, its plans and the FAQ. */
+function structuredData() {
+  return [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'StoreCare HQ',
+      url: `${WEBSITE_ORIGIN}/`,
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      description: DESCRIPTION,
+      offers: PLANS.map((p) => ({
+        '@type': 'Offer',
+        name: p.name,
+        price: p.price,
+        priceCurrency: 'USD',
+        description: `Up to ${p.stores} stores. ${p.note}`,
+      })),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+    },
+  ];
+}
+
 export default async function Landing() {
   const host = (await headers()).get('host') ?? '';
   const login = appLink(host, '/login');
@@ -173,6 +228,11 @@ export default async function Landing() {
   );
   return (
     <div className="lp" id="top">
+      <script
+        type="application/ld+json"
+        // Our own constants, serialised; "<" is escaped so no text in them can close the script tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, '\\u003c') }}
+      />
       <header className="lp-top">
         <Link href="/" className="lp-brand" aria-label="StoreCare HQ home">
           <span className="mark">SC</span>
@@ -202,8 +262,6 @@ export default async function Landing() {
           </div>
           <BrandReport facts={facts} summary={templateSummary(facts)} sections={{ ...DEFAULT_SECTIONS, changes: false, site: false }} />
         </section>
-
-        </BrandProvider>
 
         <section className="lp-oldway" aria-labelledby="oldway-title">
           <div className="lp-oldway-head">
@@ -245,10 +303,11 @@ export default async function Landing() {
               1,488 uptime checks, 31 checkout tests, a speed score every morning, and every change matched to the
               work you logged. Step through October on the sample store and see where each day lands in the report.
             </p>
-            <a href="#top" className="lp-replay-link">See the finished report ↑</a>
+            <SampleReportLink />
           </div>
           <MonthReplay days={REPLAY} store="Juniper & Ash" month="October" year={2026} monthIndex={9} />
         </section>
+        </BrandProvider>
 
         <section className="lp-watch" aria-labelledby="watch-title">
           <h2 id="watch-title">What it checks</h2>
@@ -266,8 +325,8 @@ export default async function Landing() {
           <div className="lp-book-head">
             <h2 id="book-title">Paste your client list. See your dashboard before you sign up.</h2>
             <p>
-              Up to five stores, checked side by side, the way StoreCare HQ shows them every morning. No account, nothing
-              stored.
+              Up to five stores, checked side by side, the way StoreCare HQ shows them every morning. No account: the list
+              stays in this browser, so next time you’ll see what changed on each.
             </p>
           </div>
           <PortfolioCheck signup={signup} />
@@ -333,7 +392,7 @@ export default async function Landing() {
         <section className="lp-end" id="end">
           <div>
             <h2>Make your care plan visible.</h2>
-            <p>Add your first client store in two minutes. Your first report drafts itself on the 1st.</p>
+            <p>Add your first client store in two minutes. Its first report drafts itself on {nextReportDate()}.</p>
           </div>
           <div className="lp-end-cta">
             <a href={signup} className="btn lp-btn-big">Start free trial</a>

@@ -192,3 +192,12 @@ test('domain expiry asks the registry found in the IANA directory', async () => 
   assert.equal(calls[1], 'https://rdap.verisign.com/com/v1/domain/example.com');
   assert.ok('expiresAt' in r && r.expiresAt === '2027-05-01T00:00:00.000Z');
 });
+
+test('parseSiteName reads the store name from og:site_name, in either attribute order', async () => {
+  const { parseSiteName } = await import('../src/page.ts');
+  assert.equal(parseSiteName('<meta property="og:site_name" content="Juniper &amp; Ash">'), 'Juniper & Ash');
+  assert.equal(parseSiteName(`<meta content='Ferro&#39;s  Coffee' property='og:site_name' />`), 'Ferro\'s Coffee');
+  assert.equal(parseSiteName('<meta property="og:site_name" content="Caf&#xE9; Kite">'), 'Café Kite');
+  assert.equal(parseSiteName('<meta property="og:site_name" content="  ">'), null);
+  assert.equal(parseSiteName(HTML), null);
+});

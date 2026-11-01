@@ -7,9 +7,9 @@ export type Finding = { tone: 'look' | 'good'; text: string };
 
 // Thresholds for the scan's findings. Deliberately conservative: one visit can't prove a problem,
 // so everything is phrased as "worth a look", never as a fault.
-const SLOW_MS = 2000;
-const QUICK_MS = 800;
-const MANY_APPS = 12;
+export const SLOW_MS = 2000;
+export const QUICK_MS = 800;
+export const MANY_APPS = 12;
 
 /** What one look at a store is worth mentioning, from the scan alone. Looks first, then what's fine. */
 export function findings(s: ScanSummary): Finding[] {

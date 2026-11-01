@@ -1,9 +1,12 @@
 // The landing page's "Check any store" scan: one light pass over a public storefront, returned as a short summary.
 // Public endpoint, so it is same-origin only, rate-limited per visitor, accepts public domain names only
-// (normalizeStoreUrl rejects IPs, ports and internal names) and never returns page contents.
+// (normalizeStoreUrl rejects IPs, ports and internal names) and never returns page contents: a summary, plus a
+// compact fingerprint (keys and counts, and the titles of sold-out products) that the visitor's browser keeps
+// so the next check can say what changed.
 
 import { normalizeStoreUrl, type ProbeResult } from '@storecare/storefront';
 import { isProductionHost } from './domains.ts';
+import type { Fingerprint } from './store-memory.ts';
 
 export type ScanSummary = {
   ok: true;
@@ -19,6 +22,10 @@ export type ScanSummary = {
   soldOut: number | null;
   /** Why some checks would be limited for this store, in plain words. */
   note: string | null;
+  /** The store's own name, when its pages publish one. */
+  siteName: string | null;
+  /** What the visitor's browser remembers to compare with next time. */
+  fp: Fingerprint;
 };
 export type ScanReply = ScanSummary | { ok: false; error: string };
 
@@ -26,6 +33,38 @@ type ScanConfig = { probe: (url: string) => Promise<ProbeResult>; allow: (key: s
 
 function reply(status: number, body: ScanReply) {
   return Response.json(body, { status, headers: { 'cache-control': 'no-store', ...(status === 429 ? { 'retry-after': '600' } : {}) } });
+}
+
+const MAX_OUT_TITLES = 60;
+
+/** A short, stable key for a product's prices (FNV-1a over the variant prices in variant order). */
+export function priceKey(prices: Record<string, string>): string {
+  let h = 0x811c9dc5;
+  for (const id of Object.keys(prices).sort()) {
+    const s = `${prices[id]};`;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+export function fingerprint(r: ProbeResult): Fingerprint {
+  const feed = r.productFeed.status === 'ok' ? r.productFeed : null;
+  const p: Record<string, [string, number, number]> = {};
+  const out: Record<string, string> = {};
+  for (const product of feed?.products ?? []) {
+    const variants = Object.keys(product.prices).length;
+    const soldOut = product.soldOut?.length ?? 0;
+    p[product.id] = [priceKey(product.prices), soldOut, variants];
+    if (variants > 0 && soldOut >= variants && Object.keys(out).length < MAX_OUT_TITLES) out[product.id] = product.title.slice(0, 80);
+  }
+  return {
+    at: r.checkedAt,
+    home: r.home.status === 200 && !r.home.blocked,
+    ms: r.home.ms,
+    theme: r.theme ? { id: r.theme.id, name: r.theme.name, schema: r.theme.schemaName, version: r.theme.schemaVersion } : null,
+    apps: r.apps.map((a) => [a.key, a.name]),
+    feed: feed ? { all: !feed.truncated, p, out } : null,
+  };
 }
 
 export function summarize(r: ProbeResult): ScanReply {
@@ -55,6 +94,8 @@ export function summarize(r: ProbeResult): ScanReply {
         : !feed
           ? 'The product list is not public, so price and stock checks would be limited.'
           : null,
+    siteName: r.siteName ?? null,
+    fp: fingerprint(r),
   };
 }
 

@@ -1,7 +1,7 @@
 // One pass over a store: what phase 1 can see from the public storefront.
 
 import { normalizeStoreUrl, politeGet, type HostClock } from './http.ts';
-import { detectApps, isShopifyPage, parseScripts, parseTheme, type DetectedApp, type ThemeInfo } from './page.ts';
+import { detectApps, isShopifyPage, parseScripts, parseSiteName, parseTheme, type DetectedApp, type ThemeInfo } from './page.ts';
 import { fetchProductFeed, type ProductFeed } from './products.ts';
 import { isAllowed, parseRobots, type Robots } from './robots.ts';
 import type { Snapshot } from './diff.ts';
@@ -13,6 +13,8 @@ export type ProbeResult = {
   checkedAt: string;
   home: { status: number; ms: number; blocked: boolean; error?: string };
   isShopify: boolean;
+  /** The store's own name from its link-preview tags, when it publishes one. */
+  siteName?: string | null;
   theme: ThemeInfo | null;
   apps: DetectedApp[];
   scriptCount: number;
@@ -70,6 +72,7 @@ export async function probeStore(
       ? { status: home.status, ms: home.ms, blocked: home.blocked, error: home.error }
       : { status: 0, ms: 0, blocked: false, error: 'disallowed by robots.txt' },
     isShopify: home ? isShopifyPage(home.body, home.headers) : false,
+    siteName: html ? parseSiteName(html) : null,
     theme: html ? parseTheme(html) : null,
     apps: detectApps(scripts, pageBase),
     scriptCount: scripts.length,
