@@ -47,3 +47,16 @@ export function checkupNote(s: ScanSummary, agency: string, list: Finding[] = fi
   ];
   return lines.join('\n');
 }
+
+export const PORTFOLIO_MAX = 5;
+
+/** Store addresses pasted as a list (lines, commas or spaces), tidied, de-duplicated and capped. */
+export function parseStoreList(text: string, max = PORTFOLIO_MAX): { stores: string[]; dropped: number } {
+  const seen = new Set<string>();
+  for (const raw of text.split(/[\s,;]+/)) {
+    const host = raw.trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/[/?#].*$/, '').replace(/^www\./, '');
+    if (host.includes('.')) seen.add(host);
+  }
+  const all = [...seen];
+  return { stores: all.slice(0, max), dropped: Math.max(0, all.length - max) };
+}

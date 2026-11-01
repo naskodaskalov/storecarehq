@@ -12,6 +12,8 @@ import { LiveLog, type LogLine } from './live-log';
 import { ValueCalculator } from './value-calculator';
 import { MobileMenu } from './mobile-menu';
 import { BrandProvider } from './brand-context';
+import { PortfolioCheck } from './portfolio-check';
+import { StickyCta } from './sticky-cta';
 import { MonthReplay, type ReplayDay, type ReplayEvent } from './month-replay';
 import './landing.css';
 
@@ -260,6 +262,17 @@ export default async function Landing() {
           </dl>
         </section>
 
+        <section id="book" className="lp-book-sec" aria-labelledby="book-title">
+          <div className="lp-book-head">
+            <h2 id="book-title">Paste your client list. See your dashboard before you sign up.</h2>
+            <p>
+              Up to five stores, checked side by side, the way StoreCare HQ shows them every morning. No account, nothing
+              stored.
+            </p>
+          </div>
+          <PortfolioCheck signup={signup} />
+        </section>
+
         <section className="lp-value" aria-labelledby="value-title">
           <div className="lp-value-head">
             <h2 id="value-title">What a care client is worth to you</h2>
@@ -317,7 +330,7 @@ export default async function Landing() {
           </div>
         </section>
 
-        <section className="lp-end">
+        <section className="lp-end" id="end">
           <div>
             <h2>Make your care plan visible.</h2>
             <p>Add your first client store in two minutes. Your first report drafts itself on the 1st.</p>
@@ -338,6 +351,8 @@ export default async function Landing() {
           </div>
         </section>
       </main>
+
+      <StickyCta signup={signup} />
 
       <footer className="lp-foot">
         <span>© 2026 StoreCare HQ</span>

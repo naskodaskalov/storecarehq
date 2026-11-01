@@ -111,3 +111,8 @@ test('rate limiting blocks repeated attempts and expires after ten minutes', asy
     time = 600_000;
     assert.equal(allow('one'), true);
 });
+test('the limiter takes a custom ceiling', () => {
+  const allow = contactLimiter(() => 0, 12);
+  for (let i = 0; i < 12; i++) assert.equal(allow('k'), true);
+  assert.equal(allow('k'), false);
+});

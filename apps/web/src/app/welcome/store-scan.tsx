@@ -8,7 +8,7 @@ import { useBrand } from './brand-context';
 const STEPS = ['Reading robots.txt', 'Loading the home page', 'Spotting the theme and apps', 'Reading the product list'];
 
 /** Remember the scanned store for onboarding. The cookie is shared by www. and app. in production. */
-function rememberStore(host: string) {
+export function rememberStore(host: string) {
   const domain = location.hostname.endsWith('storecarehq.com') ? '; domain=.storecarehq.com' : '';
   const secure = location.protocol === 'https:' ? '; secure' : '';
   document.cookie = `sc_store=${encodeURIComponent(host)}; path=/; max-age=${7 * 86400}; samesite=lax${domain}${secure}`;

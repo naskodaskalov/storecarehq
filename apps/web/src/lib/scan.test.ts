@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ProbeResult } from '@storecare/storefront';
 import { handleScan, summarize, type ScanSummary } from './scan.ts';
-import { checkupNote, findings } from './scan-findings.ts';
+import { checkupNote, findings, parseStoreList } from './scan-findings.ts';
 
 function probe(over: Partial<ProbeResult> = {}): ProbeResult {
   return {
@@ -113,4 +113,10 @@ test('the check-up note reads fine with nothing to report and no agency name', (
   const note = checkupNote(summary({ responseMs: 1200, appCount: 0, unknownApps: 0, soldOut: 0, theme: null }), '  ');
   assert.match(note, /Nothing stood out/);
   assert.ok(!note.includes('I’m with'));
+});
+
+test('a pasted store list is tidied, de-duplicated and capped at five', () => {
+  const { stores, dropped } = parseStoreList('https://www.Ferro.co/collections/all\nferro.co, kite.com  bloom.shop;juniper.com\nnot-a-store\nsalt.com oak.com');
+  assert.deepEqual(stores, ['ferro.co', 'kite.com', 'bloom.shop', 'juniper.com', 'salt.com']);
+  assert.equal(dropped, 1);
 });

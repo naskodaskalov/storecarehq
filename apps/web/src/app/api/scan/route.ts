@@ -2,8 +2,8 @@ import { probeStore } from '@storecare/storefront';
 import { contactLimiter } from '@/lib/contact';
 import { handleScan } from '@/lib/scan';
 
-// Five scans per visitor per ten minutes, same window as the contact form.
-const allow = contactLimiter();
+// Twelve scans per visitor per ten minutes: enough for the hero check plus a five-store portfolio check, twice.
+const allow = contactLimiter(Date.now, 12);
 
 export const maxDuration = 30;
 

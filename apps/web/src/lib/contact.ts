@@ -7,14 +7,14 @@ type ContactConfig = { apiKey?: string; to?: string; from?: string; send?: typeo
 const MAX_BODY_BYTES = 16_384;
 const emailPattern = /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/;
 
-export function contactLimiter(now: () => number = Date.now) {
+export function contactLimiter(now: () => number = Date.now, max = 5) {
     const attempts = new Map<string, { count: number; expires: number }>();
     return (key: string) => {
         const time = now();
         for (const [address, entry] of attempts) if (entry.expires <= time) attempts.delete(address);
         const entry = attempts.get(key);
         if (entry) {
-            if (entry.count >= 5) return false;
+            if (entry.count >= max) return false;
             entry.count += 1;
         } else {
             if (attempts.size >= 10_000) return false;
