@@ -18,6 +18,7 @@ const paths = {
   chevron: 'm9 5 7 7-7 7',
   calendar: 'M4 5h16v16H4ZM8 2v6M16 2v6M4 11h16',
   arrow: 'M4 12h16m-6-6 6 6-6 6',
+  settings: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M16 4v4M10 10v4M18 16v4',
 } as const;
 
 export type IconName = keyof typeof paths;

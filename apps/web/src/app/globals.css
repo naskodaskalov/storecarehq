@@ -543,6 +543,24 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
 .workspace-form-grid > .field { min-width: 0; }
 .workspace-form-actions { border-bottom: 1px solid var(--border); padding-bottom: 24px; }
 .settings-page section[id] { scroll-margin-top: 24px; }
+.brand-settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.brand-settings-fields { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.color-input { display: flex; align-items: center; gap: 10px; }
+.color-input input[type='color'] { width: 46px; height: 42px; padding: 3px; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); cursor: pointer; flex: none; }
+.color-input input[type='text'] { flex: 1; min-width: 0; text-transform: uppercase; }
+.brand-preview { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.brand-preview-card { border: 1px solid var(--border); border-radius: 10px; background: #fff; overflow: hidden; display: flex; flex-direction: column; gap: 16px; padding-bottom: 18px; }
+.brand-preview-bar { height: 6px; }
+.brand-preview-head { display: flex; align-items: center; gap: 12px; padding: 0 18px; }
+.brand-preview-head img { max-height: 40px; max-width: 160px; object-fit: contain; }
+.brand-preview-mark { width: 40px; height: 40px; border-radius: 8px; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; flex: none; }
+.brand-preview-title { font-weight: 600; font-size: 15px; color: #16202a; }
+.brand-preview-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 18px; }
+.brand-preview-stats div { display: flex; flex-direction: column; gap: 2px; padding: 10px; background: var(--bg); border-radius: 6px; }
+.brand-preview-stats strong { font-size: 17px; }
+.brand-preview-stats span { font-size: 11px; color: var(--muted); }
+.brand-preview-card .warn { padding: 0 18px; }
+@media (max-width: 860px) { .brand-settings { grid-template-columns: 1fr; } }
 .report-builder-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 28px; align-items: start; }
 .report-builder-controls { min-width: 0; display: flex; flex-direction: column; gap: 24px; }
 .report-builder-controls .check, .report-builder-controls .small { font-size: 12px; }
