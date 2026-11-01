@@ -15,6 +15,7 @@ import { BrandProvider } from './brand-context';
 import { SampleReportLink } from './sample-report-link';
 import { PortfolioCheck } from './portfolio-check';
 import { StickyCta } from './sticky-cta';
+import { StickyHeader } from './sticky-header';
 import { MonthReplay, type ReplayDay, type ReplayEvent } from './month-replay';
 import './landing.css';
 
@@ -233,17 +234,19 @@ export default async function Landing() {
         // Our own constants, serialised; "<" is escaped so no text in them can close the script tag.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, '\\u003c') }}
       />
-      <header className="lp-top">
-        <Link href="/" className="lp-brand" aria-label="StoreCare HQ home">
-          <span className="mark">SC</span>
-          StoreCare HQ
-        </Link>
-        <nav className="lp-nav" aria-label="Main">
-          <div className="lp-nav-links">{nav}</div>
-          <a href={signup} className="btn lp-btn-small">Start free trial</a>
-          <MobileMenu>{nav}</MobileMenu>
-        </nav>
-      </header>
+      <StickyHeader>
+        <div className="lp-top">
+          <Link href="/" className="lp-brand" aria-label="StoreCare HQ home">
+            <span className="mark">SC</span>
+            StoreCare HQ
+          </Link>
+          <nav className="lp-nav" aria-label="Main">
+            <div className="lp-nav-links">{nav}</div>
+            <a href={signup} className="btn lp-btn-small">Start free trial</a>
+            <MobileMenu>{nav}</MobileMenu>
+          </nav>
+        </div>
+      </StickyHeader>
 
       <main>
         <BrandProvider initialColor={facts.brandColor}>

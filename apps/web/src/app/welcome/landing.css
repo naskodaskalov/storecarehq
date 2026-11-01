@@ -508,3 +508,20 @@
   .lp-bdelta { grid-column: 2 / -1; grid-row: 3; }
 }
 .lp-board-detail .lp-finding-change::before { background: #a9b4c2; }
+
+/* ---- Sticky header: the menu stays in reach while the page scrolls ---- */
+.lp-head { position: sticky; top: 0; z-index: 40; background: var(--bg); transition: background-color .2s ease, box-shadow .2s ease; }
+.lp-head .lp-top { padding-top: 14px; padding-bottom: 14px; }
+.lp-head.is-scrolled { background: rgb(246 248 250 / 0.86); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px); box-shadow: 0 1px 0 var(--border), 0 10px 24px -20px #16181d40; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lp-head.is-scrolled { background: var(--bg); }
+}
+/* In-page links and keyboard focus land below the header, not under it. */
+html:has(.lp-head) { scroll-padding-top: 92px; }
+@media (max-width: 640px) {
+  .lp-head .lp-top { padding-top: 10px; padding-bottom: 10px; }
+  html:has(.lp-head) { scroll-padding-top: 84px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-head { transition: none; }
+}
