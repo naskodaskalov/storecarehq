@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { APP_ORIGIN, hostRouting, isPublicPath, isWebsiteHost, SHARE_IMAGE_PATH, sessionRouting } from './lib/domains';
+import { APP_ORIGIN, hostRouting, isPublicPath, isWebsiteHost, SHARE_IMAGE_PATH, sessionRouting, WEBSITE_PAGES } from './lib/domains';
 
 // /r/<token> is the client's report link: no account, the token is the key. /welcome is the landing page.
 // /api/stripe/webhook is called by Stripe and checks its own signature.
@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
   // The public website never needs to read or refresh an agency session.
-  if ((isWebsiteHost(host) && (path === '/welcome' || path === SHARE_IMAGE_PATH)) || path === '/api/contact' || path === '/api/scan' || path === '/api/stripe/webhook' || path.startsWith('/r/')) return NextResponse.next();
+  if ((isWebsiteHost(host) && (path === '/welcome' || path === SHARE_IMAGE_PATH || WEBSITE_PAGES.includes(path))) || path === '/api/contact' || path === '/api/scan' || path === '/api/stripe/webhook' || path.startsWith('/r/')) return NextResponse.next();
   // Layouts read the path (the app layout sends lapsed agencies to /billing from any other page).
   request.headers.set('x-pathname', request.nextUrl.pathname);
   if (process.env.STORECARE_DEMO === '1') {

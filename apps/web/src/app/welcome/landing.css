@@ -96,7 +96,8 @@
 }
 
 .lp-foot { max-width: var(--lp-max); margin: 0 auto; padding: 28px 24px 48px; display: flex; gap: 24px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
-.lp-foot a { color: var(--muted); margin-left: auto; }
+.lp-foot a { color: var(--muted); }
+.lp-foot a:first-of-type { margin-left: auto; }
 
 @media (max-width: 900px) {
   .lp-hero, .lp-log { grid-template-columns: 1fr; gap: 36px; }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
-import { APP_ORIGIN, WEBSITE_ORIGIN, SHARE_IMAGE_PATH, appLink, websiteLink, hostRouting, sessionRouting, authCallbackUrl, isPublicPath } from './domains.ts';
+import { APP_ORIGIN, WEBSITE_ORIGIN, SHARE_IMAGE_PATH, WEBSITE_PAGES, appLink, websiteLink, hostRouting, sessionRouting, authCallbackUrl, isPublicPath } from './domains.ts';
 
 test('production website is always marketing; application links use the app host', () => {
   for (const host of ['storecarehq.com', 'www.storecarehq.com']) {
@@ -114,4 +114,15 @@ test('the landing page’s share image is served from the website host, read-onl
     // Nothing else under the landing page becomes reachable on the website host.
     assert.equal(hostRouting(host, '/welcome/other')?.kind, 'redirect');
   }
+});
+
+test('legal and bot pages are public on the website host and readable on the app host without signing in', () => {
+  for (const path of WEBSITE_PAGES) {
+    assert.equal(hostRouting('www.storecarehq.com', path), null);
+    assert.equal(hostRouting('storecarehq.com', path), null);
+    assert.deepEqual(hostRouting('www.storecarehq.com', path, '', 'POST'), { kind: 'reject' });
+    assert.equal(sessionRouting('app.storecarehq.com', path, false), null);
+  }
+  assert.equal(isPublicPath('/privacy/other'), false);
+  assert.equal(isPublicPath('/terms-of-use'), false);
 });

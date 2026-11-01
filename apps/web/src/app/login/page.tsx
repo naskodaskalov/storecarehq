@@ -36,6 +36,7 @@ export default async function Login({ searchParams }: {
         {signup && <><PasswordField name="confirmation" label="Confirm password" autoComplete="new-password" minLength={8} /><p className="login-email-note">Use at least 8 characters. Password managers and long passphrases are welcome.</p></>}
         {!signup && !link && <Link className="auth-text-link" href="/auth/forgot-password">Forgot or set password?</Link>}
         <SubmitButton pendingText={signup ? 'Creating account…' : link ? 'Sending link…' : 'Signing in…'}>{signup ? 'Create account' : link ? 'Email me a sign-in link' : 'Sign in'}</SubmitButton>
+        {signup && <p className="small muted" style={{ margin: 0 }}>By creating an account you agree to the <Link href="/terms">terms of service</Link> and the <Link href="/privacy">privacy policy</Link>.</p>}
         {!signup && <Link className="auth-alternative" href={link ? '/login' : '/login?method=link'}>{link ? 'Sign in with a password' : 'Email me a sign-in link instead'}</Link>}
       </form>
     </>}

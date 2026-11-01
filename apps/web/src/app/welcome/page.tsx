@@ -125,7 +125,7 @@ const FAQ = [
   },
   {
     q: 'Will the checks slow the store down or place orders?',
-    a: 'No. Checks are light, identify themselves as StoreCareBot and follow the store’s robots.txt. The checkout test is optional, only runs with your consent, and stops at the checkout page before any payment.',
+    a: 'No. Checks are light and identify themselves as StoreCareBot, and reading pages and the product feed follows the store’s robots.txt. The checkout test is optional, only runs with your consent, and stops at the checkout page before any payment.',
   },
   {
     q: 'Does the free store check on this page keep anything?',
@@ -419,6 +419,10 @@ export default async function Landing() {
       <footer className="lp-foot">
         <span>© 2026 StoreCare HQ</span>
         <span>Not affiliated with Shopify.</span>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/dpa">Data processing</a>
+        <a href="/bot">StoreCareBot</a>
         <a href={login}>Sign in</a>
       </footer>
     </div>
