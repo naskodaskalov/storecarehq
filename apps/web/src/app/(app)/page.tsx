@@ -3,6 +3,7 @@ import { dashboard, requireAgency } from '@/lib/data';
 import { host, hours, when, monthStartLabel } from '@/lib/format';
 import { Icon } from '@/components/icon';
 import { StoreTable } from '@/components/store-table';
+import { briefHeadline, briefItems, monthProgress, pace } from '@/lib/dashboard-brief';
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   const { deleted } = await searchParams;
@@ -18,7 +19,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   for (const w of d.work) if (w.counts_to_plan) minutesByStore.set(w.store_id, (minutesByStore.get(w.store_id) ?? 0) + w.minutes);
   const latestCheckout = new Map<string, { result: string; ran_at: string }>();
   for (const c of d.checkouts) if (!latestCheckout.has(c.store_id)) latestCheckout.set(c.store_id, c);
-  const storeName = new Map(d.stores.map((s) => [s.id, s.name]));
 
   const totalMinutes = [...minutesByStore.values()].reduce((a, b) => a + b, 0);
   const totalPlan = d.stores.reduce((a, s) => a + Number(s.care_plans?.hours_included ?? 0), 0);
@@ -27,12 +27,20 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const attention = d.stores.filter(needsAttention).length;
   const healthy = d.stores.filter((s) => s.status === 'active' && s.health_score !== null && s.health_score >= 90 && !needsAttention(s)).length;
   const drafts = d.reports.filter((r) => r.status === 'draft').length;
+  const now = new Date();
   const storeRows = d.stores.map((s) => {
     const co = latestCheckout.get(s.id);
     const report = d.reports.find((r) => r.store_id === s.id);
-    return { id: s.id, name: s.name, domain: host(s.public_url), score: s.health_score, status: s.status, attention: needsAttention(s), checkout: co ? { result: co.result, time: when(co.ran_at).time } : null, used: Number(hours(minutesByStore.get(s.id) ?? 0)), included: Number(s.care_plans?.hours_included ?? 0), report: report ? { id: report.id, status: report.status, period: report.period } : null };
+    return { id: s.id, name: s.name, domain: host(s.public_url), score: s.health_score, status: s.status, attention: needsAttention(s), checkout: co ? { result: co.result, time: when(co.ran_at).time } : null, used: Number(hours(minutesByStore.get(s.id) ?? 0)), included: Number(s.care_plans?.hours_included ?? 0), report: report ? { id: report.id, status: report.status, period: report.period } : null, pace: pace({ included: Number(s.care_plans?.hours_included ?? 0), usedMinutes: minutesByStore.get(s.id) ?? 0 }, now) };
   });
-  const unexplainedRisky = d.changes.filter((c) => c.risky && !c.work_entry_id).slice(0, 5);
+  const briefInput = {
+    now,
+    stores: d.stores.map((s) => ({ id: s.id, name: s.name, status: s.status, included: Number(s.care_plans?.hours_included ?? 0), usedMinutes: minutesByStore.get(s.id) ?? 0 })),
+    incidents: d.incidents, changes: d.changes, checkouts: d.checkouts, reports: d.reports,
+  };
+  const items = briefItems(briefInput);
+  const headline = briefHeadline(briefInput, items);
+  const monthEnd = monthProgress(now).endLabel;
 
   if (!d.stores.length) {
     return (
@@ -53,7 +61,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       <div className="page-heading">
         <div>
           <h1>Overview</h1>
-          <p>Your client stores, at a glance.</p>
+          <p className="brief-headline">{headline}</p>
         </div>
         <div className="page-actions"><span className="period-label"><Icon name="calendar" size={18} />{monthStartLabel()}</span><Link className="btn" href="/onboarding/store"><Icon name="plus" size={18} />Add store</Link></div>
       </div>
@@ -87,25 +95,30 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </Link>
       </div>
 
-      {(d.incidents.length > 0 || unexplainedRisky.length > 0) && (
-        <section className="attention-section">
-          <h2>Needs attention <span className="section-count">{d.incidents.length + unexplainedRisky.length}</span></h2>
-          {d.incidents.map((i) => (
-            <div key={i.id} className="attention-row incident-row">
-              <span className="attention-icon danger"><Icon name="alert" /></span>
-              <div className="attention-copy"><strong>{storeName.get(i.store_id)}</strong><span>{i.kind === 'down' ? 'Store is down' : 'Checkout test failed'} · {i.cause}</span></div>
-              <Link className="btn secondary" href={`/stores/${i.store_id}`}>Investigate</Link>
-            </div>
-          ))}
-          {unexplainedRisky.map((c) => (
-            <div key={c.id} className="attention-row change-row">
-              <span className="attention-icon warning"><Icon name="alert" /></span>
-              <div className="attention-copy"><strong>{storeName.get(c.store_id)}</strong><span>{c.summary} · Not in your work log</span></div>
-              <Link className="btn secondary" href={`/stores/${c.store_id}?change=${c.id}#change-details`}>View change</Link>
-            </div>
-          ))}
-        </section>
-      )}
+      <section className="brief" aria-labelledby="brief-title">
+        <div className="brief-head">
+          <h2 id="brief-title">Today, in order</h2>
+          <span className="section-count">{items.length}</span>
+          <span className="brief-note">Most urgent first. Plan pace is forecast to {monthEnd}.</span>
+        </div>
+        {items.length ? (
+          <ol className="brief-list">
+            {items.map((i, n) => (
+              <li key={i.key} className={`brief-item ${i.tone}`}>
+                <span className="brief-n" aria-hidden="true">{n + 1}</span>
+                <div className="brief-copy">
+                  <span className="brief-store">{i.store}</span>
+                  <strong>{i.title}</strong>
+                  <span>{i.detail}</span>
+                </div>
+                <Link className="btn secondary" href={i.href}>{i.action}</Link>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="brief-clear"><span className="brief-clear-mark" aria-hidden="true"><Icon name="check" size={18} /></span>Every store is quiet and every plan is on pace. StoreCare keeps watching; nothing needs you right now.</div>
+        )}
+      </section>
 
       <StoreTable stores={storeRows} />
     </div>

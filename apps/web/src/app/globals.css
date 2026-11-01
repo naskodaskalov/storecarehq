@@ -716,3 +716,36 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
   .page-heading h1 { font-size: 28px; }.page-actions { width: 100%; justify-content: space-between; }.attention-row { gap: 10px; padding: 13px 12px; flex-wrap: wrap; }.attention-copy { flex-basis: calc(100% - 55px); }.attention-row .btn { margin-left: 48px; height: 34px; }.attention-icon { width: 32px; height: 32px; }
   .store-panel-heading { flex-wrap: wrap; padding: 16px; }.store-search { max-width: none; width: 100%; }.store-filters { padding: 0 16px 15px; }.store-filters button { font-size: 10px; padding: 6px 8px; }.store-panel-footer { padding: 14px 16px; flex-wrap: wrap; }
 }
+
+/* Dashboard morning brief: everything that wants the agency today, in order */
+.brief-headline { font-size: 15px; color: var(--text-2); max-width: 70ch; }
+.brief { display: flex; flex-direction: column; gap: 12px; }
+.brief-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.brief-note { margin-left: auto; font-size: 12px; color: var(--muted); }
+.brief-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.brief-item { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 16px; border-left: 4px solid transparent; }
+.brief-item + .brief-item { border-top: 1px solid var(--border); }
+.brief-item.danger { border-left-color: #c2410c; }
+.brief-item.warning { border-left-color: #e4a21a; }
+.brief-item.info { border-left-color: var(--accent); }
+.brief-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bg); color: var(--text-2); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.brief-item.danger .brief-n { background: #c2410c; color: #fff; }
+.brief-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.brief-store { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.brief-copy > span:last-child { color: var(--muted); font-size: 13px; }
+.brief-clear { display: flex; align-items: center; gap: 12px; padding: 16px 18px; background: var(--accent-soft); border-radius: 10px; color: var(--text-2); font-size: 14px; }
+.brief-clear-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; flex: none; }
+@media (max-width: 640px) {
+  .brief-note { margin-left: 0; flex-basis: 100%; }
+  .brief-item { grid-template-columns: 28px minmax(0, 1fr); }
+  .brief-item .btn { grid-column: 2; justify-self: start; }
+}
+
+/* Plan pace: where an evenly spread plan would be today, and where the month is heading */
+.plan-usage { flex-wrap: wrap; row-gap: 4px; }
+.pace-bar { position: relative; display: inline-flex; align-items: center; }
+.pace-tick { position: absolute; top: -3px; width: 2px; height: 11px; margin-left: -1px; background: var(--text-2); border-radius: 1px; opacity: .55; }
+.pace-note { flex-basis: 100%; font-size: 11px; font-weight: 600; }
+.pace-note.warn { color: var(--warn); }
+.pace-note.quiet { color: #2747a8; }
+.pace-note.ok { color: var(--muted); font-weight: 500; }

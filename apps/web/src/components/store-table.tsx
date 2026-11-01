@@ -3,12 +3,38 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Icon } from './icon';
+import type { Pace } from '@/lib/dashboard-brief';
 
 export type DashboardStore = {
   id: string; name: string; domain: string; score: number | null; status: string;
   attention: boolean; checkout: { result: string; time: string } | null;
   used: number; included: number; report: { id: string; status: string; period: string } | null;
+  pace?: Pace;
 };
+
+/** Hours used, a tick where an evenly spread plan would be today, and where the month is heading. */
+function PlanPace({ s }: { s: DashboardStore }) {
+  const p = s.pace;
+  const over = s.included > 0 && s.used > s.included;
+  const note = !p ? null
+    : p.state === 'heading-over' ? { tone: 'warn', text: `→ ${p.projected}h by month end` }
+    : p.state === 'over' ? { tone: 'warn', text: p.projected ? `Over plan · → ${p.projected}h` : 'Over plan' }
+    : p.state === 'quiet' ? { tone: 'quiet', text: 'Quiet month' }
+    : p.state === 'on-pace' ? { tone: 'ok', text: 'On pace' }
+    : null;
+  return (
+    <div className={`plan-usage${over ? ' over-plan' : ''}`}>
+      <span>{s.used.toFixed(1)} <span className="muted">/ {s.included || '—'}</span></span>
+      {s.included > 0 && (
+        <span className="pace-bar" title={p ? `About ${p.expected}h would be used by today if the plan were spread evenly` : undefined}>
+          <progress value={Math.min(s.used, s.included)} max={s.included} aria-label={`${s.name}: ${s.used.toFixed(1)} of ${s.included} hours used${over ? ', over plan' : ''}${note ? `, ${note.text}` : ''}`} />
+          {p && p.state !== 'no-plan' && <i className="pace-tick" style={{ left: `${Math.min(100, (p.expected / s.included) * 100)}%` }} aria-hidden="true" />}
+        </span>
+      )}
+      {note && <span className={`pace-note ${note.tone}`}>{note.text}</span>}
+    </div>
+  );
+}
 
 export function StoreTable({ stores }: { stores: DashboardStore[] }) {
   const [query, setQuery] = useState('');
@@ -28,13 +54,12 @@ export function StoreTable({ stores }: { stores: DashboardStore[] }) {
           const tone = s.status === 'paused' || s.score === null ? 'neutral' : s.score >= 90 ? 'success' : s.score >= 75 ? 'warning' : 'danger';
           const label = s.status === 'paused' ? 'Paused' : s.score === null ? 'Pending' : s.score >= 90 ? 'Healthy' : s.score >= 75 ? 'Attention' : 'At risk';
           const checkoutTone = s.checkout?.result === 'pass' ? 'success' : s.checkout?.result === 'fail' ? 'danger' : 'neutral';
-          const over = s.included > 0 && s.used > s.included;
           const avatar = [...s.name].reduce((n, c) => n + c.charCodeAt(0), 0) % 5;
           return <tr key={s.id}>
             <td><div className="store-identity"><span className={`store-avatar avatar-${avatar}`}>{s.name.split(/\s|&/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('')}</span><div><Link href={`/stores/${s.id}`} className="store-name">{s.name}</Link><div className="store-domain">{s.domain}</div>{s.status === 'limited' && <div className="limited-label">Limited monitoring</div>}</div></div></td>
             <td><span className={`status-badge ${tone}`}>{s.status !== 'paused' && s.score !== null && <strong>{s.score}</strong>}{label}</span></td>
             <td><div className="checkout-result"><span className={`result-icon ${checkoutTone}`}><Icon size={12} name={s.checkout?.result === 'pass' ? 'check' : s.checkout?.result === 'fail' ? 'close' : 'minus'} /></span><span>{s.checkout ? s.checkout.result === 'pass' ? 'Passed' : s.checkout.result === 'fail' ? 'Failed' : 'Blocked' : 'No recent test'}</span>{s.checkout && <span className="checkout-time">{s.checkout.time}</span>}</div></td>
-            <td><div className={`plan-usage${over ? ' over-plan' : ''}`}><span>{s.used.toFixed(1)} <span className="muted">/ {s.included || '—'}</span></span>{s.included > 0 && <progress value={s.used} max={s.included} aria-label={`${s.name}: ${s.used.toFixed(1)} of ${s.included} hours used${over ? ', over plan' : ''}`} />}</div></td>
+            <td><PlanPace s={s} /></td>
             <td>{s.report ? <Link href={`/reports/${s.report.id}`} className={`status-badge report-badge ${s.report.status === 'sent' ? 'success' : 'neutral'}`} title={`Report period: ${s.report.period}`}><Icon name="report" size={14} />{s.report.status === 'sent' ? 'Sent' : s.report.status === 'approved' ? 'Approved' : 'Draft ready'}</Link> : <span className="muted small">No report yet</span>}</td>
             <td><Link href={`/stores/${s.id}`} className="store-open" aria-label={`Open ${s.name}`}><Icon name="chevron" size={16} /></Link></td>
           </tr>;
