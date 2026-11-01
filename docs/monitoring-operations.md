@@ -29,6 +29,13 @@ Requests remain durable on dispatch failure and normal scheduled ticks also drai
 queueing/build time and other scans can delay starting; the UI shows queued status, not a promise
 of immediate execution. No GitHub token is stored in the browser or Vercel app.
 
+Supabase loads pg-safeupdate for every API session, so any `UPDATE`/`DELETE` without `WHERE` fails,
+including inside functions the API reaches through triggers. The first dispatcher updated its state row
+unqualified: once dispatch was enabled, "Run health check" (and the initial check for a new store) failed
+with "Could not queue a health check". Migration `20261101213000_health_check_dispatch_safe_update.sql`
+qualifies the update and makes dispatch errors never cost a request; `apps/worker/test/sql-functions.test.ts`
+rejects unqualified updates/deletes in any SQL function, since plain Postgres in CI cannot reproduce this.
+
 Rollout: apply migration `20261030132924_health_check_requests.sql` (dispatch starts disabled),
 push the tested worker/app to main, then enable `storecare_ops.health_check_dispatch_state.enabled`
 and deploy the app. The private dispatch-state table deliberately has deny-all RLS and no public

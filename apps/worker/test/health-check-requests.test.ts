@@ -150,6 +150,27 @@ test('a stale worker cannot save over a newer lease, and eligibility changes sto
   assert.equal((await scan(store.id)).status,'failed');
 });
 
+test('a dispatch rejected outside the provider call still queues the request and the new store',options,async () => {
+  // In Supabase API sessions pg-safeupdate rejected the dispatcher's state update ("UPDATE requires a WHERE
+  // clause"), which used to fail every "Run health check" and every new store once dispatch was enabled.
+  // Plain Postgres has no safeupdate, so reject that update the same way here.
+  await db!.pool.query('update storecare_ops.health_check_dispatch_state set enabled=true,last_attempt_at=null');
+  await db!.pool.query("create function storecare_ops.reject_state_update() returns trigger language plpgsql as $$ begin raise exception 'UPDATE requires a WHERE clause'; end $$");
+  await db!.pool.query('create trigger reject_state_update before update on storecare_ops.health_check_dispatch_state for each row execute function storecare_ops.reject_state_update()');
+  try {
+    const {store,user}=await setup();
+    assert.equal((await scan(store.id)).source,'initial');
+    await db!.pool.query("update public.health_check_requests set status='completed',requested_at=now()-interval '10 minutes' where store_id=$1",[store.id]);
+    const id=await request(user,store.id);
+    const row=await scan(store.id);
+    assert.equal(row.id,id);assert.equal(row.status,'queued');assert.equal(row.source,'manual');
+  } finally {
+    await db!.pool.query('drop trigger reject_state_update on storecare_ops.health_check_dispatch_state');
+    await db!.pool.query('drop function storecare_ops.reject_state_update()');
+    await db!.pool.query('update storecare_ops.health_check_dispatch_state set enabled=false where singleton');
+  }
+});
+
 test('dispatch failure cannot roll back a new request or expose private errors',options,async () => {
   await db!.pool.query("create function storecare_ops.dispatch_monitor() returns bigint language plpgsql as $$ begin raise exception 'private dispatch credential'; end $$");
   await db!.pool.query('update storecare_ops.health_check_dispatch_state set enabled=true,last_attempt_at=null');
