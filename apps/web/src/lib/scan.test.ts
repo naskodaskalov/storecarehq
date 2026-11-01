@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ProbeResult } from '@storecare/storefront';
-import { handleScan, summarize } from './scan.ts';
+import { handleScan, summarize, type ScanSummary } from './scan.ts';
+import { checkupNote, findings } from './scan-findings.ts';
 
 function probe(over: Partial<ProbeResult> = {}): ProbeResult {
   return {
@@ -72,4 +73,44 @@ test('a probe that throws becomes a friendly error', async () => {
   const res = await handleScan(request({ url: 'shop.example.com' }), { probe: async () => { throw new Error('boom'); }, allow: allowAll, clientKey: 't' });
   assert.equal(res.status, 502);
   assert.equal((await res.json()).ok, false);
+});
+
+function summary(over: Partial<ScanSummary> = {}): ScanSummary {
+  const s = summarize(probe());
+  assert.ok(s.ok);
+  return { ...s, ...over };
+}
+
+test('summary counts the scripts we could not name', () => {
+  assert.equal(summary().unknownApps, 1);
+});
+
+test('findings put things worth a look first and stay phrased as suggestions', () => {
+  const list = findings(summary({ responseMs: 2600, appCount: 14, unknownApps: 3, soldOut: 2 }));
+  assert.deepEqual(list.map((f) => f.tone), ['look', 'look', 'look', 'look', 'good']);
+  assert.match(list[0].text, /2\.6s/);
+  assert.match(list[1].text, /14 apps/);
+  assert.match(list[2].text, /3 scripts come/);
+  assert.match(list[3].text, /2 products have/);
+  assert.ok(!list.some((f) => /broken|error|fail/i.test(f.text)));
+});
+
+test('a quick, lean store gets only good findings', () => {
+  const list = findings(summary({ responseMs: 400, appCount: 3, unknownApps: 0, soldOut: 0 }));
+  assert.ok(list.length >= 2 && list.every((f) => f.tone === 'good'));
+});
+
+test('the check-up note is signed by the agency and lists what is worth a look', () => {
+  const note = checkupNote(summary({ responseMs: 2600 }), 'Northline Studio');
+  assert.match(note, /I’m with Northline Studio/);
+  assert.match(note, /shop\.example\.com/);
+  assert.match(note, /• The home page took 2\.6s/);
+  assert.ok(note.trimEnd().endsWith('Northline Studio'));
+  assert.ok(!/StoreCare/.test(note), 'the note is in the agency’s name, not ours');
+});
+
+test('the check-up note reads fine with nothing to report and no agency name', () => {
+  const note = checkupNote(summary({ responseMs: 1200, appCount: 0, unknownApps: 0, soldOut: 0, theme: null }), '  ');
+  assert.match(note, /Nothing stood out/);
+  assert.ok(!note.includes('I’m with'));
 });

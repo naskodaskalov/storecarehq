@@ -1,16 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import type { Facts, Sections } from '@storecare/reports';
 import { ReportView } from '@/components/report-view';
+import { useBrand } from './brand-context';
 
 const SWATCHES = ['#2747A8', '#0F766E', '#C2410C', '#7C3AED', '#BE123C', '#16181D'];
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** The hero's sample report, re-branded live with the visitor's agency name and colour. */
 export function BrandReport({ facts, summary, sections }: { facts: Facts; summary: string; sections: Sections }) {
-  const [name, setName] = useState('');
-  const [color, setColor] = useState(facts.brandColor);
+  const { name, setName, color, setColor } = useBrand();
   const agency = name.trim() || facts.agencyName;
   const brand = HEX.test(color) ? color : facts.brandColor;
   // The drafted summary is written in the agency's voice ("we"), so only the header and accents change.

@@ -11,6 +11,8 @@ import { BrandReport } from './brand-report';
 import { LiveLog, type LogLine } from './live-log';
 import { ValueCalculator } from './value-calculator';
 import { MobileMenu } from './mobile-menu';
+import { BrandProvider } from './brand-context';
+import { MonthReplay, type ReplayDay, type ReplayEvent } from './month-replay';
 import './landing.css';
 
 export const metadata: Metadata = {
@@ -43,6 +45,48 @@ const LOG: LogLine[] = [
   { store: 'Ferro Coffee', text: 'Checkout test passed on mobile and desktop', tone: 'good' },
 ];
 const LOG_TIMES = ['06:02', '06:31', '09:14', '11:40', '13:05', '15:22', '18:47'];
+
+// October on the sample store, day by day: the same month the hero report is drafted from.
+const REPLAY_EVENTS: Record<number, { events: ReplayEvent[]; report: string }> = {
+  2: {
+    events: [
+      { time: '09:14', text: 'New live theme published: “Dawn – Autumn”', tone: 'plain' },
+      { time: '09:20', text: 'Matched to your work log: Autumn theme, 2 h 30 min', tone: 'work' },
+    ],
+    report: 'Work done: “Launched the autumn homepage and collections.” Counted against the plan’s 10 hours.',
+  },
+  14: {
+    events: [
+      { time: '06:02', text: 'Checkout test failed on mobile: stuck at the shipping step', tone: 'risk' },
+      { time: '06:04', text: 'Alert sent to Slack and email after the second failed run', tone: 'risk' },
+      { time: '06:31', text: 'Checkout test passed again, down for 29 min', tone: 'good' },
+      { time: '06:40', text: 'You logged: Checkout fix, 45 min', tone: 'work' },
+    ],
+    report: 'Incidents: checkout was down 29 minutes on 14 October, “a shipping app update; rolled back.” Fixed before most shoppers woke up.',
+  },
+  17: {
+    events: [{ time: '13:05', text: 'Smile.io added to the storefront, not in your work log', tone: 'risk' }],
+    report: 'Flagged for you, not the client: an app the client added themselves. You decide whether it goes in the report.',
+  },
+  22: {
+    events: [
+      { time: '11:10', text: 'Two apps removed from the storefront', tone: 'plain' },
+      { time: '11:30', text: 'You logged: Speed, 1 h 30 min', tone: 'work' },
+    ],
+    report: 'Work done: “Compressed hero images and removed two unused apps.” The speed chart shows what it bought.',
+  },
+  23: {
+    events: [{ time: '06:00', text: 'Mobile speed score up from 63 to 71 after yesterday’s work', tone: 'good' }],
+    report: 'Speed: mobile score up from 61 to 74 over the month, with the jump lined up against the work that caused it.',
+  },
+  26: {
+    events: [{ time: '03:30', text: 'One uptime check timed out; the next passed. No alert.', tone: 'plain' }],
+    report: 'Uptime: 99.9% over 1,488 checks. One blip at 3:30 a.m., counted honestly.',
+  },
+};
+const QUIET_REPORT = 'Counts toward 99.9% uptime and 30 of 31 checkout passes. Nothing to explain, which is the point.';
+const SPEED = [61, 62, 60, 61, 62, 61, 60, 62, 61, 63, 62, 61, 60, 62, 63, 62, 61, 63, 62, 63, 62, 63, 71, 72, 73, 72, 73, 74, 73, 74, 74];
+const REPLAY: ReplayDay[] = SPEED.map((speed, i) => ({ day: i + 1, speed, ...(REPLAY_EVENTS[i + 1] ?? { events: [], report: QUIET_REPORT }) }));
 
 // The usual care-plan toolkit, side by side with what replaces it.
 const OLD_WAY = [
@@ -126,7 +170,7 @@ export default async function Landing() {
     </>
   );
   return (
-    <div className="lp">
+    <div className="lp" id="top">
       <header className="lp-top">
         <Link href="/" className="lp-brand" aria-label="StoreCare HQ home">
           <span className="mark">SC</span>
@@ -140,6 +184,7 @@ export default async function Landing() {
       </header>
 
       <main>
+        <BrandProvider initialColor={facts.brandColor}>
         <section className="lp-hero">
           <div className="lp-hero-copy">
             <p className="lp-eyebrow">For Shopify freelancers and agencies with care plans</p>
@@ -155,6 +200,8 @@ export default async function Landing() {
           </div>
           <BrandReport facts={facts} summary={templateSummary(facts)} sections={{ ...DEFAULT_SECTIONS, changes: false, site: false }} />
         </section>
+
+        </BrandProvider>
 
         <section className="lp-oldway" aria-labelledby="oldway-title">
           <div className="lp-oldway-head">
@@ -187,6 +234,18 @@ export default async function Landing() {
             </p>
           </div>
           <LiveLog lines={LOG} times={LOG_TIMES} />
+        </section>
+
+        <section className="lp-replay" aria-labelledby="replay-title">
+          <div className="lp-replay-head">
+            <h2 id="replay-title">Your client reads one page. Here’s the month behind it.</h2>
+            <p>
+              1,488 uptime checks, 31 checkout tests, a speed score every morning, and every change matched to the
+              work you logged. Step through October on the sample store and see where each day lands in the report.
+            </p>
+            <a href="#top" className="lp-replay-link">See the finished report ↑</a>
+          </div>
+          <MonthReplay days={REPLAY} store="Juniper & Ash" month="October" year={2026} monthIndex={9} />
         </section>
 
         <section className="lp-watch" aria-labelledby="watch-title">

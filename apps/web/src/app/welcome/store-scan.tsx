@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { ScanReply, ScanSummary } from '@/lib/scan';
+import { checkupNote, findings } from '@/lib/scan-findings';
+import { useBrand } from './brand-context';
 
 const STEPS = ['Reading robots.txt', 'Loading the home page', 'Spotting the theme and apps', 'Reading the product list'];
 
@@ -72,6 +74,7 @@ export function StoreScan({ signup }: { signup: string }) {
 
 function ScanCard({ r, signup, onAgain }: { r: ScanSummary; signup: string; onAgain: () => void }) {
   const speed = r.responseMs < 800 ? 'quick' : r.responseMs < 2000 ? 'ok' : 'slow';
+  const list = findings(r);
   return (
     <section className="lp-scan-card" aria-label={`Check results for ${r.host}`}>
       <header>
@@ -87,6 +90,13 @@ function ScanCard({ r, signup, onAgain }: { r: ScanSummary; signup: string; onAg
         </div>
       </dl>
       {r.note && <p className="lp-scan-note">{r.note}</p>}
+      {list.length > 0 && (
+        <div className="lp-findings">
+          <h3>What one look shows</h3>
+          <ul>{list.map((f) => <li key={f.text} className={`lp-finding-${f.tone}`}>{f.text}</li>)}</ul>
+        </div>
+      )}
+      <Pitch r={r} list={list} />
       <p className="lp-scan-pitch">
         That’s one look. StoreCare HQ looks every 30 minutes, tests the checkout every morning, and writes down the moment
         the theme, an app or {r.products ? `any of those ${r.products.count}${r.products.more ? '+' : ''} products` : 'the catalogue'} changes.
@@ -96,5 +106,50 @@ function ScanCard({ r, signup, onAgain }: { r: ScanSummary; signup: string; onAg
         <button type="button" className="lp-link-btn" onClick={onAgain}>Check another store</button>
       </div>
     </section>
+  );
+}
+
+/** Turn the check into a first message to the store owner, signed by the visitor's agency.
+ *  For agencies, a store check is how a care-plan conversation starts. */
+function Pitch({ r, list }: { r: ScanSummary; list: ReturnType<typeof findings> }) {
+  const { name, setName, color } = useBrand();
+  const [open, setOpen] = useState(false);
+  const [edited, setEdited] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const draft = checkupNote(r, name, list);
+  const text = edited ?? draft;
+  const subject = `A quick check on ${r.host}`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard blocked: the text is selectable */ }
+  }
+
+  if (!open) {
+    return (
+      <button type="button" className="lp-pitch-open" onClick={() => setOpen(true)} aria-expanded={false}>
+        <span className="lp-pitch-badge">New client?</span>
+        Turn this check into a note for the store owner →
+      </button>
+    );
+  }
+  return (
+    <div className="lp-pitch" style={{ ['--brand' as string]: color }}>
+      <div className="lp-pitch-head">
+        <h3>A first note to the owner of {r.host}</h3>
+        <input aria-label="Sign it as (your agency name)" placeholder="Sign as: your agency name" value={name} maxLength={40}
+          onChange={(e) => { setName(e.target.value); setEdited(null); }} />
+      </div>
+      <textarea aria-label="Note to the store owner" value={text} rows={12} onChange={(e) => setEdited(e.target.value)} />
+      <div className="lp-pitch-actions">
+        <button type="button" className="btn secondary" onClick={copy}>{copied ? 'Copied' : 'Copy note'}</button>
+        <a className="btn secondary" href={`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`}>Open in email</a>
+        {edited !== null && <button type="button" className="lp-link-btn" onClick={() => setEdited(null)}>Reset draft</button>}
+      </div>
+      <p className="lp-pitch-fine">Drafted from this one check; edit anything. Nothing is sent from here.</p>
+    </div>
   );
 }

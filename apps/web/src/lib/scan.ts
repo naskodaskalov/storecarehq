@@ -13,6 +13,8 @@ export type ScanSummary = {
   theme: string | null;
   apps: string[];
   appCount: number;
+  /** Third-party scripts we could not name. */
+  unknownApps: number;
   products: { count: number; more: boolean } | null;
   soldOut: number | null;
   /** Why some checks would be limited for this store, in plain words. */
@@ -43,6 +45,7 @@ export function summarize(r: ProbeResult): ScanReply {
     theme,
     apps: apps.slice(0, 8),
     appCount: apps.length,
+    unknownApps: r.apps.filter((a) => !a.known).length,
     products: feed ? { count: feed.products.length, more: feed.truncated } : null,
     soldOut: feed ? feed.products.filter((p) => (p.soldOut?.length ?? 0) > 0).length : null,
     note: r.home.blocked
