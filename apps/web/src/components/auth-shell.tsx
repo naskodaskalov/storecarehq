@@ -23,7 +23,7 @@ export async function AuthShell({ children }: { children: ReactNode }) {
         <div className="login-story-footer">Behind every thriving store is a team that cares.</div>
       </aside>
       <section className="login-entry" aria-labelledby="login-title">
-        <header className="login-entry-top"><a href={home}>← Back to StoreCare</a><span className="demo-badge">DEMO</span></header>
+        <header className="login-entry-top"><a href={home}>← Back to StoreCare</a></header>
         <div className="login-form-content">
           {children}
         </div>

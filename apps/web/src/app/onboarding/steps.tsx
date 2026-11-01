@@ -18,7 +18,7 @@ const GUIDANCE = [
 
 export function OnboardingFrame({ step, children }: { step: 1 | 2 | 3 | 4; children: ReactNode }) {
   return <div className="setup-shell">
-    <header className="setup-header"><Link href="/welcome" className="brand"><span className="mark">SC</span>StoreCare HQ</Link><div><Link href="/">Back to workspace <Icon name="arrow" size={15} /></Link><span className="demo-badge">DEMO</span></div></header>
+    <header className="setup-header"><Link href="/welcome" className="brand"><span className="mark">SC</span>StoreCare HQ</Link><div><Link href="/">Back to workspace <Icon name="arrow" size={15} /></Link></div></header>
     <div className="setup-layout"><aside className="setup-rail"><span className="setup-kicker">LET’S GET YOU SET UP</span><h2>Your agency.<br /><span>Ready for more.</span></h2><OnboardingTop step={step} /><div className="setup-guidance"><Icon name={step === 1 ? 'home' : step === 2 ? 'billing' : step === 3 ? 'store' : 'clock'} size={24} /><strong>{GUIDANCE[step - 1][0]}</strong><p>{GUIDANCE[step - 1][1]}</p></div></aside>
       <main className={`setup-content${step === 2 ? ' setup-content-wide' : ''}`}><div className="setup-step-label">STEP {String(step).padStart(2, '0')} <span>OF 04</span></div>{children}<footer className="setup-footer"><Icon name="check" size={14} />{step === 3 ? 'Public storefront only. No Shopify installation required.' : 'Built for the teams behind the stores.'}</footer></main>
     </div>

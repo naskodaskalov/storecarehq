@@ -30,5 +30,5 @@ export function NavLinks() {
 export function WorkspaceHeader() {
   const path = usePathname();
   const label = path.startsWith('/stores') ? 'Store details' : LINKS.find((l) => l.match(path))?.label ?? 'Workspace';
-  return <header className="workspace-header"><div className="breadcrumb"><span>Workspace</span><span className="breadcrumb-divider">/</span><strong>{label}</strong></div><span className="demo-badge" title="StoreCare HQ demo · MVP preview">DEMO</span></header>;
+  return <header className="workspace-header"><div className="breadcrumb"><span>Workspace</span><span className="breadcrumb-divider">/</span><strong>{label}</strong></div></header>;
 }
