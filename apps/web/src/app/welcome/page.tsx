@@ -6,6 +6,7 @@ import { headers } from 'next/headers';
 import { appLink, WEBSITE_ORIGIN } from '@/lib/domains';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, templateSummary, type MonthData } from '@storecare/reports';
 import { ContactForm } from '@/components/contact-form';
+import { Analytics, CookieSettingsLink } from '@/components/analytics';
 import { StoreScan } from './store-scan';
 import { BrandReport } from './brand-report';
 import { LiveLog, type LogLine } from './live-log';
@@ -421,7 +422,9 @@ export default async function Landing() {
         <a href="/dpa">Data processing</a>
         <a href="/bot">StoreCareBot</a>
         <a href={login}>Sign in</a>
+        <CookieSettingsLink />
       </footer>
+      <Analytics />
     </div>
   );
 }
