@@ -1,6 +1,6 @@
 # Outreach report links
 
-Status: approved and implemented locally. This replaces test-email attachments with hosted report views. Production migration/deployment remain rollout steps.
+Status: approved and implemented locally. Production database migration applied and verified on 2026-11-02; website deployment remains. This replaces test-email attachments with hosted report views.
 
 ## User experience
 

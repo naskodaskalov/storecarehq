@@ -30,7 +30,8 @@ durable campaign send/suppression state remain later rollout work.
 
 `outreach-report-links.ts` publishes immutable report-only snapshots, separate from operational
 stores/work/reports, to `outreach_report_snapshots`. Apply migration
-`20261102134518_outreach_report_links.sql` before rollout. Browser roles have no table privileges
+`20261102135722_outreach_report_links.sql` (applied to the StoreCare HQ database on 2026-11-02).
+Browser roles have no table privileges
 or RLS policies; server actions use the existing service client after `requireAdmin`. The database
 grants the service only insertion, reads and revocation updates; a trigger prevents snapshot changes
 or undoing revocation. Two independent random 32-byte bearer tokens are generated for each bundle;

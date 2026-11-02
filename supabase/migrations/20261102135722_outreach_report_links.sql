@@ -1,4 +1,5 @@
 -- Separate from client stores, work entries and operational reports.
+-- Version matches the migration applied to StoreCare HQ on 2026-11-02.
 create table public.outreach_report_snapshots (
   id uuid primary key,
   owner_email text not null check (owner_email = lower(owner_email) and length(owner_email) between 3 and 320),

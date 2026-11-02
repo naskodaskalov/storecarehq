@@ -51,7 +51,12 @@ verified RLS/grants, service-only insertion/revocation, immutable contents, irre
 and maximum lifetime. Browser checks verified publication, exact email URLs, signed-out views and
 HTML downloads, public-data privacy, no-store/noindex/no-referrer headers, sample labels in print,
 390px layout, backup restoration and 404s on both view/download routes after revocation.
-Production migration/deployment have not been performed; no email was sent.
+Production migration `20261102135722_outreach_report_links` applied to StoreCare HQ on 2026-11-02.
+Verified live: RLS enabled, no anonymous/authenticated reads, server create/read/revoke allowed,
+content updates denied, immutable trigger enabled, and zero report snapshots. Security advisor
+comparison shows only the expected new informational [RLS-with-no-policies notice](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
+for this intentionally server-only table; pre-existing warnings are unchanged.
+Local migration filename matches the applied remote version. Website deployment remains; no email was sent.
 
 ### Resend testing phase (approved)
 - [x] Add branded email template and previewable report attachments.
