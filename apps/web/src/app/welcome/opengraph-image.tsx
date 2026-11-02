@@ -4,8 +4,9 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
+import { SHARE_IMAGE_ALT } from '@/lib/share-image';
 
-export const alt = 'StoreCare HQ: know what changed on every client store before your client does. A branded monthly care report for a Shopify store.';
+export const alt = SHARE_IMAGE_ALT;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
