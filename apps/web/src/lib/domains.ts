@@ -25,8 +25,10 @@ export function websiteLink(host: string) {
 
 const matches = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
 export const isOutreachReportPath = (path: string) => /^\/outreach\/r\/[^/]+(?:\/download)?\/?$/.test(path);
+/** Search-engine files: served on every host (each host answers for itself) without a session. */
+const CRAWLER_FILES = ['/robots.txt', '/sitemap.xml'];
 export function isPublicPath(path: string) {
-  return isOutreachReportPath(path) || ['/login', '/auth', '/r', '/welcome'].some(root => matches(path, root)) || WEBSITE_PAGES.includes(path) || path === '/api/stripe/webhook' || path === '/api/contact' || path === '/api/scan' || path === MONITORING_HEALTH_PATH;
+  return CRAWLER_FILES.includes(path) || isOutreachReportPath(path) || ['/login', '/auth', '/r', '/welcome'].some(root => matches(path, root)) || WEBSITE_PAGES.includes(path) || path === '/api/stripe/webhook' || path === '/api/contact' || path === '/api/scan' || path === MONITORING_HEALTH_PATH;
 }
 
 type Routing = { kind: 'redirect' | 'rewrite'; url: string } | { kind: 'reject' } | null;
@@ -45,7 +47,8 @@ export function hostRouting(host: string, path: string, search = '', method = 'G
     return path === '/' ? { kind: 'rewrite', url: destination(WEBSITE_ORIGIN, '/welcome', search) } : null;
   }
   // Keep already-shared reports, signed Stripe deliveries and in-flight recovery links working.
-  if (isOutreachReportPath(path) || path === '/api/contact' || path === '/api/scan' || path === '/api/stripe/webhook' || path === MONITORING_HEALTH_PATH || matches(path, '/r') || path === '/auth/callback' || path === '/auth/password') return null;
+  // robots.txt and sitemap.xml answer for the host they were asked on.
+  if (CRAWLER_FILES.includes(path) || isOutreachReportPath(path) || path === '/api/contact' || path === '/api/scan' || path === '/api/stripe/webhook' || path === MONITORING_HEALTH_PATH || matches(path, '/r') || path === '/auth/callback' || path === '/auth/password') return null;
   if (website || host === 'storecarehq.vercel.app') {
     if (method !== 'GET' && method !== 'HEAD') return { kind: 'reject' };
     return { kind: 'redirect', url: destination(APP_ORIGIN, path, search) };

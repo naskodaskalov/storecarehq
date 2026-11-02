@@ -1,11 +1,23 @@
 // Shared frame for the public policy pages: privacy, terms, data processing and the bot page.
 
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { headers } from 'next/headers';
-import { websiteLink } from '@/lib/domains';
+import { WEBSITE_ORIGIN, websiteLink } from '@/lib/domains';
 import { Analytics, CookieSettingsLink } from '@/components/analytics';
 import './legal.css';
+
+/** Title, description, canonical address and share preview for a policy page on the website host. */
+export function legalMetadata(path: string, title: string, description: string): Metadata {
+  return {
+    metadataBase: new URL(WEBSITE_ORIGIN),
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { type: 'website', url: path, siteName: 'StoreCare HQ', title, description, locale: 'en_US' },
+  };
+}
 
 export const LEGAL_UPDATED = '2 November 2026';
 

@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
-import { LegalPage } from '../legal-page';
+import { LegalPage, legalMetadata } from '../legal-page';
 
-export const metadata: Metadata = {
-  title: 'Data processing terms · StoreCare HQ',
-  description: 'How StoreCare HQ processes personal data on behalf of agencies, under Article 28 GDPR.',
-};
+export const metadata: Metadata = legalMetadata('/dpa', 'Data processing terms · StoreCare HQ', 'How StoreCare HQ processes personal data on behalf of agencies, under Article 28 GDPR.');
 
 export default function Dpa() {
   return (

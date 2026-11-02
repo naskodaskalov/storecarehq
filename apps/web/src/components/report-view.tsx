@@ -11,12 +11,16 @@ export function ReportView({
   summary,
   sections,
   logoUrl,
+  embedded = false,
 }: {
   facts: Facts;
   summary: string;
   sections: Sections;
   logoUrl?: string | null;
+  /** Shown inside another page (the landing page's sample): the store name is not the page's main heading. */
+  embedded?: boolean;
 }) {
+  const Title = embedded ? 'h2' : 'h1';
   const brand = /^#[0-9a-f]{6}$/i.test(facts.brandColor) ? facts.brandColor : '#2747A8';
   const f = facts;
   const hoursLine =
@@ -37,7 +41,7 @@ export function ReportView({
           <span>{f.agencyName}</span>
         </div>
         <div className="report-kicker">Monthly care report · {f.period.label}</div>
-        <h1 className="report-title">{f.storeName}</h1>
+        <Title className="report-title">{f.storeName}</Title>
         <div className="report-sub">{f.storeHost}</div>
       </header>
 

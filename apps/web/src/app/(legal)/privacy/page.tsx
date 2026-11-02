@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
-import { LegalPage } from '../legal-page';
+import { LegalPage, legalMetadata } from '../legal-page';
 
-export const metadata: Metadata = {
-  title: 'Privacy policy · StoreCare HQ',
-  description: 'What StoreCare HQ collects, why, who processes it for us, how long we keep it and your rights.',
-};
+export const metadata: Metadata = legalMetadata('/privacy', 'Privacy policy · StoreCare HQ', 'What StoreCare HQ collects, why, who processes it for us, how long we keep it and your rights.');
 
 export default function Privacy() {
   return (
