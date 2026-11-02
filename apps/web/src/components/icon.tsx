@@ -20,6 +20,7 @@ const paths = {
   arrow: 'M4 12h16m-6-6 6 6-6 6',
   settings: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M16 4v4M10 10v4M18 16v4',
   users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  menu: 'M4 6h16M4 12h16M4 18h16',
   chart: 'M3 3v18h18M8 17v-4M13 17V8M18 17v-7',
 } as const;
 

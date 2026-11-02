@@ -11,6 +11,7 @@ import { NavLinks, WorkspaceHeader } from './nav-links';
 import { signOut } from '@/app/auth/actions';
 import { SubmitButton } from '@/components/submit-button';
 import { Icon } from '@/components/icon';
+import { NavShell } from '@/components/nav-shell';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { agency } = await requireAgency();
@@ -30,7 +31,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="shell">
-      <nav className="nav" aria-label="Main">
+      <NavShell label="Main">
         <Link href="/" className="brand"><div className="mark">SC</div><span className="brand-name">StoreCare HQ</span></Link>
         <div className="workspace-identity"><span className="nav-caption">Workspace</span><div className="workspace-name">{agency.name}</div></div>
         <NavLinks isAdmin={isAdmin} themeDetector={themeDetector} />
@@ -42,7 +43,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
         <Link href="/auth/password" className="small" style={{ color: '#cbd9df' }}>Set or change password</Link>
         <form action={signOut} className="signout-form"><SubmitButton secondary pendingText="Signing out…"><Icon name="logout" size={17} />Sign out</SubmitButton></form>
-      </nav>
+      </NavShell>
       <div className="workspace-body">
         <WorkspaceHeader />
         <main className="main" id="main-content">

@@ -45,15 +45,24 @@ h2 { margin: 0; font-size: 18px; font-weight: 700; }
 .nav-foot { margin-top: auto; border-top: 1px solid #34454d; padding: 20px 8px 0; }
 .nav-foot .muted { color: #b5c6ce; margin-top: 12px; font-size: 11px; }
 .main { min-width: 0; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 26px; max-width: 1680px; margin: 0 auto; }
+/* Phones: a top bar with the brand and a menu button; the full menu opens below it. */
+.nav-toggle { display: none; }
 @media (max-width: 640px) {
   .main { padding: 24px 16px 40px; }
   .shell { flex-direction: column; }
-  .nav { width: 100%; flex: none; height: auto; position: static; flex-direction: row; align-items: center; gap: 12px; padding: 12px; overflow-x: auto; }
-  .nav .brand { padding: 0; flex: none; }
-  .nav .brand-name { display: none; }
-  .nav-links { flex-direction: row; flex: none; }
-  .nav-links a { min-height: 40px; white-space: nowrap; padding: 0 10px; }
-  .nav-foot { display: none; }
+  .nav { width: 100%; flex: none; height: auto; position: sticky; top: 0; z-index: 40; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0; padding: 10px 12px; overflow: visible; }
+  .nav .brand { padding: 0 4px; flex: none; order: 0; }
+  .nav-toggle { display: inline-flex; order: 1; margin-left: auto; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 1px solid #41535b; border-radius: 7px; background: transparent; color: #ecf3f5; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .nav-toggle:hover { background: #24383f; }
+  .nav > :not(.brand):not(.nav-toggle) { display: none; order: 2; width: 100%; }
+  .nav[data-open] { max-height: 100dvh; overflow-y: auto; padding-bottom: 16px; }
+  .nav[data-open] > :not(.brand):not(.nav-toggle) { display: flex; }
+  .nav[data-open] > .workspace-identity { flex-direction: column; margin-top: 16px; }
+  .nav[data-open] > .nav-links { flex-direction: column; margin-top: 12px; }
+  .nav[data-open] > .nav-foot { flex-direction: column; margin-top: 12px; padding: 16px 8px 0; }
+  .nav[data-open] > a.small { padding: 14px 14px 0; }
+  .nav[data-open] > .signout-form { margin-top: 12px; }
+  .nav-links a { min-height: 46px; }
 }
 
 /* Blocks */
@@ -385,12 +394,7 @@ th:first-child, td:first-child { padding-left: 0; }
 .signout-form { margin-top: -12px; }
 .signout-form .btn.secondary { justify-content: flex-start; width: 100%; color: #cbd9df; background: transparent; border-color: #41535b; font-size: 12px; }
 .signout-form .btn.secondary:hover:not(:disabled) { color: white; background: #24383f; }
-@media (max-width: 640px) {
-  .nav { flex-wrap: wrap; overflow: visible; }
-  .nav-links { order: 3; width: 100%; overflow-x: auto; }
-  .signout-form { margin: 0 0 0 auto; flex-shrink: 0; }
-  .signout-form .btn.secondary { height: 36px; white-space: nowrap; }
-}
+
 .demo-dot { width: 7px; height: 7px; border-radius: 50%; background: #169b76; box-shadow: 0 0 0 3px #169b7610; display: inline-block; flex-shrink: 0; }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
 .page-heading h1 { font-size: 32px; letter-spacing: -.04em; }
@@ -711,7 +715,7 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
 }
 @media (min-width: 641px) and (max-width: 1100px) { .nav { width: 200px; flex-basis: 200px; }.brand { font-size: 14px; }.main { padding: 24px; }.dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
-  .workspace-identity { display: none; }.workspace-header { height: 50px; padding: 0 16px; }.nav-links a { gap: 7px; font-size: 12px; }.nav-links a svg { width: 16px; }.nav .mark { width: 27px; height: 27px; }.nav-links { gap: 3px; }
+  .workspace-header { height: 50px; padding: 0 16px; }
   .main { gap: 22px; }.dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.dashboard-kpis .kpi { padding: 16px 12px; }.metric-icon { position: static; width: 28px; height: 28px; margin-bottom: 7px; }.kpi .value { font-size: 27px; }.dashboard-kpis .small { font-size: 10px; }
   .page-heading h1 { font-size: 28px; }.page-actions { width: 100%; justify-content: space-between; }.attention-row { gap: 10px; padding: 13px 12px; flex-wrap: wrap; }.attention-copy { flex-basis: calc(100% - 55px); }.attention-row .btn { margin-left: 48px; height: 34px; }.attention-icon { width: 32px; height: 32px; }
   .store-panel-heading { flex-wrap: wrap; padding: 16px; }.store-search { max-width: none; width: 100%; }.store-filters { padding: 0 16px 15px; }.store-filters button { font-size: 10px; padding: 6px 8px; }.store-panel-footer { padding: 14px 16px; flex-wrap: wrap; }
