@@ -106,7 +106,9 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
                           <span className="muted">Not started</span>
                         )}
                       </td>
-                      <td className="small">{s.client_contact_email ?? <span className="muted">No email set</span>}</td>
+                      <td className="small">{r?.status === 'sent' && r.sent_to
+                        ? <><span className="muted">Sent to </span>{r.sent_to}</>
+                        : s.client_contact_email ?? <span className="muted">No email set</span>}</td>
                       <td style={{ textAlign: 'right' }}>
                         {r ? (
                           <Link className="btn secondary" href={`/reports/${r.id}`} style={{ height: 40 }}>Open</Link>

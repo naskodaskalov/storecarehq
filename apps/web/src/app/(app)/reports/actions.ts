@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, writeSummary, type Facts, type Sections } from '@storecare/reports';
 import { supabaseServer } from '@/lib/supabase';
 import { loadMonthData } from '@/lib/report-data';
-import { reportEmailKey } from '@/lib/report-email';
+import { reportEmailHtml, reportEmailKey, reportEmailSubject, reportEmailText } from '@/lib/report-email';
 import { persistReportEdit } from '@/lib/report-workflow';
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
@@ -103,7 +103,7 @@ export async function sendReport(formData: FormData) {
   const id = str(formData, 'report');
   const to = str(formData, 'to');
   const supabase = await supabaseServer();
-  const { data: report } = await supabase.from('reports').select('id, status, share_token, summary_text, facts, updated_at').eq('id', id).single();
+  const { data: report } = await supabase.from('reports').select('id, store_id, agency_id, status, share_token, summary_text, facts, updated_at').eq('id', id).single();
   if (!report) redirect('/reports');
   if (report.status === 'draft') redirect(`/reports/${id}?error=${encodeURIComponent('Approve the report before sending it.')}`);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) redirect(`/reports/${id}?error=${encodeURIComponent('Enter the client email address.')}`);
@@ -116,6 +116,10 @@ export async function sendReport(formData: FormData) {
     const key = process.env.RESEND_API_KEY;
     if (!key) redirect(`/reports/${id}?error=${encodeURIComponent('Email sending is not set up yet. Use "Open in my email app" instead.')}`);
     const from = process.env.REPORTS_FROM ?? `${facts.agencyName} <reports@storecarehq.com>`;
+    const { data: agency } = await supabase.from('agencies').select('sender_email').eq('id', report.agency_id).single();
+    const replyTo = agency?.sender_email || null;
+    const email = { agencyName: facts.agencyName, brandColor: facts.brandColor, storeName: facts.storeName,
+      periodLabel: facts.period.label, summary: report.summary_text ?? '', link, replyTo };
     let res: Response;
     try { res = await fetch('https://api.resend.com/emails', {
       method: 'POST', signal: AbortSignal.timeout(15_000),
@@ -125,8 +129,10 @@ export async function sendReport(formData: FormData) {
       body: JSON.stringify({
         from,
         to: [to],
-        subject: `${facts.storeName}: your ${facts.period.label} care report`,
-        text: `${report.summary_text ?? ''}\n\nRead the full report: ${link}\n\n${facts.agencyName}`,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+        subject: reportEmailSubject(email),
+        text: reportEmailText(email),
+        html: reportEmailHtml(email),
       }),
     }); } catch {
       redirect(`/reports/${id}?error=${encodeURIComponent('The email request timed out or could not be completed. You can safely try again: the same report is never emailed twice to the same address within a day.')}`);
@@ -144,6 +150,8 @@ export async function sendReport(formData: FormData) {
   if (markError || !marked) redirect(`/reports/${id}?error=${encodeURIComponent(manual
     ? 'Could not record this report as sent. Reload the report and try again.'
     : 'The email was sent, but its status could not be saved. Sending again is safe: it will not be delivered twice.')}`);
+  // Remember the address for next month when the store has no client email yet. Best effort.
+  await supabase.from('stores').update({ client_contact_email: to }).eq('id', report.store_id).is('client_contact_email', null);
   revalidatePath(`/reports/${id}`);
   revalidatePath('/reports');
   redirect(`/reports/${id}?sent=1`);
