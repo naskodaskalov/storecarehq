@@ -44,6 +44,8 @@ export const metadata: Metadata = {
     title: 'Know what changed on every client store before your client does.',
     description: 'Monitoring and white-label monthly reports for Shopify care plans. Check any store free, no sign-up.',
   },
+  // Google Search Console's HTML-tag check, when the site is verified that way (DNS verification needs nothing here).
+  ...(process.env.GOOGLE_SITE_VERIFICATION ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } } : {}),
 };
 
 const PLANS = [

@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
-import { LegalPage } from '../legal-page';
+import { LegalPage, legalMetadata } from '../legal-page';
 
-export const metadata: Metadata = {
-  title: 'StoreCareBot · StoreCare HQ',
-  description: 'What StoreCareBot is, what it requests from a store, how often, and how to limit or block it.',
-};
+export const metadata: Metadata = legalMetadata('/bot', 'StoreCareBot · StoreCare HQ', 'What StoreCareBot is, what it requests from a store, how often, and how to limit or block it.');
 
 export default function Bot() {
   return (

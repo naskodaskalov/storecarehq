@@ -51,7 +51,7 @@ export function BrandReport({ facts, summary, sections }: { facts: Facts; summar
         {preview ? (
           <StorePreview key={preview.scan.host + preview.memory.looks.length} checked={preview} agency={agency} brand={brand} />
         ) : (
-          <ReportView facts={branded} summary={summary} sections={sections} />
+          <ReportView facts={branded} summary={summary} sections={sections} embedded />
         )}
       </div>
       <figcaption>
