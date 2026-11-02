@@ -8,6 +8,7 @@ import { COLUMNS, draftMessage, ensureUnique, exportCsv, newPack, parseCsv, rest
 import { SAMPLE_NOTICE, sampleMonthReport } from '@/lib/sample-month-report';
 import { quickReport } from '../actions';
 import { EmailComposer, type TestSenderInfo } from './email-composer';
+import { Icon } from '@/components/icon';
 
 function download(name: string, value: string, type: string) {
   const url = URL.createObjectURL(new Blob([value], { type }));
@@ -74,9 +75,9 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
   const sample = current ? sampleMonthReport(current.prospect.agency_name, current.preparedAt || new Date().toISOString()) : null;
 
   return <>
-    <section className="card no-print outreach-import">
-      <div><h2>01 / Add agencies</h2><p className="small muted">Import reviewed leads from the Shopify directory. Files stay in this tab until you export. Email testing sends only to your signed-in admin address after approval.</p></div>
-      <div className="outreach-actions">
+    <details className="card no-print outreach-import" open={packs.length === 0 || undefined}>
+      <summary className="outreach-import-heading"><span className="outreach-step"><Icon name="plus" size={19} /></span><span><strong>Add agencies</strong><span className="small muted">Import a list or add your next prospect by hand.</span></span><Icon name="chevron" size={17} /></summary>
+      <div className="outreach-import-content"><div className="outreach-upload-grid">
         <label className="field">Agency CSV<input type="file" accept=".csv,text/csv" disabled={busy} onChange={e => { void importFile(e.target.files?.[0], false); e.target.value = ''; }} /></label>
         <label className="field">Restore JSON backup<input type="file" accept=".json,application/json" disabled={busy} onChange={e => { void importFile(e.target.files?.[0], true); e.target.value = ''; }} /></label>
         <button className="btn secondary" onClick={() => download('agency-template.csv', COLUMNS.join(',') + '\r\n', 'text/csv')}>Download CSV template</button>
@@ -87,32 +88,36 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
           try { const p = validateProspect(Object.fromEntries(new FormData(form))); setPacks(ensureUnique([...packs, newPack(p)])); setDirty(true); setError(''); form.reset(); }
           catch (err) { setError(err instanceof Error ? err.message : 'Check the agency details.'); }
         }}>
-          {COLUMNS.map(key => <label className="field" key={key}>{key.replaceAll('_', ' ')}<input name={key} disabled={busy} required={['agency_name', 'agency_url', 'client_store_url', 'portfolio_source_url'].includes(key)} type={key === 'contact_email' ? 'email' : 'text'} maxLength={key.endsWith('_url') ? 300 : 120} /></label>)}
+          {COLUMNS.map(key => <label className="field" key={key}>{{ agency_name: 'Agency name', agency_url: 'Agency website', directory_url: 'Directory profile (optional)', contact_name: 'Contact name (optional)', contact_email: 'Contact email (optional)', client_store_url: 'Client store website', portfolio_source_url: 'Portfolio reference' }[key]}<input name={key} placeholder={key.endsWith('_url') ? 'https://…' : key === 'contact_email' ? 'hello@agency.com' : undefined} disabled={busy} required={['agency_name', 'agency_url', 'client_store_url', 'portfolio_source_url'].includes(key)} type={key === 'contact_email' ? 'email' : 'text'} maxLength={key.endsWith('_url') ? 300 : 120} /></label>)}
           <button disabled={busy} className="btn">Add agency</button>
         </form>
       </details>
       {error && <p className="error" role="alert">{error}</p>}
-    </section>
+      <p className="small muted outreach-storage-note"><Icon name="clock" size={14} />Your list stays in this tab. Export a backup to keep your progress.</p></div>
+    </details>
+
+    {packs.length === 0 && <section className="outreach-empty no-print"><span className="outreach-empty-icon"><Icon name="mail" size={28} /></span><h2>Your next conversation starts here.</h2><p>Add an agency, check a store from its portfolio, and turn the findings into a personal introduction.</p><div className="outreach-empty-steps"><span>01 <strong>Add an agency</strong></span><Icon name="arrow" size={16} /><span>02 <strong>Prepare a report</strong></span><Icon name="arrow" size={16} /><span>03 <strong>Send a test</strong></span></div></section>}
 
     {packs.length > 0 && <>
       <div className="outreach-toolbar no-print">
-        <p><strong>{packs.length}</strong> agencies · <strong>{packs.filter(p => p.report?.ok).length}</strong> health checks ready</p>
+        <div className="outreach-stats"><div><span>Agencies</span><strong>{String(packs.length).padStart(2, '0')}</strong></div><div><span>Health checks ready</span><strong>{String(packs.filter(p => p.report?.ok).length).padStart(2, '0')}</strong></div><div><span>Report links created</span><strong>{String(packs.filter(p => p.links).length).padStart(2, '0')}</strong></div></div>
         <div className="outreach-actions">
           <button className="btn" disabled={busy || !eligible.length} onClick={() => void prepare(eligible)}>Prepare reviewed agencies ({eligible.length})</button>
           {busy && <button className="btn secondary" onClick={() => { stop.current = true; }}>Stop after current check</button>}
           <button className="btn secondary" disabled={busy} onClick={() => { download('storecare-outreach.json', serializePacks(packs), 'application/json'); setDirty(false); }}>Export backup{dirty ? ' *' : ''}</button>
           <button className="btn secondary" onClick={() => download('storecare-outreach.csv', exportCsv(packs), 'text/csv')}>Export CSV summary</button>
         </div>
-        <p role="status" aria-live="polite">{busy ? `Checking ${progress}. Each check may take a minute.` : 'Review portfolio matches below, then prepare up to 20 at a time.'}</p>
+        <p className="outreach-progress" role="status" aria-live="polite">{busy ? `Checking ${progress}. Each check may take a minute.` : 'Review a portfolio match, prepare the report, then write your introduction.'}</p>
       </div>
       <div className="outreach-workspace">
         <aside className="outreach-list no-print" aria-label="Agency list">
-          {packs.map((p, i) => <button key={p.prospect.agency_url} className={active === i ? 'is-active' : ''} aria-pressed={active === i} onClick={() => setActive(i)}><strong>{p.prospect.agency_name}</strong><span>{p.report && !p.report.ok ? 'Check failed — retry available' : p.status}{p.reviewed ? ' · reviewed' : ' · needs review'}</span></button>)}
+          <div className="outreach-list-caption">YOUR AGENCIES <span>{packs.length}</span></div>
+          {packs.map((p, i) => <button key={p.prospect.agency_url} className={active === i ? 'is-active' : ''} aria-pressed={active === i} onClick={() => setActive(i)}><span className="outreach-agency-avatar" aria-hidden="true">{p.prospect.agency_name.slice(0, 1).toUpperCase()}</span><span className="outreach-agency-copy"><strong>{p.prospect.agency_name}</strong><span className="outreach-agency-domain">{new URL(p.prospect.agency_url).hostname.replace(/^www\./, '')}</span><span className={`outreach-status ${p.report?.ok ? 'is-ready' : ''}`}>{p.report && !p.report.ok ? 'Check failed — retry available' : p.status}{p.reviewed ? ' · reviewed' : ' · needs review'}</span></span></button>)}
         </aside>
         {current && <div className="outreach-detail">
-          <section className="card no-print">
-            <h2>02 / {current.prospect.agency_name}</h2>
-            <div className="outreach-actions">
+          <section className="card no-print outreach-agency-card">
+            <div className="outreach-section-heading"><span className="outreach-step">01</span><div><p className="outreach-eyebrow">REVIEW THE MATCH</p><h2>{current.prospect.agency_name}</h2></div></div>
+            <div className="outreach-actions outreach-source-links">
               <a href={current.prospect.agency_url} target="_blank" rel="noreferrer">Agency website ↗</a>
               <a href={current.prospect.portfolio_source_url} target="_blank" rel="noreferrer">Portfolio evidence ↗</a>
               <a href={current.prospect.client_store_url} target="_blank" rel="noreferrer">Client store ↗</a>
@@ -127,16 +132,16 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
             <p className="small muted">Public storefront checks only. No recurring monitoring or checkout test is enabled.</p>
             {current.links && <p className="small muted">Revoke the saved report links in the email preview before refreshing this health check.</p>}
           </section>
-          <section className="card no-print">
-            <h2>03 / Personal introduction</h2>
-            <p className="small muted">Edit the introduction below, then preview and approve a test to your own address. Existing edits are kept when you refresh a check.</p>
+          <section className="card no-print outreach-compose-card">
+            <div className="outreach-section-heading"><span className="outreach-step">02</span><div><p className="outreach-eyebrow">MAKE IT PERSONAL</p><h2>Your introduction</h2></div></div>
+            <EmailComposer key={current.prospect.agency_url} pack={current} sender={sender} busy={busy} onSubject={subject => update(active, { subject })} onLinks={links => update(active, { links })} editor={<>
             <div className="field"><label htmlFor="outreach-draft">Email draft</label><textarea id="outreach-draft" rows={13} disabled={busy} value={current.draft} onChange={e => update(active, { draft: e.target.value })} maxLength={20000} /></div>
             <div className="outreach-actions"><CopyButton text={current.draft} label="Copy email draft" />
               <button className="btn secondary" disabled={!current.report?.ok} onClick={() => { if (current.report && (!current.draft || window.confirm('Replace your edited draft with a fresh draft from the current check?'))) update(active, { draft: draftMessage(current.prospect, current.report) }); }}>Regenerate draft</button>
             </div>
-            <EmailComposer key={current.prospect.agency_url} pack={current} sender={sender} busy={busy} onSubject={subject => update(active, { subject })} onLinks={links => update(active, { links })} />
+            </>} />
           </section>
-          <div className="outreach-actions no-print">
+          <div className="outreach-actions outreach-report-tabs no-print">
             <button className={`btn ${view === 'health' ? '' : 'secondary'}`} aria-pressed={view === 'health'} onClick={() => setView('health')}>Current health check</button>
             <button className={`btn ${view === 'sample' ? '' : 'secondary'}`} aria-pressed={view === 'sample'} onClick={() => setView('sample')}>Sample monthly report</button>
             <button className="btn secondary" disabled={view === 'health' && !current.report?.ok} onClick={() => window.print()}>Print / save selected report as PDF</button>

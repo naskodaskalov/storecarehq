@@ -762,10 +762,14 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
 
 /* Admin: quick report */
 .admin-shell { min-height: 100vh; background: var(--bg, #f4f7f7); }
-.admin-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.admin-header { gap: 14px; flex-wrap: wrap; }
 .admin-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border-radius: 4px; background: #182f36; color: #fff; }
 .admin-email { margin-left: auto; }
-.admin-main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+.admin-main { width: 100%; max-width: 1440px; margin: 0 auto; padding: 32px 32px 64px; }
+.admin-main:has(.admin-form) { max-width: 1000px; }
+.admin-back { display: flex; align-items: center; gap: 10px; color: #d9e8ec; font-size: 13px; text-decoration: none; }
+.admin-back:hover { color: white; }
+@media (max-width: 760px) { .admin-main { padding: 24px 16px 40px; } .admin-email { display: none; } }
 .admin-form-row { display: flex; gap: 14px; flex-wrap: wrap; }
 .quick-report-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .quick-report-count { display: flex; flex-direction: column; align-items: center; min-width: 110px; padding: 10px 14px; border-radius: 8px; background: #e7f5f1; color: #0b5c52; text-align: center; }
