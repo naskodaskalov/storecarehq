@@ -123,6 +123,15 @@ jobs to inactive deliberately; it never changes the Vault token.
 An external dispatch avoids GitHub's scheduled-event delivery queue, but still depends
 on runner availability. For strict intervals use the persistent worker instead.
 
+## Alert when monitoring stops
+
+`GET https://app.storecarehq.com/api/health/monitoring` answers 200 while monitoring runs and 503 when any eligible
+store has had no uptime check for 75 minutes, a requested health check has waited over 30 minutes, or the database
+cannot be read (`public.monitoring_freshness()`, service role only). The reply never names stores or agencies.
+Point a free external uptime monitor (UptimeRobot, Better Stack or Healthchecks) at it every 5 minutes with email
+or phone alerts. Optionally set `MONITORING_STATUS_TOKEN` in Vercel and add `?token=…` to the monitored URL.
+This is independent of GitHub and Supabase Cron, so it catches a scheduler that silently stopped.
+
 ## Acceptance checks after deployment
 
 1. Confirm the fixed workflow is on main; local edits do not update the live workflow.
