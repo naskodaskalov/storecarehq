@@ -67,10 +67,6 @@ export default function Privacy() {
         <li><strong>Local storage</strong> in your browser for the stores you checked on our website, as above.</li>
       </ul>
       <p>We use no advertising, tracking or analytics cookies, so we don’t ask for cookie consent.</p>
-      <p>
-        Our pages load fonts from Google Fonts, which means your browser connects to Google’s servers and shares your IP
-        address with Google when a page loads.
-      </p>
 
       <h2>Who processes data for us</h2>
       <table>
@@ -81,7 +77,7 @@ export default function Privacy() {
           <tr><td>GitHub (Microsoft)</td><td>Running the scheduled monitoring jobs</td><td>United States</td></tr>
           <tr><td>Stripe</td><td>Payments and subscriptions</td><td>EU and United States</td></tr>
           <tr><td>Resend</td><td>Sending alert, report and contact emails</td><td>United States</td></tr>
-          <tr><td>Google</td><td>PageSpeed Insights speed measurements (receives store addresses) and web fonts</td><td>United States</td></tr>
+          <tr><td>Google</td><td>PageSpeed Insights speed measurements (receives store addresses, not personal data)</td><td>United States</td></tr>
           <tr><td>Anthropic</td><td>When enabled, writing the three-sentence summary at the top of a draft report from that month’s monitoring facts</td><td>United States</td></tr>
           <tr><td>Slack</td><td>Delivering alerts, only if you add a Slack destination</td><td>United States</td></tr>
         </tbody>
