@@ -419,6 +419,7 @@ export default async function Landing() {
       <footer className="lp-foot">
         <span>© 2026 StoreCare HQ</span>
         <span>Not affiliated with Shopify.</span>
+        <a href="/tools/shopify-theme-detector">Shopify theme detector</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
         <a href="/dpa">Data processing</a>

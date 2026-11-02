@@ -153,3 +153,12 @@ test('a pasted store list is tidied, de-duplicated and capped at five', () => {
   assert.deepEqual(stores, ['ferro.co', 'kite.com', 'bloom.shop', 'juniper.com', 'salt.com']);
   assert.equal(dropped, 1);
 });
+
+test('summary carries the theme parts the theme detector shows', () => {
+  const s = summarize(probe());
+  assert.ok(s.ok);
+  assert.deepEqual(s.themeDetail, { name: 'Autumn', base: 'Dawn', version: '15.0.0', themeStoreId: 887 });
+  const headless = summarize(probe({ theme: null }));
+  assert.ok(headless.ok);
+  assert.equal(headless.themeDetail, null);
+});

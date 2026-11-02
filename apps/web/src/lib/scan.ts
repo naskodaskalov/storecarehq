@@ -14,6 +14,8 @@ export type ScanSummary = {
   host: string;
   responseMs: number;
   theme: string | null;
+  /** The live theme's parts, for the theme detector: the store's own name for it, the theme it was built from, and its Theme Store ID. */
+  themeDetail: { name: string | null; base: string | null; version: string | null; themeStoreId: number | null } | null;
   apps: string[];
   appCount: number;
   /** Third-party scripts we could not name. */
@@ -82,6 +84,7 @@ export function summarize(r: ProbeResult): ScanReply {
     host: new URL(finalUrl).host.replace(/^www\./, ''),
     responseMs: r.home.ms,
     theme,
+    themeDetail: r.theme ? { name: r.theme.name, base: r.theme.schemaName, version: r.theme.schemaVersion, themeStoreId: r.theme.themeStoreId } : null,
     apps: apps.slice(0, 8),
     appCount: apps.length,
     unknownApps: r.apps.filter((a) => !a.known).length,
