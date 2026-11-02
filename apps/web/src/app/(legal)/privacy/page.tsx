@@ -19,7 +19,7 @@ export default function Privacy() {
             <ul>
               <li>We only check the public side of stores. We never log in to a store or see its customers or orders.</li>
               <li>We keep account, billing and monitoring data to run the service, and nothing for advertising.</li>
-              <li>No tracking or advertising cookies; no analytics that follow you around the web.</li>
+              <li>No advertising cookies. Google Analytics runs on our website only if you accept it, and never in the app.</li>
               <li>Our database is hosted in the EU (Ireland).</li>
             </ul>
           </div>
@@ -44,6 +44,7 @@ export default function Privacy() {
           <tr><td>Monitoring results: uptime, speed, theme and app changes, product and price changes, checkout tests and site checks of public storefronts</td><td>The service itself</td><td>Contract</td></tr>
           <tr><td>Contact form messages: name, email, topic and message</td><td>To answer you</td><td>Legitimate interest in replying to enquiries</td></tr>
           <tr><td>Technical logs: IP address, browser and request details kept by our hosting and database providers</td><td>Security, abuse prevention and fixing faults</td><td>Legitimate interest</td></tr>
+          <tr><td>Website analytics (only if you accept): pages viewed, how you reached the site, approximate location, device and browser, and clicks such as “Start free trial”, collected by Google Analytics with a random cookie ID</td><td>To understand how people find and use our website</td><td>Consent, which you can withdraw at any time with “Cookie settings”</td></tr>
         </tbody>
       </table>
       <p>
@@ -60,19 +61,21 @@ export default function Privacy() {
         time, or by clearing this site’s data in your browser.
       </p>
 
-      <h2>Cookies and local storage</h2>
+      <h2 id="cookies">Cookies and local storage</h2>
       <ul>
         <li><strong>Sign-in cookies</strong> keep you signed in to the app. They are strictly necessary.</li>
         <li><strong>A short-lived “store you checked” cookie</strong> (<code>sc_store</code>, 7 days) pre-fills the store address when you start a trial after checking a store.</li>
-        <li><strong>Local storage</strong> in your browser for the stores you checked on our website, as above.</li>
+        <li><strong>Local storage</strong> in your browser for the stores you checked on our website, as above, and your cookie choice (<code>sc_analytics</code>).</li>
+        <li><strong>Google Analytics cookies</strong> (<code>_ga</code>, <code>_ga_*</code>, up to 2 years), only on our public website and only if you click “Accept”. They count visits, pages viewed, how you reached us and clicks such as “Start free trial”. Google signals and ad personalisation are off. You can change your mind any time with “Cookie settings” at the bottom of the page; declining removes these cookies.</li>
       </ul>
-      <p>We use no advertising, tracking or analytics cookies, so we don’t ask for cookie consent.</p>
+      <p>We use no advertising cookies. The app you sign in to has no analytics.</p>
 
       <h2>Who processes data for us</h2>
       <table>
         <thead><tr><th>Provider</th><th>What for</th><th>Where</th></tr></thead>
         <tbody>
           <tr><td>Supabase</td><td>Database and sign-in</td><td>EU (Ireland)</td></tr>
+          <tr><td>Google (Analytics)</td><td>Website visit statistics, only with your consent</td><td>EU and US (EU–US Data Privacy Framework)</td></tr>
           <tr><td>Vercel</td><td>Hosting the website and app</td><td>Global edge network; may process data outside the EU</td></tr>
           <tr><td>GitHub (Microsoft)</td><td>Running the scheduled monitoring jobs</td><td>United States</td></tr>
           <tr><td>Stripe</td><td>Payments and subscriptions</td><td>EU and United States</td></tr>
