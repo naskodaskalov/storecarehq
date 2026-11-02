@@ -20,8 +20,14 @@ export async function createWorkspace(formData: FormData) {
   const name = String(formData.get('agency') ?? '').trim();
   if (!name) redirect('/onboarding?error=name');
   const supabase = await supabaseServer();
-  const { error } = await supabase.rpc('create_agency', { agency_name: name, band: String(formData.get('band') ?? '') || null });
+  const { data: agencyId, error } = await supabase.rpc('create_agency', { agency_name: name, band: String(formData.get('band') ?? '') || null });
   if (error) redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
+  // Client replies go to the email the agency registered with until the owner changes it in Settings. Best effort:
+  // report emails fall back to the owner's email when this is empty.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (agencyId && user?.email) {
+    await supabase.from('agencies').update({ sender_email: user.email }).eq('id', agencyId).is('sender_email', null);
+  }
   redirect('/onboarding/trial');
 }
 

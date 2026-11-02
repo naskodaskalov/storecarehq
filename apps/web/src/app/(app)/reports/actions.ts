@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, writeSummary, type Facts, type Sections } from '@storecare/reports';
 import { supabaseServer } from '@/lib/supabase';
 import { loadMonthData } from '@/lib/report-data';
+import { replyToFor } from '@/lib/agency-reply-to';
 import { reportEmailHtml, reportEmailKey, reportEmailSubject, reportEmailText } from '@/lib/report-email';
 import { persistReportEdit } from '@/lib/report-workflow';
 
@@ -117,7 +118,7 @@ export async function sendReport(formData: FormData) {
     if (!key) redirect(`/reports/${id}?error=${encodeURIComponent('Email sending is not set up yet. Use "Open in my email app" instead.')}`);
     const from = process.env.REPORTS_FROM ?? `${facts.agencyName} <reports@storecarehq.com>`;
     const { data: agency } = await supabase.from('agencies').select('sender_email').eq('id', report.agency_id).single();
-    const replyTo = agency?.sender_email || null;
+    const replyTo = await replyToFor(report.agency_id, agency?.sender_email);
     const email = { agencyName: facts.agencyName, brandColor: facts.brandColor, storeName: facts.storeName,
       periodLabel: facts.period.label, summary: report.summary_text ?? '', link, replyTo };
     let res: Response;

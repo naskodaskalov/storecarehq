@@ -1,4 +1,5 @@
 import { requireAgency } from '@/lib/data';
+import { ownerEmail } from '@/lib/agency-reply-to';
 import { supabaseServer } from '@/lib/supabase';
 import { DEFAULT_BRAND_COLOR } from '@/lib/agency-profile';
 import { SubmitButton } from '@/components/submit-button';
@@ -16,6 +17,7 @@ export default async function AgencySettings({ searchParams }: { searchParams: P
   ]);
   const a = details ?? { name: agency.name, brand_color: agency.brand_color, logo_url: null, sender_email: null };
   const isOwner = membership?.role === 'owner';
+  const replyTo = a.sender_email ?? (await ownerEmail(agency.id)) ?? '';
 
   return (
     <div className="workspace-page settings-page">
@@ -50,9 +52,9 @@ export default async function AgencySettings({ searchParams }: { searchParams: P
             <h2>Client emails</h2>
             <div className="workspace-form-grid">
               <div className="field">
-                <label htmlFor="sender_email">Reply-to email <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-                <input id="sender_email" name="sender_email" type="email" defaultValue={a.sender_email ?? ''} placeholder="hello@youragency.com" autoComplete="email" />
-                <span className="small muted">Where client replies to report emails should go.</span>
+                <label htmlFor="sender_email">Reply-to email</label>
+                <input id="sender_email" name="sender_email" type="email" defaultValue={replyTo} placeholder="hello@youragency.com" autoComplete="email" />
+                <span className="small muted">Where client replies to report emails go. It starts as the email you signed up with; change it to a shared inbox if you like.</span>
               </div>
             </div>
           </section>
