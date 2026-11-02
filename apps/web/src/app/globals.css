@@ -759,3 +759,26 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
 .danger-form p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.6; max-width: 70ch; }
 .danger-form .field { max-width: 420px; }
 .danger-form .btn { align-self: flex-start; }
+
+/* Admin: quick report */
+.admin-shell { min-height: 100vh; background: var(--bg, #f4f7f7); }
+.admin-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.admin-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border-radius: 4px; background: #182f36; color: #fff; }
+.admin-email { margin-left: auto; }
+.admin-main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+.admin-form-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.quick-report-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.quick-report-count { display: flex; flex-direction: column; align-items: center; min-width: 110px; padding: 10px 14px; border-radius: 8px; background: #e7f5f1; color: #0b5c52; text-align: center; }
+.quick-report-count strong { font-size: 28px; line-height: 1; }
+.quick-report-count span { font-size: 12px; margin-top: 4px; }
+.quick-report-count.has-looks { background: var(--warn-bg); color: var(--warn); }
+.quick-report-section h3 { margin: 0 0 8px; font-size: 15px; }
+.quick-report-section ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.quick-report-section li { display: flex; gap: 10px; align-items: baseline; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.qr-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: #1f9d87; transform: translateY(-1px); }
+.qr-look .qr-dot { background: #d08a1c; }
+@media print {
+  .admin-header { display: none; }
+  .admin-main { padding: 0; max-width: none; }
+  .quick-report { border: 0; padding: 0; }
+}
