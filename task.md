@@ -36,3 +36,47 @@ and the production build passed. Live migration applied with dispatch disabled. 
 reads are allowed, lease reads/status writes are denied, and anonymous RPC execution is denied.
 The Supabase advisor's new RPC execution warning is intentional (membership/billing-checked);
 the private dispatcher state deliberately has deny-all RLS. Existing unrelated findings remain.
+
+## Outreach implementation
+
+### Hosted report links (approved)
+- [x] Add isolated immutable snapshot storage and hashed report tokens.
+- [x] Add publish/revoke and snapshot-bound approval/send actions.
+- [x] Replace email attachments with view links and public downloads.
+- [x] Verify role isolation, lifecycle, email payloads, browser views and build.
+
+Hosted-link verification: 115 web tests passed / one existing opt-in host-routing check skipped.
+All workspace type checks and production build passed. The isolated local PostgreSQL checks
+verified RLS/grants, service-only insertion/revocation, immutable contents, irreversible revocation
+and maximum lifetime. Browser checks verified publication, exact email URLs, signed-out views and
+HTML downloads, public-data privacy, no-store/noindex/no-referrer headers, sample labels in print,
+390px layout, backup restoration and 404s on both view/download routes after revocation.
+Production migration/deployment have not been performed; no email was sent.
+
+### Resend testing phase (approved)
+- [x] Add branded email template and previewable report attachments.
+- [x] Add server-signed approval and admin-only test transport.
+- [x] Add preview/approve/send controls and sender configuration.
+- [x] Verify tests, type checks, production build and browser preview.
+
+Resend testing verification: 111 web tests passed, one existing opt-in routing check skipped.
+All workspace type checks and the production build passed. Provider mocks verified actual
+recipient/reply-to enforcement, signed-payload approval, edited/expired/tampered rejection,
+same-key retries, and failed/unknown acceptance handling. Browser verification checked email,
+both report attachment and plain-text previews, real website CTA, demo send blocking, subject
+backup restoration and desktop/390px layouts. No real email, production data change or deployment.
+
+- [x] Inspect admin/report boundaries and approved plan.
+- [x] Implement prospect imports, exports and factual drafts.
+- [x] Implement isolated illustrative monthly reports.
+- [x] Build admin preparation and printing interface.
+- [x] Run tests, type checks, build and UI verification.
+- [x] Document architecture and delivery limits.
+
+Outreach verification: web suite 104 passed / 1 existing opt-in routing check skipped;
+all workspace type checks passed; production build passed. Seven new import/export,
+draft and sample-report tests pass. Browser checks against the production build in
+local demo mode verified manual entry, review gating, sample and print isolation,
+390px mobile width, edited-draft backup restore and interrupted-request retry.
+The restored-draft textarea label was corrected during browser verification.
+No deployment, production data changes, directory collection or emails were performed.

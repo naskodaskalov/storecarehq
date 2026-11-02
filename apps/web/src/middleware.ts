@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { APP_ORIGIN, hostRouting, isPublicPath, isWebsiteHost, SHARE_IMAGE_PATH, sessionRouting, WEBSITE_PAGES, MONITORING_HEALTH_PATH } from './lib/domains';
+import { APP_ORIGIN, hostRouting, isPublicPath, isWebsiteHost, isOutreachReportPath, SHARE_IMAGE_PATH, sessionRouting, WEBSITE_PAGES, MONITORING_HEALTH_PATH } from './lib/domains';
 
 // /r/<token> is the client's report link: no account, the token is the key. /welcome is the landing page.
 // /api/stripe/webhook is called by Stripe and checks its own signature.
@@ -8,6 +8,13 @@ import { APP_ORIGIN, hostRouting, isPublicPath, isWebsiteHost, SHARE_IMAGE_PATH,
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? request.nextUrl.host;
   const path = request.nextUrl.pathname;
+  if (isOutreachReportPath(path)) {
+    const response = NextResponse.next();
+    response.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    response.headers.set('Referrer-Policy', 'no-referrer');
+    return response;
+  }
   const routing = hostRouting(host, path, request.nextUrl.search, request.method);
   if (routing?.kind === 'reject') return new NextResponse('This page has moved. Open https://app.storecarehq.com/login to continue.', { status: 409 });
   if (routing?.kind === 'redirect') return NextResponse.redirect(routing.url);
