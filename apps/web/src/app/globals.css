@@ -749,3 +749,13 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
 .pace-note.warn { color: var(--warn); }
 .pace-note.quiet { color: #2747a8; }
 .pace-note.ok { color: var(--muted); font-weight: 500; }
+
+/* Settings → Your data */
+.data-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.data-row p { margin: 4px 0 0; }
+.danger-zone { border: 1px solid #ecd0d0; border-radius: 8px; background: #fffafa; }
+.danger-zone summary { cursor: pointer; padding: 12px 16px; font-weight: 600; color: #a03333; }
+.danger-form { display: flex; flex-direction: column; gap: 14px; padding: 0 16px 16px; }
+.danger-form p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.6; max-width: 70ch; }
+.danger-form .field { max-width: 420px; }
+.danger-form .btn { align-self: flex-start; }

@@ -7,7 +7,7 @@ import { supabaseServer } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 
 export default async function Login({ searchParams }: {
-  searchParams: Promise<{ sent?: string; error?: string; trial?: string; signed_out?: string; method?: string; verify?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string; trial?: string; signed_out?: string; method?: string; verify?: string; deleted?: string }>;
 }) {
   const q = await searchParams;
   const supabase = await supabaseServer();
@@ -21,6 +21,7 @@ export default async function Login({ searchParams }: {
     <h1 id="login-title">{q.verify ? 'Confirm your email.' : sent ? 'Check your inbox.' : signup ? 'Better care starts here.' : 'Welcome back.'}</h1>
     <p className="login-description">{signup ? 'Create your account, then set up your agency workspace and free trial.' : 'A clear view of your stores. A little peace of mind.'}</p>
     {q.signed_out && <div className="login-feedback" role="status">You&apos;ve been signed out successfully.</div>}
+    {q.deleted && <div className="login-feedback" role="status">{q.deleted === 'account' ? 'Your workspace, its data and your sign-in account were deleted.' : 'Your workspace and its data were deleted. Your sign-in account is kept for your other workspaces.'}</div>}
     {q.error && <div className="error" role="alert">{q.error}</div>}
     {q.verify ? <div className="login-sent" role="status">
       <p>If your account needs verification, we&apos;ve sent an email. Open the link in this browser to continue. Already have an account? Sign in or reset your password.</p>

@@ -4,6 +4,7 @@ import { DEFAULT_BRAND_COLOR } from '@/lib/agency-profile';
 import { SubmitButton } from '@/components/submit-button';
 import { BrandFields } from './brand-fields';
 import { saveAgency } from './actions';
+import { deleteWorkspaceAction } from './workspace-actions';
 
 export default async function AgencySettings({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   const { saved, error } = await searchParams;
@@ -62,6 +63,34 @@ export default async function AgencySettings({ searchParams }: { searchParams: P
           </div>
         </fieldset>
       </form>
+
+      <section className="workspace-section" id="your-data">
+        <h2>Your data</h2>
+        <div className="data-row">
+          <div>
+            <strong>Export everything</strong>
+            <p className="small muted">Stores, care plans, work log, reports, changes, incidents and client requests, as one JSON file.</p>
+          </div>
+          <a className="btn secondary" href="/api/export" download>Download export</a>
+        </div>
+        {isOwner && (
+          <details className="danger-zone">
+            <summary>Delete this workspace</summary>
+            <form action={deleteWorkspaceAction} className="danger-form">
+              <p>
+                This cancels your subscription straight away, stops monitoring and permanently deletes {a.name}, its stores,
+                work log, reports and history. Client report links stop working. If this is your only workspace, your sign-in
+                account is deleted too. It cannot be undone, so download an export first if you need one.
+              </p>
+              <div className="field">
+                <label htmlFor="confirm">Type <strong>{a.name}</strong> to confirm</label>
+                <input id="confirm" name="confirm" type="text" required autoComplete="off" spellCheck={false} />
+              </div>
+              <SubmitButton pendingText="Deleting…" danger>Delete workspace permanently</SubmitButton>
+            </form>
+          </details>
+        )}
+      </section>
     </div>
   );
 }
