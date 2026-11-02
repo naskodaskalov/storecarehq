@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
-import { LegalPage } from '../legal-page';
+import { LegalPage, legalMetadata } from '../legal-page';
 
-export const metadata: Metadata = {
-  title: 'Terms of service · StoreCare HQ',
-  description: 'The terms for using StoreCare HQ: trial, billing, cancellation, acceptable use and responsibilities.',
-};
+export const metadata: Metadata = legalMetadata('/terms', 'Terms of service · StoreCare HQ', 'The terms for using StoreCare HQ: trial, billing, cancellation, acceptable use and responsibilities.');
 
 export default function Terms() {
   return (

@@ -29,7 +29,7 @@ export function StorePreview({ checked, agency, brand }: { checked: CheckedStore
           <span>{agency}</span>
         </div>
         <div className="report-kicker">Monthly care report · {clock.month}</div>
-        <h1 className="report-title">{name}</h1>
+        <h2 className="report-title">{name}</h2>
         <div className="report-sub">{scan.host}</div>
       </header>
 
