@@ -2,7 +2,7 @@
 // to its agency. Needs STRIPE_SECRET_KEY; the webhook also needs STRIPE_WEBHOOK_SECRET.
 
 import Stripe from 'stripe';
-import { agencyUpdateFromSubscription, lookupKey, PLANS, SAAS_TAX_CODE, type PlanKey } from './billing';
+import { agencyUpdateFromSubscription, lookupKey, PLANS, SAAS_TAX_CODE, STALE_STRIPE_RESET, type BillingFields, type PlanKey } from './billing';
 import { supabaseAdmin } from './supabase-admin';
 
 let client: Stripe | null = null;
@@ -87,4 +87,26 @@ export async function confirmCheckout(sessionId: string, agencyId: string): Prom
     console.error('[billing] confirm checkout failed', e);
     return false;
   }
+}
+
+/** "No such customer" and similar: the object does not exist in this Stripe account. */
+export const isMissing = (e: unknown) => (e as { code?: string })?.code === 'resource_missing';
+
+/** If the agency's saved Stripe customer is gone from this account (or deleted), forget the stale links so billing
+ *  starts cleanly instead of failing. Returns the agency as it now stands. */
+export async function dropStaleStripeLinks<A extends { id: string } & Pick<BillingFields, 'stripe_customer_id'>>(agency: A): Promise<A> {
+  if (!agency.stripe_customer_id) return agency;
+  let gone = false;
+  try {
+    const c = await stripe().customers.retrieve(agency.stripe_customer_id);
+    gone = !!(c as { deleted?: boolean }).deleted;
+  } catch (e) {
+    if (!isMissing(e)) throw e;
+    gone = true;
+  }
+  if (!gone) return agency;
+  console.warn(`[billing] agency ${agency.id}: saved Stripe customer not found in this account; links cleared`);
+  const { error } = await supabaseAdmin().from('agencies').update(STALE_STRIPE_RESET).eq('id', agency.id);
+  if (error) throw new Error(`[billing] could not clear stale Stripe links: ${error.message}`);
+  return { ...agency, ...STALE_STRIPE_RESET };
 }

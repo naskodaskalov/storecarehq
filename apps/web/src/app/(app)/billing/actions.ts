@@ -6,7 +6,7 @@ import { billingState, checkoutTrial, isPlanKey, PLANS, type PlanKey, checkoutTa
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { portalConfiguration, priceFor, stripe, stripeEnabled, syncSubscription } from '@/lib/stripe';
+import { dropStaleStripeLinks, portalConfiguration, priceFor, stripe, stripeEnabled, syncSubscription } from '@/lib/stripe';
 
 const APP = () => process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 /** Sign-up (onboarding) and the billing page share these actions; each returns to its own page. */
@@ -47,7 +47,9 @@ export async function choosePlan(formData: FormData) {
 
 async function choose(back: Back, plan: PlanKey) {
   const p = PLANS[plan];
-  const { agency, email, storeCount } = await ownerAgency(back);
+  const owner = await ownerAgency(back);
+  const { email, storeCount } = owner;
+  const agency = await dropStaleStripeLinks(owner.agency);
   if (storeCount > p.stores) {
     fail(back, `The ${p.name} plan includes up to ${p.stores} stores and you have ${storeCount}. Remove or pause stores first, or pick a larger plan.`);
   }
@@ -99,7 +101,7 @@ async function choose(back: Back, plan: PlanKey) {
 export async function openPortal() {
   if (!stripeEnabled()) fail('/billing', 'Billing is not connected yet.');
   await guarded('/billing', async () => {
-    const { agency } = await ownerAgency('/billing');
+    const agency = await dropStaleStripeLinks((await ownerAgency('/billing')).agency);
     if (!agency.stripe_customer_id) fail('/billing', 'Choose a plan first.');
     const session = await stripe().billingPortal.sessions.create({
       customer: agency.stripe_customer_id!,

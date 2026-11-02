@@ -115,3 +115,15 @@ export function checkoutTaxParams(managed: boolean) {
     ? ({ managed_payments: { enabled: true } } as const)
     : ({ billing_address_collection: 'auto', customer_update: { name: 'auto', address: 'auto' }, tax_id_collection: { enabled: true } } as const);
 }
+
+/** Columns to reset when an agency's saved Stripe customer no longer exists (for example after moving to a new
+ *  Stripe account). The agency starts again as if it had never subscribed: the next checkout creates a customer
+ *  and gives the first-plan free days. Its own trial date is kept. */
+export const STALE_STRIPE_RESET = {
+  plan: 'trial',
+  subscription_status: null,
+  stripe_customer_id: null,
+  stripe_subscription_id: null,
+  current_period_end: null,
+  cancel_at_period_end: false,
+} as const;

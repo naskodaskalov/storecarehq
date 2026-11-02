@@ -81,3 +81,14 @@ test('Managed Payments checkout drops the parameters Stripe rejects; normal chec
   assert.equal(managedPaymentsEnabled({}), false);
   assert.equal(SAAS_TAX_CODE, 'txcd_10103001');
 });
+
+test('an agency whose Stripe customer is gone starts billing again cleanly', async () => {
+  const { STALE_STRIPE_RESET } = await import('./billing.ts');
+  const before: BillingFields = { plan: 'agency', trial_ends_at: '2026-11-11T08:00:00Z', subscription_status: 'trialing', current_period_end: '2026-11-05T10:58:00Z', cancel_at_period_end: false, stripe_customer_id: 'cus_old', stripe_subscription_id: 'sub_old' };
+  const after = { ...before, ...STALE_STRIPE_RESET };
+  assert.deepEqual(checkoutTrial(after), { trial_period_days: 7 }, 'the next checkout gets the free days again');
+  const s = billingState(after, now);
+  assert.equal(s.paying, false);
+  assert.equal(s.hasAccess, true, 'its own trial date still gives access');
+  assert.equal(after.stripe_customer_id, null);
+});
