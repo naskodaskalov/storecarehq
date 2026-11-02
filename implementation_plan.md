@@ -1,77 +1,60 @@
-# Approved dashboard design implementation
+# Agency outreach preparation
 
-Implement the dashboard mockup approved in this chat. Preserve existing monitoring, billing and report workflows.
+Status: proposed; no product code, production data, or email sending changed.
 
-- [NEW] `apps/web/src/components/icon.tsx`: shared lightweight outline icons.
-- [MODIFY] `apps/web/src/app/(app)/layout.tsx`, `nav-links.tsx`: slate navigation, workspace identity, persistent DEMO label and breadcrumb header.
-- [MODIFY] `apps/web/src/app/(app)/page.tsx`, `apps/web/src/lib/data.ts`: real dashboard aggregates and report status.
-- [NEW] `apps/web/src/components/store-table.tsx`: searchable, filterable store table with status badges and plan usage.
-- [MODIFY] `apps/web/src/app/globals.css`: approved colors, typography, responsive shell, metrics, incidents and table.
+## Outcome
 
-Verify with web typecheck, production build, existing tests, and desktop/mobile browser review.
+Prepare personalized outreach packs inside the existing admin area. Each pack contains a dated real storefront health check, a clearly labeled illustrative monthly report, and an editable outreach message. Start with 20 reviewed agencies from Shopify's ongoing website management directory.
 
-## App subdomain separation — proposed 30 October 2026
+## Existing behavior verified
 
-### Result
+- Admin quick reports require the configured admin session, run public storefront checks, support printing/saving as PDF, and generate a copyable note. Results are currently transient.
+- Monthly reporting loads dated monitoring and work records. The scheduled worker skips stores created after the reported month ended.
+- The existing ReportView renders both internal previews and shared client reports.
+- Adding a store now and backdating example hours does not recreate last month's monitoring history.
 
-- `https://www.storecarehq.com/` always serves the public landing page. The apex keeps redirecting to www.
-- Landing-page sign-in and trial links open `https://app.storecarehq.com/login` (with the trial query when appropriate).
-- `https://app.storecarehq.com/` validates the Supabase session: returning users see their agency dashboard, new accounts continue onboarding, and signed-out visitors see login.
-- Login, registration, recovery, callbacks, onboarding, billing, stores, work and reports stay on the app host. Sessions remain scoped to that host; marketing does not need session cookies.
-- Localhost and Vercel preview deployments keep working on their own origin. Existing shared report URLs and Stripe webhook endpoints remain valid during the transition.
-- Existing users may need to sign in once on the new app host. Do not copy tokens through URLs or widen cookies to all subdomains.
+## First implementation: preparation only
 
-### Files
+### Workflow
 
-- [NEW] `apps/web/src/lib/domains.ts`: explicit production website/app origins, host-aware routing decisions, and local/preview-safe links.
-- [NEW] `apps/web/src/lib/domains.test.ts`: verify public/app routing, signed-in/out entry behavior, legacy URLs, query preservation, preview handling and untrusted-host rejection.
-- [MODIFY] `apps/web/src/middleware.ts`: resolve the production host before auth, serve marketing independently, route legacy app GET URLs to the app host, preserve refreshed session cookies, and send signed-out app entry to login. Do not forward old-host POST bodies or server actions across origins.
-- [MODIFY] `apps/web/src/app/welcome/page.tsx`: point sign-in and trial links directly at the app origin.
-- [MODIFY] `apps/web/src/components/auth-shell.tsx`: point marketing/home links at the public website in production.
-- [MODIFY] `apps/web/src/app/auth/password-actions.ts`: resolve callbacks consistently for production app and local/preview origins, keeping recovery intent and PKCE on the same host.
-- [MODIFY] `.github/workflows/monitor.yml`, `apps/worker/src/tasks.ts`: use the app origin for monitoring/report links.
-- [NEW] Supabase migration generated with the CLI: update newly queued alert links to `https://app.storecarehq.com/stores/`, preserving trigger permissions and behavior.
-- [MODIFY] `apps/web/.env.example`, `apps/worker/.env.example`, `README.md`, `supabase/templates/README.md`: document both domains, session boundaries, callback settings and rollout steps.
-- [MODIFY] `task.md`: track implementation and validation after approval.
-- [NEW] `system_architecture.md`: record the host routing and authentication design after implementation.
+1. Add an Outreach tab/link under admin alongside Quick report.
+2. Import a CSV of reviewed agencies: agency_name, agency_url, directory_url, contact_name, contact_email, client_store_url, portfolio_source_url. Also allow entering a single agency. Validate URLs, field lengths, CSV quoting, duplicate agency domains, and duplicate contacts. Never invent emails or assume an agency's own website is a Shopify store.
+3. Require review of the portfolio link/store match before scanning. A public portfolio is evidence of past work, not proof of a current maintenance contract.
+4. Prepare selected packs sequentially in small batches using the existing admin quick-report action. Show per-agency progress, blocked/failed checks, and retry only failures. No checkout automation or recurring monitoring is enabled for prospects.
+5. Build a separate illustrative monthly report with the prospect agency's name and a fictional store, reusing ReportView. Default period: October 2026 when prepared in November 2026, calculated dynamically thereafter. Example work: theme adjustments 2h, image optimization 1.5h, app review 1h, maintenance review 0.5h. All hours and any illustrative metrics are visibly marked as sample data in both screen and print views. Do not claim that these tasks were performed or that the agency endorsed the report.
+6. Draft a short email from verified agency details and actual scan results, linking the observed facts to monitoring/reporting benefits. Include scan date and limitations. Unavailable checks are not failures; do not invent incidents, historic uptime, lost revenue, or improvements.
+7. Let the admin edit/copy the message, print either report, and export a resumable JSON pack plus a spreadsheet-safe CSV summary. Warn before leaving with unsaved work. Export/import retains drafts and statuses without adding prospect data to operational store/work tables.
 
-### Hosted configuration and rollout
+### Exact files
 
-1. Add `app.storecarehq.com` to the existing Vercel project and verify DNS/HTTPS.
-2. Add the exact `https://app.storecarehq.com/auth/callback` URL in Supabase and set its Site URL to `https://app.storecarehq.com`, retaining the existing allowed callbacks for in-flight links and local development.
-3. Set Vercel Production `NEXT_PUBLIC_APP_URL=https://app.storecarehq.com`; use an explicit public website origin in code/config. Leave local environment URLs local.
-4. Apply the alert-link migration; deploy the reviewed source and settings together so website/app routing switches atomically. Do not deploy the app URL environment change against the old routing code alone.
-5. Keep existing Resend credentials and sending domains unchanged.
+- [MODIFY] apps/web/src/app/admin/page.tsx — link to outreach preparation.
+- [NEW] apps/web/src/app/admin/outreach/page.tsx — admin outreach page, request duration/dynamic settings consistent with admin quick reports.
+- [NEW] apps/web/src/app/admin/outreach/outreach-form.tsx — CSV/manual input, review, sequential preparation, editable drafts, print and export/import controls.
+- [NEW] apps/web/src/app/admin/outreach/outreach.css — scoped outreach and print layout, always-visible sample labels.
+- [NEW] apps/web/src/lib/outreach.ts — typed prospect/pack models, CSV parsing and safe export, normalization/deduplication, pack serialization, factual message templates.
+- [NEW] apps/web/src/lib/sample-month-report.ts — deterministic illustrative monthly facts/summary using the existing report types, without database writes.
+- [NEW] apps/web/src/lib/outreach.test.ts — malformed imports, deduplication, formula-safe exports, round-trip state, drafts without fabricated findings.
+- [NEW] apps/web/src/lib/sample-month-report.test.ts — month/year boundaries, explicitly illustrative content, correct hours totals and report type compatibility.
+- [MODIFY] system_architecture.md — document admin-only preparation and isolation from real work/monitoring records.
 
-### Validation
+### Verification
 
-Run web tests, worker typecheck, web typecheck and production build. Verify marketing stays public, app entry redirects signed-out users to login, existing app sessions reach the dashboard, login/recovery callbacks stay on the app host, logout clears the app session, onboarding/billing guards still work, shared report links and webhook routes remain usable, and localhost is unaffected. Authenticated browser verification requires an available user session; do not change a password or send test emails without the corresponding user authorization.
+- Run web unit tests and repository type checks, then the web production build.
+- Exercise one manual prospect and a small CSV, including failed/blocked scans and export/import recovery.
+- Inspect both print views for sample labels and separation of measured versus illustrative data.
+- Verify admin access is enforced by the existing layout and every reused server action.
+- Confirm preparing packs does not add stores, work, monitoring consent, or outgoing emails.
 
-## Automatic first scan and manual health checks — proposed 30 October 2026
+## Outreach launch
 
-### Product behavior
+Review the first 20 agencies and their public business contact details. Send reviewed messages to agency contacts, not their portfolio merchants. Lead with one current observation and offer the sample report; do not imply a current client relationship. Initial sending uses the user's mailbox after preparation and recipient/message review.
 
-- Adding a store atomically queues its first health check. Dispatch the existing GitHub worker promptly instead of waiting for its regular 30-minute schedule.
-- Add **Run health check** beside Settings/Log time on the store page. It queues a scan for that store only, with visible queued/running/completed/partial/failed status, current phase, timestamps and retry guidance.
-- Run uptime, storefront snapshot, mobile speed and site checks (certificate, domain and links). Run checkout only with existing consent and a usable snapshot/product. Do not draft monthly reports as part of a manual health check.
-- Preserve existing health-score calculations, monitoring history and incident/alert handling. The first snapshot establishes a baseline; change detection needs a later snapshot.
-- Deduplicate repeated clicks, allow one pending/running scan per store, and enforce a five-minute cooldown in the database. Paused stores and agencies without monitoring access cannot request scans.
-- Keep the request durable if dispatch fails or GitHub is slow. The existing scheduled worker can pick it up. Show queued status honestly; do not promise immediate completion or show success before checks finish.
-- Automatically refresh scan progress while queued/running, then refresh the displayed metrics on completion. Provide a clear partial result when a provider such as PageSpeed is unavailable.
+## Later automation, after validating the first batch
 
-### Implementation
+- Directory ingestion: bounded, resumable collection of public profiles with source URLs, pagination, deduplication and respectful request pacing; verify permitted access before running collection. Discover agency business contacts and portfolio candidates for human review.
+- Durable admin prospect database and scan queue, separate from operational agency/store records; status history, resuming jobs and saved report snapshots.
+- Expiring/revocable unlisted report links that are excluded from indexing and retain sample notices. Publishing links must be an explicit action.
+- Outbound sending with a configured sender and reply address, reviewed recipients/messages, durable send deduplication, delivery status and opt-out suppression. Do not reuse ordinary client-report sending as a marketing campaign sender without these changes.
+- Follow-ups stop on replies, opt-outs and bounces; automate sending only once inbound reply detection and suppression are reliable.
 
-- [NEW] CLI-generated Supabase migration: `health_check_requests` with agency-scoped read access; constrained statuses, attempt/lease bookkeeping and per-phase results; a protected request RPC that checks membership, billing, paused state, deduplication and cooldown; an insert trigger that queues initial scans atomically with store creation. Users cannot write worker status or read dispatch credentials.
-- [MODIFY] `scripts/setup-monitor-scheduler.sql`: reuse the private `storecare_ops.dispatch_monitor()` and its existing Vault credential through a narrowly scoped internal dispatch path. No GitHub token goes into the web app. Throttle dispatch requests and keep durable requests available to scheduled runs.
-- [NEW] `apps/worker/src/health-check-requests.ts`: claim requests with a lease, run checks in dependency order, save per-check status, record final outcome, recover abandoned leases with bounded retries, and skip stores that became ineligible.
-- [MODIFY] `apps/worker/src/tick.ts`, `apps/worker/src/index.ts`: process requested scans through both worker modes, coordinate execution to avoid overlapping scans, and let normal due-job logic use the resulting fresh timestamps.
-- [NEW] `apps/web/src/app/(app)/stores/[id]/health-check-actions.ts`: authenticated request action using the user-scoped Supabase client; render useful request/cooldown errors without exposing provider responses.
-- [NEW] `apps/web/src/components/health-check-status.tsx`: run button and accessible progress panel; poll only active requests, stop on completion and refresh metrics.
-- [MODIFY] `apps/web/src/app/(app)/stores/[id]/page.tsx`, `apps/web/src/app/globals.css`: place the run control, display latest scan progress/results and show a waiting-for-first-scan state.
-- [MODIFY] `apps/web/src/app/onboarding/plan/page.tsx` and relevant onboarding success copy: explain the queued first scan and baseline behavior without claiming a completed check.
-- [NEW/MODIFY] Worker unit/database tests and web action tests: agency isolation, initial queue creation, duplicate/cooldown races, consent, partial failures, abandoned leases, paused/access changes, and preservation of scheduled monitoring behavior.
-- [MODIFY] `docs/monitoring-operations.md`, `system_architecture.md`, `task.md`: document dispatch, timing, retries, permissions, rollout and checks.
-
-### Rollout and verification
-
-Inspect the live scheduler function and table policies before finalizing the migration. Test queue/RPC security against an isolated database and run relevant worker/web tests, typechecks and the production build. Deploy worker support before enabling live request dispatch/UI; apply the migration and private dispatch wiring, then deploy the app. Verify one user-authorized scan of an existing store through the real button and confirm queued → running → final status, updated monitoring timestamps, and duplicate-click protection. Preserve existing stores and do not manufacture incidents or send client reports to test the feature.
+These later phases require a separate concrete implementation plan after sender choice, storage and campaign behavior are settled. No production account seeding or backdated operational records are needed for the first implementation.

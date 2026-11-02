@@ -1,4 +1,5 @@
 import { QuickReportForm } from './quick-report-form';
+import Link from 'next/link';
 
 export const metadata = { title: 'Quick report · StoreCare HQ admin' };
 // Storefront, SSL, domain, link and PageSpeed checks together take up to about a minute.
@@ -16,6 +17,7 @@ export default function AdminPage() {
         </div>
       </div>
       <QuickReportForm />
+      <Link href="/admin/outreach" className="btn secondary">Prepare agency outreach →</Link>
     </div>
   );
 }

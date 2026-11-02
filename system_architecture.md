@@ -1,5 +1,71 @@
 # Website and app domains
 
+## Admin outreach preparation
+
+### Email testing
+
+The admin outreach page now resolves the signed-in admin email on the server and passes
+only safe sender/recipient readiness information to `EmailComposer`. Demo mode previews only.
+`outreach-email.ts` produces branded HTML and plain text with two hosted report URLs, with
+no email attachments. Standalone report HTML is retained for explicit downloads. Preview and
+sending use the same pure template. Subjects and report references are retained in version-1
+JSON backups; older backups still load. Imported report references are never trusted as approval.
+
+`outreach-delivery.ts` is a server-only provider boundary using Resend for self-addressed tests.
+The actual recipient and reply-to are always the authenticated admin email, regardless of the
+prospect/import data. `OUTREACH_FROM` defaults to StoreCare HQ <support@storecarehq.com> and must
+be verified in Resend. Credentials stay server-side. Each action calls `requireAdmin` independently.
+Approval is an HMAC-signed digest of the rendered provider payload, bound to sender, recipient,
+subject, text and exact report URLs and valid for 15 minutes. Before approval or sending,
+`requireSavedReports` also verifies owner, token hashes, snapshot digest, expiry and revocation.
+Changed report data cannot reuse a saved version or its approval.
+Resend's idempotency key is the payload digest; renewed approvals/retries use identical payloads
+and keys, deduplicated by Resend for 24 hours. This is test-only deduplication, not a durable
+campaign send ledger. Acceptance is displayed separately from confirmed delivery. Unknown
+acceptance permits an explicit same-key retry; no automatic retry occurs. No sends happen on import,
+preview or approval, and a test send never marks an agency contacted. Real agency delivery and
+durable campaign send/suppression state remain later rollout work.
+
+### Hosted outreach report links
+
+`outreach-report-links.ts` publishes immutable report-only snapshots, separate from operational
+stores/work/reports, to `outreach_report_snapshots`. Apply migration
+`20261102135722_outreach_report_links.sql` (applied to the StoreCare HQ database on 2026-11-02).
+Browser roles have no table privileges
+or RLS policies; server actions use the existing service client after `requireAdmin`. The database
+grants the service only insertion, reads and revocation updates; a trigger prevents snapshot changes
+or undoing revocation. Two independent random 32-byte bearer tokens are generated for each bundle;
+only their SHA-256 hashes are stored. Tokens themselves remain in the admin's exportable references.
+
+Public `/outreach/r/<token>` views and `/download` return only the matching report's content,
+with no owner/contact/draft data. Middleware permits only these route shapes without auth and sets
+no-store, noindex and no-referrer headers. Page data is dynamic; both view and download recheck
+30-day expiry and revocation. Download responses use fixed HTML filenames, escaped standalone
+documents, and a restrictive CSP. Save as PDF uses the browser's print dialog. Sample notices remain
+in all renderings. Publishing and revoking are explicit admin actions. Revoke existing links before
+refreshing a linked health check; the next publication creates a new version and clears approval.
+Links use the configured `NEXT_PUBLIC_APP_URL` origin (the production app domain). Demo mode uses
+process-local memory solely for preview/browser testing; it never enables email delivery.
+
+### Prospect preparation
+
+`/admin/outreach` uses the existing admin session gate and `quickReport` server action.
+Prospects, review flags, current scan snapshots, editable drafts and manual outreach statuses
+live in browser memory and can be exported/restored through a versioned JSON backup.
+CSV summaries neutralize spreadsheet formulas. Imports require agency/store/portfolio URLs,
+reject duplicate agency domains or contacts, and are capped at 100 prospects. Each batch
+prepares up to 20 reviewed agencies sequentially; failed checks remain retryable.
+
+`sample-month-report.ts` builds a fictional previous-month report using shared report types.
+It never creates stores, work entries, monitoring history or checkout consent. Screen and
+print views label the sample; measured health checks are a separate view. Drafts use only
+neutral measured PageSpeed observations, not failed-check or revenue claims. Preparing a pack
+sends no email, creates no public report link, and schedules no recurring prospect scans.
+Export a JSON backup before leaving; CSV summaries are not full backups. Agency sending and
+follow-up suppression, durable prospect storage, and directory ingestion are later phases.
+
+## Host routing
+
 Production uses one Next.js deployment on Vercel with two distinct hosts:
 
 - `www.storecarehq.com` (with apex redirect): public landing page regardless of authentication.

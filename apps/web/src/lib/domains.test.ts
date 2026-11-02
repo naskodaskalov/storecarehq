@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
 import { APP_ORIGIN, WEBSITE_ORIGIN, SHARE_IMAGE_PATH, WEBSITE_PAGES, appLink, websiteLink, hostRouting, sessionRouting, authCallbackUrl, isPublicPath } from './domains.ts';
 
+test('outreach report views and downloads are public while admin and other outreach routes stay private', () => {
+  for (const path of ['/outreach/r/' + 'a'.repeat(64), '/outreach/r/' + 'b'.repeat(64) + '/download']) {
+    assert.equal(isPublicPath(path), true);
+    assert.equal(hostRouting('www.storecarehq.com', path), null);
+    assert.equal(sessionRouting('app.storecarehq.com', path, false), null);
+  }
+  for (const path of ['/admin/outreach', '/outreach', '/outreach/r', '/outreach/r/token/secret']) {
+    assert.equal(isPublicPath(path), false);
+    assert.deepEqual(sessionRouting('app.storecarehq.com', path, false), { kind: 'redirect', path: '/login' });
+  }
+});
+
 test('production website is always marketing; application links use the app host', () => {
   for (const host of ['storecarehq.com', 'www.storecarehq.com']) {
     assert.deepEqual(hostRouting(host, '/'), { kind: 'rewrite', url: `${WEBSITE_ORIGIN}/welcome` });
