@@ -1,7 +1,6 @@
 /** Agency details a workspace member can edit on /settings. Mirrors the columns granted for update in
  *  supabase/migrations/20261029000002_billing.sql (plan, trial and billing fields are never editable here). */
 
-export const BANDS = ['1–5', '6–15', '16–40', '40+'] as const;
 export const DEFAULT_BRAND_COLOR = '#2747A8';
 
 export type AgencyProfile = {
@@ -9,10 +8,9 @@ export type AgencyProfile = {
   brandColor: string;
   logoUrl: string | null;
   senderEmail: string | null;
-  band: string | null;
 };
 
-type Input = { name: string; brandColor: string; logoUrl: string; senderEmail: string; band: string };
+type Input = { name: string; brandColor: string; logoUrl: string; senderEmail: string };
 
 export function validateAgencyProfile(input: Input): { ok: true; profile: AgencyProfile } | { ok: false; error: string } {
   const name = input.name.trim();
@@ -41,8 +39,5 @@ export function validateAgencyProfile(input: Input): { ok: true; profile: Agency
   const email = input.senderEmail.trim().toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'That reply-to email does not look right.' };
 
-  const band = input.band.trim();
-  if (band && !(BANDS as readonly string[]).includes(band)) return { ok: false, error: 'Pick how many client stores you look after.' };
-
-  return { ok: true, profile: { name, brandColor: brandColor.toUpperCase(), logoUrl, senderEmail: email || null, band: band || null } };
+  return { ok: true, profile: { name, brandColor: brandColor.toUpperCase(), logoUrl, senderEmail: email || null } };
 }

@@ -17,7 +17,6 @@ export async function saveAgency(formData: FormData) {
     brandColor: str('brand_color'),
     logoUrl: str('logo_url'),
     senderEmail: str('sender_email'),
-    band: str('band'),
   });
   if (!result.ok) back('error=' + encodeURIComponent(result.error));
   const p = result.ok ? result.profile : null!;
@@ -26,7 +25,7 @@ export async function saveAgency(formData: FormData) {
   // RLS lets only workspace owners update the agency; an update that matches no row means not allowed.
   const { data, error } = await supabase
     .from('agencies')
-    .update({ name: p.name, brand_color: p.brandColor, logo_url: p.logoUrl, sender_email: p.senderEmail, stores_band: p.band })
+    .update({ name: p.name, brand_color: p.brandColor, logo_url: p.logoUrl, sender_email: p.senderEmail })
     .eq('id', agency.id)
     .select('id');
   if (error) back('error=' + encodeURIComponent('Could not save your agency details. Please try again.'));

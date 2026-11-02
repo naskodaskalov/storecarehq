@@ -1,6 +1,6 @@
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
-import { BANDS, DEFAULT_BRAND_COLOR } from '@/lib/agency-profile';
+import { DEFAULT_BRAND_COLOR } from '@/lib/agency-profile';
 import { SubmitButton } from '@/components/submit-button';
 import { BrandFields } from './brand-fields';
 import { saveAgency } from './actions';
@@ -10,10 +10,10 @@ export default async function AgencySettings({ searchParams }: { searchParams: P
   const { agency, userId } = await requireAgency();
   const supabase = await supabaseServer();
   const [{ data: details }, { data: membership }] = await Promise.all([
-    supabase.from('agencies').select('name, brand_color, logo_url, sender_email, stores_band').eq('id', agency.id).single(),
+    supabase.from('agencies').select('name, brand_color, logo_url, sender_email').eq('id', agency.id).single(),
     supabase.from('memberships').select('role').eq('agency_id', agency.id).eq('user_id', userId).single(),
   ]);
-  const a = details ?? { name: agency.name, brand_color: agency.brand_color, logo_url: null, sender_email: null, stores_band: null };
+  const a = details ?? { name: agency.name, brand_color: agency.brand_color, logo_url: null, sender_email: null };
   const isOwner = membership?.role === 'owner';
 
   return (
@@ -36,13 +36,6 @@ export default async function AgencySettings({ searchParams }: { searchParams: P
                 <label htmlFor="name">Agency name</label>
                 <input id="name" name="name" type="text" defaultValue={a.name} required maxLength={80} autoComplete="organization" />
                 <span className="small muted">Shown in the app and on every client report.</span>
-              </div>
-              <div className="field">
-                <label htmlFor="band">Client stores you look after</label>
-                <select id="band" name="band" defaultValue={a.stores_band ?? ''}>
-                  <option value="">Not set</option>
-                  {BANDS.map((b) => <option key={b} value={b}>{b} stores</option>)}
-                </select>
               </div>
             </div>
           </section>
