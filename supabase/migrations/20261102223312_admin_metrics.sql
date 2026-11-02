@@ -2,6 +2,7 @@
 -- p_tz is the admin's time zone: "today" starts at local midnight and "week" is the last 7 calendar days, today included.
 -- People are auth users that are neither deleted nor anonymous. Funnel steps count people; a person passes a
 -- workspace step when any workspace they belong to does. Stores and workspaces are counted as they exist now.
+-- Version matches the migration applied to StoreCare HQ on 2026-11-02.
 create or replace function public.admin_metrics(p_tz text default 'UTC') returns jsonb
 language sql stable security definer set search_path = '' as $$
   with bounds as (

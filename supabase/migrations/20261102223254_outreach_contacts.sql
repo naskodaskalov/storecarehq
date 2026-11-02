@@ -4,6 +4,7 @@
 -- Rejected emails are not recorded. An identical email (same recipient, subject, text and report links) is one row:
 -- a retry reuses the provider's duplicate-prevention key, and a confirmed retry upgrades an unconfirmed row.
 -- Server-only, like outreach_report_snapshots: browser roles have no access; the admin pages use the service role.
+-- Version matches the migration applied to StoreCare HQ on 2026-11-02.
 create table public.outreach_contacts (
   id uuid primary key default gen_random_uuid(),
   sent_at timestamptz not null default now(),

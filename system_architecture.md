@@ -38,7 +38,7 @@ Completion, failure and stopping clear queue state without discarding edited dra
 ### Outreach history
 
 `sendOutreachTest` saves every agency email the provider accepted, or whose acceptance is unconfirmed
-after a timeout, to `outreach_contacts` (migration `20261102221500_outreach_contacts.sql`): sender
+after a timeout, to `outreach_contacts` (migration `20261102223254_outreach_contacts.sql`, applied to the StoreCare HQ database on 2026-11-02): sender
 admin, agency name and website domain, contact, store, subject, introduction text, report-links id,
 delivery state and provider message id. Rejected emails and test-mode sends are not saved. The row key
 is the provider payload digest (the same value as Resend's idempotency key), so a retry of the same
@@ -148,7 +148,7 @@ under a row lock. Checkout remains subject to existing consent/devices/product p
 ## Admin overview
 
 `/admin` is the overview; the quick report moved to `/admin/quick-report`. One call to
-`public.admin_metrics(p_tz)` (migration `20261102221600_admin_metrics.sql`, service role only, called
+`public.admin_metrics(p_tz)` (migration `20261102223312_admin_metrics.sql`, applied on 2026-11-02; service role only, called
 after `requireAdmin`) returns sign-ups, stores, workspaces and outreach emails for today, the last 7
 calendar days and in total; subscription counts by plan for MRR and trial pipeline at list prices; the
 onboarding funnel (signed up, confirmed email, workspace, store, trial with card, paying); the 10 newest
