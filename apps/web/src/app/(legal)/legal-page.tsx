@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { WEBSITE_ORIGIN, websiteLink } from '@/lib/domains';
+import { SHARE_IMAGE } from '@/lib/share-image';
 import { Analytics, CookieSettingsLink } from '@/components/analytics';
 import './legal.css';
 
@@ -15,7 +16,8 @@ export function legalMetadata(path: string, title: string, description: string):
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { type: 'website', url: path, siteName: 'StoreCare HQ', title, description, locale: 'en_US' },
+    openGraph: { type: 'website', url: path, siteName: 'StoreCare HQ', title, description, locale: 'en_US', images: [SHARE_IMAGE] },
+    twitter: { card: 'summary_large_image', title, description, images: [SHARE_IMAGE] },
   };
 }
 

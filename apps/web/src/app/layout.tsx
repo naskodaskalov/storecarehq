@@ -8,10 +8,20 @@ import '@fontsource/schibsted-grotesk/700.css';
 import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import './globals.css';
+import { WEBSITE_ORIGIN } from '@/lib/domains';
+import { SHARE_IMAGE } from '@/lib/share-image';
 
+const DESCRIPTION = 'Care-plan monitoring and monthly client reports for Shopify agencies.';
+
+// Defaults for every page, including the app: any link to StoreCare shares with the same preview image.
+// Pages that set their own openGraph or twitter fields must include SHARE_IMAGE too (Next.js replaces
+// those objects rather than merging them).
 export const metadata: Metadata = {
+  metadataBase: new URL(WEBSITE_ORIGIN),
   title: 'StoreCare HQ',
-  description: 'Care-plan monitoring and monthly client reports for Shopify agencies.',
+  description: DESCRIPTION,
+  openGraph: { type: 'website', siteName: 'StoreCare HQ', title: 'StoreCare HQ', description: DESCRIPTION, locale: 'en_US', images: [SHARE_IMAGE] },
+  twitter: { card: 'summary_large_image', title: 'StoreCare HQ', description: DESCRIPTION, images: [SHARE_IMAGE] },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

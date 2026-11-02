@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { appLink, WEBSITE_ORIGIN } from '@/lib/domains';
+import { SHARE_IMAGE } from '@/lib/share-image';
 import { Analytics, CookieSettingsLink } from '@/components/analytics';
 import { StickyHeader } from '../../welcome/sticky-header';
 import { ThemeDetector } from './theme-detector';
@@ -21,8 +22,8 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: PATH },
-  openGraph: { type: 'website', url: PATH, siteName: 'StoreCare HQ', title: 'Shopify Theme Detector', description: DESCRIPTION, locale: 'en_US' },
-  twitter: { card: 'summary', title: 'Shopify Theme Detector', description: DESCRIPTION },
+  openGraph: { type: 'website', url: PATH, siteName: 'StoreCare HQ', title: 'Shopify Theme Detector', description: DESCRIPTION, locale: 'en_US', images: [SHARE_IMAGE] },
+  twitter: { card: 'summary_large_image', title: 'Shopify Theme Detector', description: DESCRIPTION, images: [SHARE_IMAGE] },
 };
 
 const FAQ = [
