@@ -1,11 +1,15 @@
 'use client';
 
-// Google Analytics 4 for the public website, loaded only after the visitor agrees.
-// Nothing is sent to Google before consent (not even cookieless pings), so the banner is a real choice.
-// Needs NEXT_PUBLIC_GA_ID (the "G-…" measurement ID); without it this renders nothing.
+// Website analytics, two layers:
+// - Vercel Web Analytics for every visit: no cookies and no cross-site ID, so it needs no consent.
+//   It only sends data when deployed on Vercel with Web Analytics enabled for the project.
+// - Google Analytics 4, loaded only after the visitor accepts. Nothing is sent to Google before consent
+//   (not even cookieless pings), so the banner is a real choice. Needs NEXT_PUBLIC_GA_ID ("G-…").
 
 import Script from 'next/script';
 import { useEffect, useState } from 'react';
+import { Analytics as VercelAnalytics } from '@vercel/analytics/next';
+import { track as vercelTrack } from '@vercel/analytics';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 const KEY = 'sc_analytics';
@@ -40,8 +44,13 @@ function clearGaCookies() {
   }
 }
 
-/** Sends a custom event when analytics is on; does nothing otherwise. */
+/** Sends a custom event to Vercel, and to Google when the visitor accepted analytics. */
 export function track(name: string, params: Record<string, string | number> = {}) {
+  try {
+    vercelTrack(name, params);
+  } catch {
+    /* analytics must never break the page */
+  }
   const gtag = (window as unknown as { gtag?: Gtag }).gtag;
   if (gtag && readChoice() === 'granted') gtag('event', name, params);
 }
@@ -73,7 +82,6 @@ export function Analytics() {
 
   // Count the actions that matter: trial and sign-in clicks.
   useEffect(() => {
-    if (choice !== 'granted') return;
     const onClick = (e: MouseEvent) => {
       const a = (e.target as Element | null)?.closest?.('a[href]');
       const href = a?.getAttribute('href') ?? '';
@@ -82,9 +90,9 @@ export function Analytics() {
     };
     document.addEventListener('click', onClick);
     return () => document.removeEventListener('click', onClick);
-  }, [choice]);
+  }, []);
 
-  if (!GA_ID || !ready) return null;
+  if (!GA_ID || !ready) return <VercelAnalytics />;
 
   const decide = (next: Choice) => {
     saveChoice(next);
@@ -99,6 +107,7 @@ export function Analytics() {
 
   return (
     <>
+      <VercelAnalytics />
       {choice === 'granted' && (
         <>
           <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
