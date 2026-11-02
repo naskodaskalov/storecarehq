@@ -6,6 +6,7 @@ import { billingState, PLANS } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { currentUserIsAdmin } from '@/lib/admin-session';
 import { supabaseServer } from '@/lib/supabase';
+import { THEME_DETECTOR_PATH, websitePageLink } from '@/lib/domains';
 import { NavLinks, WorkspaceHeader } from './nav-links';
 import { signOut } from '@/app/auth/actions';
 import { SubmitButton } from '@/components/submit-button';
@@ -17,7 +18,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const { count } = await supabase.from('stores').select('id', { count: 'exact', head: true }).eq('agency_id', agency.id);
   const billing = billingState(agency);
   const isAdmin = await currentUserIsAdmin();
-  const path = (await headers()).get('x-pathname') ?? '';
+  const requestHeaders = await headers();
+  const path = requestHeaders.get('x-pathname') ?? '';
+  const themeDetector = websitePageLink(requestHeaders.get('host') ?? '', THEME_DETECTOR_PATH);
   const onBilling = path.startsWith('/billing');
   const onContact = path === '/contact';
   // Trial over and no plan: billing and contact stay available. Data is kept.
@@ -30,7 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <nav className="nav" aria-label="Main">
         <Link href="/" className="brand"><div className="mark">SC</div><span className="brand-name">StoreCare HQ</span></Link>
         <div className="workspace-identity"><span className="nav-caption">Workspace</span><div className="workspace-name">{agency.name}</div></div>
-        <NavLinks isAdmin={isAdmin} />
+        <NavLinks isAdmin={isAdmin} themeDetector={themeDetector} />
         <div className="nav-foot">
           <Link href="/settings" className="nav-account" title="Agency settings" aria-label={`${agency.name}: agency settings`}><span className="account-avatar">{agency.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><div style={{ fontWeight: 600 }}>{agency.name}</div></Link>
           <div className="small muted">

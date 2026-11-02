@@ -14,7 +14,7 @@ const LINKS = [
   { href: '/contact', label: 'Contact', icon: 'mail', match: (p: string) => p === '/contact' },
 ];
 
-export function NavLinks({ isAdmin = false }: { isAdmin?: boolean }) {
+export function NavLinks({ isAdmin = false, themeDetector }: { isAdmin?: boolean; themeDetector?: string }) {
   const path = usePathname();
   const links = isAdmin ? [...LINKS, { href: '/admin', label: 'Admin workspace', icon: 'report', match: (p: string) => p.startsWith('/admin') }] : LINKS;
   return (
@@ -24,6 +24,14 @@ export function NavLinks({ isAdmin = false }: { isAdmin?: boolean }) {
           <Icon name={l.icon as IconName} />{l.label}
         </Link>
       ))}
+      {themeDetector && (
+        <>
+          <span className="nav-caption nav-section">Free tools</span>
+          <a href={themeDetector} target="_blank" rel="noopener" title="Opens the public theme detector in a new tab">
+            <Icon name="search" />Theme detector<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </>
+      )}
     </div>
   );
 }
