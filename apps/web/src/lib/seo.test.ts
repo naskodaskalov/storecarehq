@@ -42,3 +42,9 @@ test('the theme detector is a public website page listed in the sitemap', () => 
   assert.equal(sessionRouting('www.storecarehq.com', '/tools/shopify-theme-detector', false), null);
   assert.equal(shouldNoindex('www.storecarehq.com', '/tools/shopify-theme-detector'), false);
 });
+
+test('the app links to the theme detector on the public website', async () => {
+  const { websitePageLink, THEME_DETECTOR_PATH } = await import('./domains.ts');
+  assert.equal(websitePageLink('app.storecarehq.com', THEME_DETECTOR_PATH), 'https://www.storecarehq.com/tools/shopify-theme-detector');
+  assert.equal(websitePageLink('localhost:3000', THEME_DETECTOR_PATH), '/tools/shopify-theme-detector');
+});

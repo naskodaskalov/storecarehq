@@ -19,6 +19,13 @@ export function appLink(host: string, path: string) {
   return isProductionHost(host) ? `${APP_ORIGIN}${path}` : path;
 }
 
+/** A page of the public website (such as a free tool), linked from wherever the visitor is: the app links to www. */
+export function websitePageLink(host: string, path: string) {
+  return isProductionHost(host) ? `${WEBSITE_ORIGIN}${path}` : path;
+}
+
+export const THEME_DETECTOR_PATH = '/tools/shopify-theme-detector';
+
 export function websiteLink(host: string) {
   return isProductionHost(host) ? WEBSITE_ORIGIN : '/welcome';
 }
