@@ -14,11 +14,12 @@ const LINKS = [
   { href: '/contact', label: 'Contact', icon: 'mail', match: (p: string) => p === '/contact' },
 ];
 
-export function NavLinks() {
+export function NavLinks({ isAdmin = false }: { isAdmin?: boolean }) {
   const path = usePathname();
+  const links = isAdmin ? [...LINKS, { href: '/admin', label: 'Admin: quick report', icon: 'report', match: (p: string) => p.startsWith('/admin') }] : LINKS;
   return (
     <div className="nav-links">
-      {LINKS.map((l) => (
+      {links.map((l) => (
         <Link key={l.href} href={l.href} aria-current={l.match(path) ? 'page' : undefined}>
           <Icon name={l.icon as IconName} />{l.label}
         </Link>
