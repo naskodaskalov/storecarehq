@@ -20,6 +20,7 @@ const scan = (over: Partial<ScanSummary> = {}): ScanSummary => ({
   host: 'ferrocoffee.co',
   responseMs: 412,
   theme: 'Autumn · Dawn 15.0.0',
+  themeDetail: { name: 'Autumn', base: 'Dawn', version: '15.0.0', themeStoreId: 887 },
   apps: ['Klaviyo', 'Hotjar'],
   appCount: 2,
   unknownApps: 0,

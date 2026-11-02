@@ -35,3 +35,10 @@ test('only the public website is indexable, and report links never are', () => {
   assert.equal(shouldNoindex('www.storecarehq.com', '/r/abc'), true);
   assert.equal(shouldNoindex('my-preview.vercel.app', '/welcome'), true);
 });
+
+test('the theme detector is a public website page listed in the sitemap', () => {
+  assert.ok(sitemapXml().includes('<loc>https://www.storecarehq.com/tools/shopify-theme-detector</loc>'));
+  assert.equal(hostRouting('www.storecarehq.com', '/tools/shopify-theme-detector'), null);
+  assert.equal(sessionRouting('www.storecarehq.com', '/tools/shopify-theme-detector', false), null);
+  assert.equal(shouldNoindex('www.storecarehq.com', '/tools/shopify-theme-detector'), false);
+});

@@ -3,7 +3,7 @@ export const WEBSITE_ORIGIN = 'https://www.storecarehq.com';
 /** The landing page's link-preview image, served from the website host like the page itself. */
 export const SHARE_IMAGE_PATH = '/welcome/opengraph-image';
 /** Public pages served on the website host (and readable without an account on the app host). */
-export const WEBSITE_PAGES = ['/privacy', '/terms', '/dpa', '/bot'];
+export const WEBSITE_PAGES = ['/tools/shopify-theme-detector', '/privacy', '/terms', '/dpa', '/bot'];
 /** Read by an external uptime monitor; answers without a session on any host. */
 export const MONITORING_HEALTH_PATH = '/api/health/monitoring';
 
