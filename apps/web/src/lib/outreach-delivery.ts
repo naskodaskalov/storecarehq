@@ -28,6 +28,12 @@ function payloadFor(input: TestEmailInput, c: TestDeliveryConfig) {
   return { from: c.from, to: [to], reply_to: c.adminEmail, subject: email.subject, html: email.html, text: email.text };
 }
 const digestOf = (payload: unknown) => createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+
+/** The recipient and duplicate-prevention digest of the email an approval sends, for the outreach history. */
+export function deliveryFingerprint(input: TestEmailInput, c: TestDeliveryConfig): { digest: string; to: string } {
+  const payload = payloadFor(input, c);
+  return { digest: digestOf(payload), to: payload.to[0] };
+}
 const signature = (data: string, key: string, mode: string) => createHmac('sha256', key).update(`storecare-outreach-${mode}/v2/${data}`).digest('base64url');
 
 export function approveTestDelivery(input: TestEmailInput, c: TestDeliveryConfig, now = Date.now()) {

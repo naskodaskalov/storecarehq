@@ -24,16 +24,32 @@ subject, text and exact report URLs and valid for 15 minutes. Before approval or
 `requireSavedReports` also verifies owner, token hashes, snapshot digest, expiry and revocation.
 Changed report data cannot reuse a saved version or its approval.
 Resend's idempotency key is the payload digest; renewed approvals/retries use identical payloads
-and keys, deduplicated by Resend for 24 hours. This is provider deduplication, not a durable
-campaign send ledger. Acceptance is displayed separately from confirmed delivery. Unknown
-acceptance permits an explicit same-key retry; no automatic retry occurs. No sends happen on import,
-preview or approval. Outreach status remains manually managed. Cold introductions, automated follow-ups
-and durable campaign send/suppression state remain later rollout work.
+and keys, deduplicated by Resend for 24 hours. Acceptance is displayed separately from confirmed
+delivery. Unknown acceptance permits an explicit same-key retry; no automatic retry occurs. No sends
+happen on import, preview or approval. Each accepted (or unconfirmed) send is saved to the outreach
+history below, and an accepted send marks the agency "contacted"; other statuses stay manual.
+Cold introductions, automated follow-ups and suppression lists remain later rollout work.
 
 Preparation now tracks queued/running agencies separately. Dependent composer and report sections
 stay mounted but hidden/inert while their agency is queued/running, replaced with accessible status
 and reduced-motion-aware skeletons. Already completed agencies remain usable during another scan.
 Completion, failure and stopping clear queue state without discarding edited drafts.
+
+### Outreach history
+
+`sendOutreachTest` saves every agency email the provider accepted, or whose acceptance is unconfirmed
+after a timeout, to `outreach_contacts` (migration `20261102221500_outreach_contacts.sql`): sender
+admin, agency name and website domain, contact, store, subject, introduction text, report-links id,
+delivery state and provider message id. Rejected emails and test-mode sends are not saved. The row key
+is the provider payload digest (the same value as Resend's idempotency key), so a retry of the same
+approved email never adds a second row, and a confirmed retry upgrades an unconfirmed one. Browser
+roles have no access; the service role may only read, insert and update the delivery fields. If saving
+fails after a send, the admin sees that the email went out but is missing from the history.
+
+`/admin/outreach` loads the newest 1,000 rows (without message text) into a searchable history panel.
+An agency counts as contacted before when its website domain (ignoring `www.`) or contact email matches
+a saved row: the agency list shows a "Contacted <date>" badge, the agency card and send panel warn
+before writing again, and batch preparation skips it (it can still be prepared on its own).
 
 ### Hosted outreach report links
 
@@ -128,3 +144,15 @@ The store page renders `HealthCheckStatus`. Its authenticated, no-store API read
 status columns. It polls active scans, stops on terminal status/error, and refreshes store metrics
 when work finishes. New request RPCs deduplicate active scans and enforce a five-minute cooldown
 under a row lock. Checkout remains subject to existing consent/devices/product prerequisites.
+
+## Admin overview
+
+`/admin` is the overview; the quick report moved to `/admin/quick-report`. One call to
+`public.admin_metrics(p_tz)` (migration `20261102221600_admin_metrics.sql`, service role only, called
+after `requireAdmin`) returns sign-ups, stores, workspaces and outreach emails for today, the last 7
+calendar days and in total; subscription counts by plan for MRR and trial pipeline at list prices; the
+onboarding funnel (signed up, confirmed email, workspace, store, trial with card, paying); the 10 newest
+sign-ups with their workspace, plan state and store count; last-7-day product activity; and the
+`monitoring_freshness()` result. Days start at midnight in `STORECARE_ADMIN_TIMEZONE` (default
+Europe/Sofia). Deleted and anonymous auth users are excluded; deleted stores and workspaces are not
+counted. Demo mode shows sample numbers.

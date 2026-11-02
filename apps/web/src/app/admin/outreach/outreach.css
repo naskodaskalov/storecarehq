@@ -112,3 +112,25 @@
   .outreach-sample-notice { display: block !important; background: none; border: 2px solid #333; color: #000; }
   .outreach-sample .report-foot { display: none; }
 }
+/* Outreach history: the saved list of sent emails, and "contacted before" notes on agencies. */
+.outreach-contacted { display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 2px 7px; border-radius: 20px; font-size: 10px; line-height: 1.5; color: #916000; background: #fff5dc; }
+.outreach-contacted svg { flex: none; }
+.outreach-previous { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid var(--warn-border); border-radius: 6px; background: var(--warn-bg); color: #5b430b; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.outreach-previous svg { flex: none; margin-top: 2px; color: var(--warn); }
+.outreach-previous ul { margin: 4px 0 0; padding-left: 16px; }
+.outreach-history { display: block; padding: 0; }
+.outreach-history[open] > summary > svg:last-child { transform: rotate(90deg); }
+.outreach-history .outreach-import-content { padding-top: 20px; border-top: 1px solid var(--border); margin: 0 24px; padding-left: 0; padding-right: 0; }
+.outreach-history .table-empty { padding: 20px 0 4px; text-align: left; }
+.outreach-history-search { max-width: 320px; background: white; }
+.outreach-history-table { min-width: 760px; font-size: 12px; }
+.outreach-history-table th { text-transform: none; letter-spacing: 0; font-size: 11px; color: #54687b; padding: 10px 12px; }
+.outreach-history-table td { padding: 12px; vertical-align: top; }
+.outreach-history-table td > strong, .outreach-history-table td > span:not(.status-badge), .outreach-history-table td > a { display: block; }
+.outreach-history-day { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.outreach-history-sub { font-size: 11px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+a.outreach-history-sub { text-decoration: none; }
+a.outreach-history-sub:hover { color: var(--accent); text-decoration: underline; }
+.outreach-history-subject { max-width: 320px; color: var(--text-2); }
+.outreach-history-error { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid var(--warn-border); background: var(--warn-bg); border-radius: 6px; font-size: 12px; color: #5b430b; }
+@media (max-width: 640px) { .outreach-history .outreach-import-content { margin: 0 18px; } .outreach-history-search { max-width: none; } }

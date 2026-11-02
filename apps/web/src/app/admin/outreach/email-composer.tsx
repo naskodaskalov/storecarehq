@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icon';
 import { defaultOutreachSubject, outreachEmail } from '@/lib/outreach-email';
 import type { Pack, ReportLinks } from '@/lib/outreach';
+import { contactDay, type OutreachContact } from '@/lib/outreach-history';
 import { approveOutreachTest, sendOutreachTest, publishOutreachReports, revokeOutreachReports } from './actions';
 
 export type TestSenderInfo = { from: string; to: string; mode: 'agency' | 'test'; ready: boolean; storageReady: boolean; reason: string };
 
-export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }: { pack: Pack; sender: TestSenderInfo; busy: boolean; onSubject: (value: string) => void; onLinks: (value: ReportLinks | undefined) => void; editor: ReactNode }) {
+export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubject, onLinks, onSent, editor }: { pack: Pack; sender: TestSenderInfo; busy: boolean; previous: OutreachContact | null; timeZone: string; onSubject: (value: string) => void; onLinks: (value: ReportLinks | undefined) => void; onSent: (contact: OutreachContact | undefined, accepted: boolean) => void; editor: ReactNode }) {
   const subject = pack.subject ?? defaultOutreachSubject(pack.prospect.agency_name);
   const recipient = sender.mode === 'agency' ? pack.prospect.contact_email.trim() : sender.to;
   const recipientReady = /^[^\s@<>;,\r\n]+@[^\s@<>;,\r\n]+\.[^\s@<>;,\r\n]+$/.test(recipient);
@@ -19,7 +20,8 @@ export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }
   const [tab, setTab] = useState(0);
   const lock = useRef(false);
   const input = { pack, subject };
-  const identity = JSON.stringify(input);
+  // The outreach status is not part of the email: changing it (also automatically after a send) keeps the approval.
+  const identity = JSON.stringify({ ...input, pack: { ...pack, status: undefined } });
   const currentIdentity = useRef(identity);
   currentIdentity.current = identity;
   useEffect(() => { setApproval(null); setSent(false); setMessage(''); }, [identity]);
@@ -39,8 +41,10 @@ export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }
       if (send && approval) {
         const result = await sendOutreachTest(input, approval.token);
         if (original !== currentIdentity.current) return;
-        if (result.state === 'accepted') { setSent(true); setMessage(`Resend accepted the email for ${recipient}. Message ID: ${result.id}. Delivery is not yet confirmed.`); }
-        else setMessage(result.error);
+        const history = result.contact ? (result.contact.delivery === 'accepted' ? ' Saved to the outreach history.' : ' Saved to the outreach history as unconfirmed.') : result.historyError ? ` ${result.historyError}` : '';
+        if (result.state === 'accepted') { setSent(true); setMessage(`Resend accepted the email for ${recipient}. Message ID: ${result.id}. Delivery is not yet confirmed.${history}`); }
+        else setMessage(`${result.error}${result.state === 'unknown' ? history : ''}`);
+        if (result.state !== 'failed') onSent(result.contact, result.state === 'accepted');
       } else {
         const result = await approveOutreachTest(input);
         if (original !== currentIdentity.current) return;
@@ -96,6 +100,7 @@ export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }
     <div className="outreach-send-panel">
     {!sender.ready && <p className="small muted">{sender.reason}</p>}
     {!recipientReady && <p className="error" role="alert">Add a valid contact_email for this agency before approving or sending.</p>}
+    {previous && !sent && <p className="outreach-previous" role="note"><Icon name="alert" size={16} /><span><strong>Already contacted on {contactDay(previous.sent_at, timeZone)}</strong> ({previous.contact_email}). Sending again adds a follow-up to the outreach history.</span></p>}
     <p className="outreach-recipient-confirmation">Recipient: <strong>{recipient || 'Not supplied'}</strong></p>
     <div className="outreach-actions">
       <button type="button" className="btn secondary" disabled={!sender.ready || !recipientReady || !preview || !pack.links || pending || busy || sent} onClick={() => void run(false)}>{pending ? 'Working…' : approval ? 'Renew approval' : 'Approve email'}</button>
