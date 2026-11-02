@@ -48,8 +48,8 @@ checkout configuration without devices, and no eligible stores missing uptime ch
 3. Complete a real browser acceptance journey with the owner: new verified account, sandbox
    Checkout, store setup, work entry, report save/approve, public client link and chosen report
    delivery. No payment, new account password or client-email send was performed in this pass.
-4. Direct report delivery still needs durable delivery records/idempotency to handle ambiguous
-   timeouts safely. Current failure copy warns users to check delivery before resending.
+4. Done (2 November): report emails carry a Resend idempotency key per report version and recipient,
+   so a retry after a timeout cannot deliver twice within 24 hours.
 5. Onboarding writes now fail visibly and can be retried; creating store, plan and routes is
    still multiple writes rather than one database transaction. A transactional onboarding RPC
    is a further hardening option for repeated failures/concurrent requests.

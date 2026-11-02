@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { buildFacts, DEFAULT_SECTIONS, monthPeriod, writeSummary, type Facts, type Sections } from '@storecare/reports';
 import { supabaseServer } from '@/lib/supabase';
 import { loadMonthData } from '@/lib/report-data';
+import { reportEmailKey } from '@/lib/report-email';
 import { persistReportEdit } from '@/lib/report-workflow';
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
@@ -102,7 +103,7 @@ export async function sendReport(formData: FormData) {
   const id = str(formData, 'report');
   const to = str(formData, 'to');
   const supabase = await supabaseServer();
-  const { data: report } = await supabase.from('reports').select('id, status, share_token, summary_text, facts').eq('id', id).single();
+  const { data: report } = await supabase.from('reports').select('id, status, share_token, summary_text, facts, updated_at').eq('id', id).single();
   if (!report) redirect('/reports');
   if (report.status === 'draft') redirect(`/reports/${id}?error=${encodeURIComponent('Approve the report before sending it.')}`);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) redirect(`/reports/${id}?error=${encodeURIComponent('Enter the client email address.')}`);
@@ -118,7 +119,9 @@ export async function sendReport(formData: FormData) {
     let res: Response;
     try { res = await fetch('https://api.resend.com/emails', {
       method: 'POST', signal: AbortSignal.timeout(15_000),
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      // The same report version to the same address is one email: a retry after a timeout returns Resend's
+      // original result instead of sending again (keys are kept for 24 hours).
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'idempotency-key': reportEmailKey(id, report.updated_at, to) },
       body: JSON.stringify({
         from,
         to: [to],
@@ -126,7 +129,10 @@ export async function sendReport(formData: FormData) {
         text: `${report.summary_text ?? ''}\n\nRead the full report: ${link}\n\n${facts.agencyName}`,
       }),
     }); } catch {
-      redirect(`/reports/${id}?error=${encodeURIComponent('The email request timed out or could not be completed. Check delivery before trying again; the message may have been accepted.')}`);
+      redirect(`/reports/${id}?error=${encodeURIComponent('The email request timed out or could not be completed. You can safely try again: the same report is never emailed twice to the same address within a day.')}`);
+    }
+    if (res.status === 409) {
+      redirect(`/reports/${id}?error=${encodeURIComponent('This report is already being sent to that address. Wait a minute and reload; it will not be sent twice.')}`);
     }
     if (!res.ok) {
       redirect(`/reports/${id}?error=${encodeURIComponent(`Email could not be sent (HTTP ${res.status}). Check your email sending configuration and try again.`)}`);
@@ -137,7 +143,7 @@ export async function sendReport(formData: FormData) {
     .eq('id', id).in('status', ['approved', 'sent']).select('id').single();
   if (markError || !marked) redirect(`/reports/${id}?error=${encodeURIComponent(manual
     ? 'Could not record this report as sent. Reload the report and try again.'
-    : 'The email provider accepted the message, but its status could not be saved. Check delivery before sending again.')}`);
+    : 'The email was sent, but its status could not be saved. Sending again is safe: it will not be delivered twice.')}`);
   revalidatePath(`/reports/${id}`);
   revalidatePath('/reports');
   redirect(`/reports/${id}?sent=1`);
