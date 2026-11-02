@@ -6,6 +6,7 @@ import { checkupNote, findings, parseStoreList } from '@/lib/scan-findings';
 import { forgetStore, forgetStores, loadStores, remember, saveStore, STORES_EVENT, whenLabel, type StoreMemory } from '@/lib/store-memory';
 import { storeName } from '@/lib/store-preview';
 import { useBrand, type CheckedStore } from './brand-context';
+import { track } from '@/components/analytics';
 
 const STEPS = ['Reading robots.txt', 'Loading the home page', 'Spotting the theme and apps', 'Reading the product list'];
 /** A store checked less than an hour ago isn't worth a "welcome back". */
@@ -77,6 +78,7 @@ export function StoreScan({ signup }: { signup: string }) {
         setChecked(c);
       }
       setResult(reply);
+      track('store_check', { result: reply.ok ? 'ok' : 'error' });
     } catch {
       setResult({ ok: false, error: 'The check did not finish. Please try again in a moment.' });
     } finally {

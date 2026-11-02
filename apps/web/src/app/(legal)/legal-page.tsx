@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { websiteLink } from '@/lib/domains';
+import { Analytics, CookieSettingsLink } from '@/components/analytics';
 import './legal.css';
 
 export const LEGAL_UPDATED = '2 November 2026';
@@ -37,7 +38,9 @@ export async function LegalPage({ title, intro, children, path }: { title: strin
         <span>© 2026 StoreCare HQ</span>
         <span>Not affiliated with Shopify.</span>
         <Link href={home}>Back to the website</Link>
+        <CookieSettingsLink />
       </footer>
+      <Analytics />
     </div>
   );
 }

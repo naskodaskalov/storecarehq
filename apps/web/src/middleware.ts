@@ -69,5 +69,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico$|icon\\.svg$|apple-icon\\.png$).*)'],
+  // /_vercel/ serves Vercel Web Analytics; it must not be redirected between hosts.
+  matcher: ['/((?!_next/static|_next/image|_vercel/|favicon\\.ico$|icon\\.svg$|apple-icon\\.png$).*)'],
 };
