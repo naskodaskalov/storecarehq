@@ -1,5 +1,7 @@
 import { QuickReportForm } from './quick-report-form';
 import Link from 'next/link';
+import { Icon } from '@/components/icon';
+import './quick-report.css';
 
 export const metadata = { title: 'Quick report · StoreCare HQ admin' };
 // Storefront, SSL, domain, link and PageSpeed checks together take up to about a minute.
@@ -9,15 +11,16 @@ export const dynamic = 'force-dynamic';
 
 export default function AdminPage() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="page-heading">
+    <div className="quick-report-page">
+      <div className="page-heading quick-page-heading no-print">
         <div>
+          <p className="quick-eyebrow">STOREFRONT HEALTH</p>
           <h1>Quick report</h1>
-          <p>Check any Shopify store from the outside without adding it to a workspace. Nothing is saved.</p>
+          <p>A closer look at any Shopify store. One URL, no installation.</p>
         </div>
+        <Link href="/admin/outreach" className="btn secondary"><Icon name="mail" size={16} />Agency outreach<Icon name="arrow" size={15} /></Link>
       </div>
       <QuickReportForm />
-      <Link href="/admin/outreach" className="btn secondary">Prepare agency outreach →</Link>
     </div>
   );
 }

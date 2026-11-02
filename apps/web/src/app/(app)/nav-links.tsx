@@ -16,7 +16,7 @@ const LINKS = [
 
 export function NavLinks({ isAdmin = false }: { isAdmin?: boolean }) {
   const path = usePathname();
-  const links = isAdmin ? [...LINKS, { href: '/admin', label: 'Admin: quick report', icon: 'report', match: (p: string) => p.startsWith('/admin') }] : LINKS;
+  const links = isAdmin ? [...LINKS, { href: '/admin', label: 'Admin workspace', icon: 'report', match: (p: string) => p.startsWith('/admin') }] : LINKS;
   return (
     <div className="nav-links">
       {links.map((l) => (

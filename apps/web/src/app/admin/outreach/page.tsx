@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Icon } from '@/components/icon';
 import { OutreachForm } from './outreach-form';
 import { requireAdmin } from '@/lib/admin-session';
 import { testDeliveryConfig } from '@/lib/outreach-delivery';
@@ -15,10 +15,10 @@ export default async function OutreachPage() {
     reason: config.demo ? 'Demo mode previews only. Sign in to send a test to your own address.' : 'Configure RESEND_API_KEY and a verified OUTREACH_FROM sender to enable test delivery.' };
   return <div className="outreach">
     <header className="outreach-intro no-print">
-      <Link href="/admin">← Quick report</Link>
-      <p className="small muted">ADMIN / GROWTH</p>
-      <h1>Start a useful conversation.</h1>
-      <p>Prepare a real store health check, an illustrative monthly report, and a personal introduction for each agency.</p>
+      <div><p className="outreach-eyebrow">RELATIONSHIPS START HERE</p>
+      <h1>Agency outreach</h1>
+      <p>A useful report. A personal introduction. Your next agency customer.</p></div>
+      <span className="outreach-mode"><Icon name="mail" size={15} />Test delivery</span>
     </header>
     <OutreachForm sender={sender} />
   </div>;
