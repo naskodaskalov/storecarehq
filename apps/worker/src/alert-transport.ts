@@ -1,3 +1,5 @@
+import { alertEmailHtml } from './email-template.ts';
+
 export type Senders = {
   email: (to: string, subject: string, text: string, idempotencyKey?: string) => Promise<void>;
   slack: (webhookUrl: string, text: string) => Promise<void>;
@@ -16,7 +18,7 @@ export const defaultSenders: Senders = {
       method: 'POST', signal: AbortSignal.timeout(15_000),
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json',
         ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
-      body: JSON.stringify({ from: process.env.ALERTS_FROM ?? 'StoreCare HQ <alerts@storecarehq.com>', to: [to], subject, text }),
+      body: JSON.stringify({ from: process.env.ALERTS_FROM ?? 'StoreCare HQ <alerts@storecarehq.com>', to: [to], subject, text, html: alertEmailHtml(subject, text) }),
     });
     if (!res.ok) throw new DeliveryError(`Email provider returned HTTP ${res.status}.`, res.status === 400 || res.status === 422);
   },

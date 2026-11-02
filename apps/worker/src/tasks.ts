@@ -80,6 +80,13 @@ export async function reportTask(db: Db, storeId: string) {
   if (r.created) drafted.push({ agencyId: store.agency_id, storeName: store.name, reportId: r.reportId, periodLabel: period.label, periodStart: period.start });
 }
 
+/** "October 2026 report for Evzento is ready to review", or "3 October 2026 reports…" would read as a date. */
+export function reportDigestSubject(periodLabel: string, storeNames: string[]) {
+  return storeNames.length === 1
+    ? `${periodLabel} report for ${storeNames[0]} is ready to review`
+    : `${periodLabel} reports for ${storeNames.length} stores are ready to review`;
+}
+
 /** "3 reports are ready to review" to each agency's email and Slack routes, whatever their alert level. */
 export async function sendReportDigests(db: Db, items: Drafted[], senders: Senders = defaultSenders): Promise<number> {
   const byAgency = new Map<string, Drafted[]>();
@@ -91,12 +98,11 @@ export async function sendReportDigests(db: Db, items: Drafted[], senders: Sende
       [agencyId],
     );
     const labels = [...new Set(list.map((d) => d.periodLabel))].join(' / ');
-    const n = list.length;
-    const subject = `${n} ${labels} report${n === 1 ? ' is' : 's are'} ready to review`;
+    const subject = reportDigestSubject(labels, list.map((d) => d.storeName));
     const lines = list
       .sort((a, b) => a.storeName.localeCompare(b.storeName))
       .map((d) => `• ${d.storeName}: ${APP()}/reports/${d.reportId}`);
-    const text = `${subject}.\nThey were drafted from last month's checks, changes and work log. Nothing goes to clients until you approve and send.\n\n${lines.join('\n')}\n\nAll reports: ${APP()}/reports?period=${list[0].periodStart.slice(0, 7)}`;
+    const text = `${subject}.\n${list.length === 1 ? 'It was' : 'They were'} drafted from last month's checks, changes and work log.\nNothing goes to clients until you approve and send.\n\n${lines.join('\n')}\n\nAll reports: ${APP()}/reports?period=${list[0].periodStart.slice(0, 7)}`;
     const ids: string[] = [];
     const eventKey = `reports/${createHash('sha256').update(list.map(d => d.reportId).sort().join(',')).digest('hex')}`;
     for (const r of routes) {

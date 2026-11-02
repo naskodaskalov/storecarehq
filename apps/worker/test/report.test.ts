@@ -86,7 +86,7 @@ describe('monthly report drafting (database)', { skip: !db && 'set TEST_DATABASE
     ];
     assert.equal(await sendReportDigests(pool, items, senders), 2);
     assert.equal(out.length, 2);
-    assert.match(out[0] + out[1], /2 October 2026 reports are ready to review/);
+    assert.match(out[0] + out[1], /October 2026 reports for 2 stores are ready to review/);
     assert.match(out[0], /Ferro Coffee: .*\/reports\/r2\n• Juniper & Ash: .*\/reports\/r1/);
     assert.equal(await sendReportDigests(pool, [], senders), 0);
   });

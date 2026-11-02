@@ -122,6 +122,39 @@ export async function runCheckoutOnce(
   return finish('pass');
 }
 
+/** One plain-English reason per distinct failure, for the alert email, store page and dashboard. No final period:
+ *  the app adds its own punctuation after the cause. */
+export function describeCheckoutFailure(failed: Pick<CheckoutResult, 'device' | 'failedStep' | 'detail'>[], handle: string): string {
+  const groups = new Map<string, Device[]>();
+  for (const r of failed) {
+    const reason = failureReason(r.failedStep, r.detail ?? '', handle);
+    groups.set(reason, [...(groups.get(reason) ?? []), r.device]);
+  }
+  return [...groups].map(([reason, devices]) => `${devices.length > 1 ? 'On mobile and desktop' : `On ${devices[0]}`}, ${reason}`).join('. ');
+}
+
+function failureReason(step: StepName | null, detail: string, handle: string): string {
+  const product = `the test product “${handle}”`;
+  const status = /HTTP (\d{3})/.exec(detail)?.[1] ?? /returned (\d{3})/.exec(detail)?.[1];
+  const slow = /timeout|timed out/i.test(detail);
+  switch (step) {
+    case 'home':
+      return slow ? 'the home page took more than 30 seconds to load'
+        : status ? `the home page did not load (the store answered with error ${status})` : 'the home page did not load';
+    case 'product':
+      if (/no available variant/.test(detail)) return `${product} is sold out, so nothing could be added to the basket. Choose an in-stock product under Checkout test in the store’s settings`;
+      if (status === '404') return `${product} was not found. It may have been deleted, hidden or renamed`;
+      return slow ? `the page for ${product} took more than 30 seconds to load`
+        : status ? `the page for ${product} did not load (error ${status})` : `the page for ${product} did not load`;
+    case 'add_to_cart':
+      return status ? `adding ${product} to the basket failed (the store answered with error ${status})` : `adding ${product} to the basket failed`;
+    case 'checkout':
+      return slow ? 'the checkout page took more than 30 seconds to open' : 'the basket did not lead to the checkout page';
+    default:
+      return 'the checkout test stopped before reaching the checkout';
+  }
+}
+
 /** Picks the product to test: the agency's choice, else the first product in the latest snapshot. */
 export async function testHandle(db: Db, store: StoreRow): Promise<string | null> {
   if (store.checkout_product_handle) return store.checkout_product_handle;
@@ -161,7 +194,7 @@ export async function runCheckout(db: Db, store: StoreRow, browser?: Browser) {
   const failed = results.filter((r) => r.result === 'fail');
   let opened: string | null = null;
   if (failed.length) {
-    const cause = failed.map((r) => `${r.device}: ${r.failedStep} — ${r.detail}`).join('; ');
+    const cause = describeCheckoutFailure(failed, handle);
     const ins = await db.query<{ id: string }>(
       `insert into public.incidents (store_id, agency_id, kind, cause) values ($1, $2, 'checkout', $3)
        on conflict (store_id, kind) where resolved_at is null do nothing returning id`,
