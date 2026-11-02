@@ -44,7 +44,7 @@ export async function requireSavedReports(input: TestEmailInput, owner: string, 
   const normalized = validateTestEmail(input), links = normalized.pack.links;
   if (!links) throw new Error('Create report links before approving or sending.');
   const row = await store.byId(links.id);
-  if (!row || row.owner_email !== owner.toLowerCase() || !alive(row, now) || links.origin !== reportOrigin(origin) || links.expiresAt !== row.expires_at || !validToken(links.healthToken) || !validToken(links.sampleToken) || tokenHash(links.healthToken) !== row.health_hash || tokenHash(links.sampleToken) !== row.sample_hash || links.sourceDigest !== row.source_digest || snapshotDigest(buildSnapshot(normalized)) !== row.source_digest) throw new Error('Report links changed, expired, were revoked, or belong to another admin. Create new links and approve again.');
+  if (!row || row.owner_email !== owner.toLowerCase() || !alive(row, now) || links.origin !== reportOrigin(origin) || Date.parse(links.expiresAt) !== Date.parse(row.expires_at) || !validToken(links.healthToken) || !validToken(links.sampleToken) || tokenHash(links.healthToken) !== row.health_hash || tokenHash(links.sampleToken) !== row.sample_hash || links.sourceDigest !== row.source_digest || snapshotDigest(buildSnapshot(normalized)) !== row.source_digest) throw new Error('Report links changed, expired, were revoked, or belong to another admin. Create new links and approve again.');
   return normalized;
 }
 

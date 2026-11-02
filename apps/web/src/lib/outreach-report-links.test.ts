@@ -4,6 +4,7 @@ import { memoryReportStore, publishReportLinks, readPublicReport, requireSavedRe
 import type { TestEmailInput } from './outreach-email.ts';
 import { newPack, validateProspect } from './outreach.ts';
 import type { QuickReport } from './quick-report.ts';
+import { approveTestDelivery, sendApprovedTest } from './outreach-delivery.ts';
 const now = Date.parse('2026-11-02T10:00:00Z'), owner = 'admin@example.com', origin = 'https://app.storecarehq.com';
 function input(): TestEmailInput {
   const pack = newPack(validateProspect({ agency_name: 'North Studio', agency_url: 'north.example.com', client_store_url: 'store.example.com', portfolio_source_url: 'north.example.com/work', contact_email: 'private-prospect@example.com' }));
@@ -36,6 +37,29 @@ test('expired, revoked, malformed and unknown tokens fail for public views and d
   assert.equal(await readPublicReport(links.healthToken, store, now + 1000), null);
   assert.equal(await readPublicReport(links.sampleToken, store, now + 1000), null);
   await assert.rejects(requireSavedReports(value, owner, store, origin, now + 1000), /revoked/);
+});
+test('database timestamp formatting does not invalidate approval; a different expiry still fails', async () => {
+  const rows = new Map<string, SnapshotRow>(), store = memoryReportStore(rows), value = input();
+  const links = await publishReportLinks(value, owner, store, origin, now + 123);
+  value.pack.links = links;
+  const row = rows.get(links.id)!;
+  row.expires_at = row.expires_at.replace('Z', '+00:00');
+  assert.notEqual(row.expires_at, links.expiresAt);
+  assert.equal(Date.parse(row.expires_at), Date.parse(links.expiresAt));
+  const saved = await requireSavedReports(value, owner, store, origin, now + 123);
+  const config = { apiKey: 'test-only-key', from: 'StoreCare HQ <support@storecarehq.com>', adminEmail: owner, demo: false };
+  const approval = approveTestDelivery(saved, config, now + 123);
+  assert.ok(approval.token);
+  let sends = 0;
+  const result = await sendApprovedTest(saved, approval.token, config, async (_url, options) => {
+    sends++;
+    assert.deepEqual(JSON.parse(String(options?.body)).to, [owner]);
+    return Response.json({ id: 'mock-accepted-message' });
+  }, now + 123);
+  assert.equal(result.state, 'accepted');
+  assert.equal(sends, 1);
+  row.expires_at = new Date(Date.parse(links.expiresAt) + 1000).toISOString();
+  await assert.rejects(requireSavedReports(value, owner, store, origin, now + 123), /changed/);
 });
 test('changed reports, other admins and imported/forged references cannot approve saved links', async () => {
   const store = memoryReportStore(), value = input();
