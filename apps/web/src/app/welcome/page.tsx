@@ -10,6 +10,7 @@ import { StoreScan } from './store-scan';
 import { BrandReport } from './brand-report';
 import { LiveLog, type LogLine } from './live-log';
 import { PlanFinder } from './plan-finder';
+import { HeroStory } from './hero-story';
 import { MobileMenu } from './mobile-menu';
 import { BrandProvider } from './brand-context';
 import { SampleReportLink } from './sample-report-link';
@@ -254,6 +255,7 @@ export default async function Landing() {
           <div className="lp-hero-copy">
             <p className="lp-eyebrow">For Shopify freelancers and agencies with care plans</p>
             <h1>Know what changed on every client store before your client does.</h1>
+            <HeroStory />
             <p className="lp-lede">
               StoreCare HQ watches your clients’ stores around the clock and drafts the monthly report that proves your
               care plan is worth it.
