@@ -49,7 +49,8 @@ export default function Terms() {
       <h2>4. Free trial, plans and billing</h2>
       <ul>
         <li>Every first plan starts with a 7-day free trial. We take a card at sign-up and charge nothing until the trial ends. If you cancel during the trial, you pay nothing.</li>
-        <li>After the trial, plans are billed monthly in advance by Stripe, in US dollars. Prices exclude VAT and other taxes, which are added where they apply.</li>
+        <li>After the trial, plans are billed monthly in advance, in US dollars. Prices exclude VAT and other taxes, which are added at checkout where they apply.</li>
+        <li>Payments are handled by Stripe. Where Stripe sells the subscription to you as merchant of record (shown at checkout and on your receipt), Stripe’s terms for that purchase also apply, and Stripe collects and pays the tax and handles payment questions and refunds.</li>
         <li>Plans differ by how many stores you can monitor. You can change plan at any time; changes apply from the next billing period unless the billing page says otherwise.</li>
         <li>If a payment fails, we will remind you. If it stays unpaid, monitoring of your stores pauses until the account is paid up.</li>
         <li>We may change prices with at least 30 days’ notice by email. The new price applies from your next billing period after that.</li>

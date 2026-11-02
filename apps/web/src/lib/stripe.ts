@@ -2,7 +2,7 @@
 // to its agency. Needs STRIPE_SECRET_KEY; the webhook also needs STRIPE_WEBHOOK_SECRET.
 
 import Stripe from 'stripe';
-import { agencyUpdateFromSubscription, lookupKey, PLANS, type PlanKey } from './billing';
+import { agencyUpdateFromSubscription, lookupKey, PLANS, SAAS_TAX_CODE, type PlanKey } from './billing';
 import { supabaseAdmin } from './supabase-admin';
 
 let client: Stripe | null = null;
@@ -25,7 +25,9 @@ export async function priceFor(plan: PlanKey): Promise<string> {
     recurring: { interval: 'month' },
     lookup_key: key,
     transfer_lookup_key: true,
-    product_data: { name: `StoreCare HQ ${p.name}`, metadata: { plan } },
+    // Prices exclude VAT (as the website says); the product's tax code is eligible for Managed Payments.
+    tax_behavior: 'exclusive',
+    product_data: { name: `StoreCare HQ ${p.name}`, tax_code: SAAS_TAX_CODE, metadata: { plan } },
     metadata: { plan },
   });
   return price.id;

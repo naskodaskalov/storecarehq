@@ -100,3 +100,18 @@ export function checkoutTrial(a: Pick<BillingFields, 'stripe_subscription_id'> &
 }
 
 export const formatUsd = (n: number) => `$${n}`;
+
+/** Software as a service, business use: eligible for Stripe Managed Payments and the right US category. */
+export const SAAS_TAX_CODE = 'txcd_10103001';
+
+/** Stripe Managed Payments (Stripe is the merchant of record and handles VAT/sales tax). On when
+ *  STRIPE_MANAGED_PAYMENTS=1, once Managed Payments is active on the Stripe account. */
+export const managedPaymentsEnabled = (env: Record<string, string | undefined> = process.env) => env.STRIPE_MANAGED_PAYMENTS === '1';
+
+/** The tax-related part of a Checkout Session. With Managed Payments, Stripe collects the address, name and
+ *  VAT ID itself and rejects these parameters; without it, Checkout collects them for our invoices. */
+export function checkoutTaxParams(managed: boolean) {
+  return managed
+    ? ({ managed_payments: { enabled: true } } as const)
+    : ({ billing_address_collection: 'auto', customer_update: { name: 'auto', address: 'auto' }, tax_id_collection: { enabled: true } } as const);
+}

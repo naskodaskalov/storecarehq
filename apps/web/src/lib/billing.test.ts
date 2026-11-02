@@ -71,3 +71,13 @@ test('new agency without a plan has no access; first checkout gets 7 days, a ret
   // An account from before card-first sign-up still gets exactly 7 days, not what was left of its old trial.
   assert.deepEqual(checkoutTrial({ ...fresh, trial_ends_at: '2026-11-10T00:00:00Z' }), { trial_period_days: 7 });
 });
+
+test('Managed Payments checkout drops the parameters Stripe rejects; normal checkout keeps them', async () => {
+  const { checkoutTaxParams, managedPaymentsEnabled, SAAS_TAX_CODE } = await import('./billing.ts');
+  assert.deepEqual(checkoutTaxParams(true), { managed_payments: { enabled: true } });
+  const plain = checkoutTaxParams(false);
+  assert.ok('tax_id_collection' in plain && 'customer_update' in plain && !('managed_payments' in plain));
+  assert.equal(managedPaymentsEnabled({ STRIPE_MANAGED_PAYMENTS: '1' }), true);
+  assert.equal(managedPaymentsEnabled({}), false);
+  assert.equal(SAAS_TAX_CODE, 'txcd_10103001');
+});

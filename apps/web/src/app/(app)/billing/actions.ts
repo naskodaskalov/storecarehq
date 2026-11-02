@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import Stripe from 'stripe';
-import { billingState, checkoutTrial, isPlanKey, PLANS, type PlanKey } from '@/lib/billing';
+import { billingState, checkoutTrial, isPlanKey, PLANS, type PlanKey, checkoutTaxParams, managedPaymentsEnabled } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
@@ -88,9 +88,7 @@ async function choose(back: Back, plan: PlanKey) {
       ...(Object.keys(trial).length ? { trial_settings: { end_behavior: { missing_payment_method: 'cancel' as const } } } : {}),
     },
     allow_promotion_codes: true,
-    billing_address_collection: 'auto',
-    customer_update: { name: 'auto', address: 'auto' },
-    tax_id_collection: { enabled: true },
+    ...checkoutTaxParams(managedPaymentsEnabled()),
     success_url: `${APP()}${back}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${APP()}${back}`,
   });
