@@ -65,3 +65,29 @@ test('missing settings and demo mode cannot send; provider errors never claim de
   assert.equal((await sendApprovedTest(input(), approval.token, config, async () => Response.json({}), now)).state, 'unknown');
   assert.equal(testDeliveryConfig(' Owner@Example.com ', { STORECARE_DEMO: '1' }).adminEmail, 'owner@example.com');
 });
+
+test('production sends the requested report to CSV contact_email and keeps replies going to the admin', async () => {
+  const value = input();
+  const live = testDeliveryConfig('owner@example.com', { RESEND_API_KEY: 'fake-test-key', OUTREACH_FROM: config.from });
+  const approval = approveTestDelivery(value, live, now);
+  let calls = 0;
+  const request: typeof fetch = async (_url, options) => {
+    calls++;
+    const payload = JSON.parse(String(options?.body));
+    assert.deepEqual(payload.to, ['prospect@north.example.com']);
+    assert.equal(payload.reply_to, 'owner@example.com');
+    assert.equal(payload.cc, undefined); assert.equal(payload.bcc, undefined);
+    assert.equal(payload.attachments, undefined);
+    return Response.json({ id: 'agency-message-id' });
+  };
+  assert.equal((await sendApprovedTest(value, approval.token, live, request, now)).state, 'accepted');
+  const changed = input(); changed.pack.prospect.contact_email = 'someone-else@example.com';
+  await assert.rejects(sendApprovedTest(changed, approval.token, live, request, now), /changed/);
+  const testApproval = approveTestDelivery(value, config, now);
+  await assert.rejects(sendApprovedTest(value, testApproval.token, live, request, now), /invalid/);
+  assert.equal(calls, 1);
+  const missing = input(); missing.pack.prospect.contact_email = '';
+  assert.throws(() => approveTestDelivery(missing, live, now), /contact_email/);
+  const injected = input(); injected.pack.prospect.contact_email = 'victim@example.com\r\nBcc: other@example.com';
+  assert.throws(() => approveTestDelivery(injected, live, now));
+});

@@ -8,13 +8,13 @@ import { publishReportLinks, reportStore, requireSavedReports, revokeReportLinks
 export async function approveOutreachTest(input: TestEmailInput) {
   const { email } = await requireAdmin();
   try { const saved = await requireSavedReports(input, email, await reportStore()); return { ok: true as const, ...approveTestDelivery(saved, testDeliveryConfig(email)) }; }
-  catch (e) { return { ok: false as const, error: e instanceof Error ? e.message : 'The test could not be approved.' }; }
+  catch (e) { return { ok: false as const, error: e instanceof Error ? e.message : 'The email could not be approved.' }; }
 }
 
 export async function sendOutreachTest(input: TestEmailInput, token: string) {
   const { email } = await requireAdmin();
   try { const saved = await requireSavedReports(input, email, await reportStore()); return await sendApprovedTest(saved, token, testDeliveryConfig(email)); }
-  catch (e) { return { state: 'failed' as const, error: e instanceof Error ? e.message : 'The test could not be sent.' }; }
+  catch (e) { return { state: 'failed' as const, error: e instanceof Error ? e.message : 'The email could not be sent.' }; }
 }
 
 export async function publishOutreachReports(input: TestEmailInput) {

@@ -21,12 +21,15 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
   const [active, setActive] = useState(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [preparing, setPreparing] = useState<number | null>(null);
+  const [queued, setQueued] = useState<number[]>([]);
   const [progress, setProgress] = useState('');
   const [dirty, setDirty] = useState(false);
   const [view, setView] = useState<'health' | 'sample'>('health');
   const running = useRef(false);
   const stop = useRef(false);
   const current = packs[active];
+  const currentLoading = queued.includes(active);
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
     const navigate = (e: MouseEvent) => {
@@ -53,12 +56,15 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
 
   async function prepare(indices: number[]) {
     if (running.current) return;
+    indices = indices.filter(index => packs[index].reviewed && !packs[index].links && !['contacted', 'replied', 'declined'].includes(packs[index].status));
+    if (!indices.length) return;
     running.current = true; stop.current = false; setBusy(true); setError('');
+    setQueued(indices);
     try {
       for (const [n, index] of indices.entries()) {
         if (stop.current) break;
         const p = packs[index];
-        if (!p.reviewed || p.links || ['contacted', 'replied', 'declined'].includes(p.status)) continue;
+        setPreparing(index);
         setProgress(`${n + 1} of ${indices.length}: ${p.prospect.agency_name}`);
         const form = new FormData(); form.set('url', p.prospect.client_store_url); form.set('preparedBy', 'StoreCareHQ');
         try {
@@ -67,8 +73,9 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
           const report = result.report;
           update(index, { report, preparedAt: new Date().toISOString(), status: report.ok ? 'prepared' : 'new', ...(p.draft ? {} : { draft: draftMessage(p.prospect, report) }) });
         } catch { update(index, { report: { ok: false, error: 'The check could not finish. Try again.' } }); }
+        finally { setQueued(remaining => remaining.filter(i => i !== index)); }
       }
-    } finally { running.current = false; setBusy(false); setProgress(''); }
+    } finally { running.current = false; setBusy(false); setPreparing(null); setQueued([]); setProgress(''); }
   }
 
   const eligible = packs.map((p, i) => p.reviewed && !p.links && !p.report?.ok && p.status === 'new' ? i : -1).filter(i => i >= 0).slice(0, 20);
@@ -96,11 +103,11 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
       <p className="small muted outreach-storage-note"><Icon name="clock" size={14} />Your list stays in this tab. Export a backup to keep your progress.</p></div>
     </details>
 
-    {packs.length === 0 && <section className="outreach-empty no-print"><span className="outreach-empty-icon"><Icon name="mail" size={28} /></span><h2>Your next conversation starts here.</h2><p>Add an agency, check a store from its portfolio, and turn the findings into a personal introduction.</p><div className="outreach-empty-steps"><span>01 <strong>Add an agency</strong></span><Icon name="arrow" size={16} /><span>02 <strong>Prepare a report</strong></span><Icon name="arrow" size={16} /><span>03 <strong>Send a test</strong></span></div></section>}
+    {packs.length === 0 && <section className="outreach-empty no-print"><span className="outreach-empty-icon"><Icon name="mail" size={28} /></span><h2>Your next conversation starts here.</h2><p>Add an agency, check a store from its portfolio, and turn the findings into a personal introduction.</p><div className="outreach-empty-steps"><span>01 <strong>Add an agency</strong></span><Icon name="arrow" size={16} /><span>02 <strong>Prepare a report</strong></span><Icon name="arrow" size={16} /><span>03 <strong>Send an email</strong></span></div></section>}
 
     {packs.length > 0 && <>
       <div className="outreach-toolbar no-print">
-        <div className="outreach-stats"><div><span>Agencies</span><strong>{String(packs.length).padStart(2, '0')}</strong></div><div><span>Health checks ready</span><strong>{String(packs.filter(p => p.report?.ok).length).padStart(2, '0')}</strong></div><div><span>Report links created</span><strong>{String(packs.filter(p => p.links).length).padStart(2, '0')}</strong></div></div>
+        <div className="outreach-stats"><div><span>Agencies</span><strong>{String(packs.length).padStart(2, '0')}</strong></div><div><span>Health checks ready</span><strong>{String(packs.filter((p, i) => p.report?.ok && !queued.includes(i)).length).padStart(2, '0')}</strong></div><div><span>Report links created</span><strong>{String(packs.filter(p => p.links).length).padStart(2, '0')}</strong></div></div>
         <div className="outreach-actions">
           <button className="btn" disabled={busy || !eligible.length} onClick={() => void prepare(eligible)}>Prepare reviewed agencies ({eligible.length})</button>
           {busy && <button className="btn secondary" onClick={() => { stop.current = true; }}>Stop after current check</button>}
@@ -112,7 +119,7 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
       <div className="outreach-workspace">
         <aside className="outreach-list no-print" aria-label="Agency list">
           <div className="outreach-list-caption">YOUR AGENCIES <span>{packs.length}</span></div>
-          {packs.map((p, i) => <button key={p.prospect.agency_url} className={active === i ? 'is-active' : ''} aria-pressed={active === i} onClick={() => setActive(i)}><span className="outreach-agency-avatar" aria-hidden="true">{p.prospect.agency_name.slice(0, 1).toUpperCase()}</span><span className="outreach-agency-copy"><strong>{p.prospect.agency_name}</strong><span className="outreach-agency-domain">{new URL(p.prospect.agency_url).hostname.replace(/^www\./, '')}</span><span className={`outreach-status ${p.report?.ok ? 'is-ready' : ''}`}>{p.report && !p.report.ok ? 'Check failed — retry available' : p.status}{p.reviewed ? ' · reviewed' : ' · needs review'}</span></span></button>)}
+          {packs.map((p, i) => <button key={p.prospect.agency_url} className={active === i ? 'is-active' : ''} aria-pressed={active === i} onClick={() => setActive(i)}><span className="outreach-agency-avatar" aria-hidden="true">{p.prospect.agency_name.slice(0, 1).toUpperCase()}</span><span className="outreach-agency-copy"><strong>{p.prospect.agency_name}</strong><span className="outreach-agency-domain">{new URL(p.prospect.agency_url).hostname.replace(/^www\./, '')}</span><span className={`outreach-status ${p.report?.ok && !queued.includes(i) ? 'is-ready' : ''}`}>{queued.includes(i) ? (preparing === i ? 'Preparing reports…' : 'Queued for preparation') : p.report && !p.report.ok ? 'Check failed — retry available' : p.status}{p.reviewed ? ' · reviewed' : ' · needs review'}</span></span></button>)}
         </aside>
         {current && <div className="outreach-detail">
           <section className="card no-print outreach-agency-card">
@@ -126,18 +133,27 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
             <p className="small muted">{current.prospect.contact_name || 'Contact not supplied'} · {current.prospect.contact_email || 'Email not supplied'}</p>
             <label className="outreach-review"><input type="checkbox" disabled={busy} checked={current.reviewed} onChange={e => update(active, { reviewed: e.target.checked })} />I checked the portfolio source and store match. This does not confirm an ongoing client relationship.</label>
             <div className="outreach-actions">
-              <button className="btn" disabled={busy || !current.reviewed || !!current.links || ['contacted', 'replied', 'declined'].includes(current.status)} onClick={() => void prepare([active])}>{current.report?.ok ? 'Refresh health check' : 'Prepare this agency'}</button>
+              <button className="btn" disabled={busy || !current.reviewed || !!current.links || ['contacted', 'replied', 'declined'].includes(current.status)} aria-busy={currentLoading} onClick={() => void prepare([active])}>{currentLoading ? <><span className="spinner" aria-hidden="true" />{preparing === active ? 'Preparing reports…' : 'Queued…'}</> : current.report?.ok ? 'Refresh health check' : 'Prepare this agency'}</button>
               <label className="field">Outreach status<select disabled={busy} value={current.status} onChange={e => update(active, { status: e.target.value as Pack['status'] })}>{['new', 'prepared', 'contacted', 'replied', 'declined'].map(s => <option key={s}>{s}</option>)}</select></label>
             </div>
             <p className="small muted">Public storefront checks only. No recurring monitoring or checkout test is enabled.</p>
             {current.links && <p className="small muted">Revoke the saved report links in the email preview before refreshing this health check.</p>}
           </section>
+          {currentLoading && <div className="outreach-preparing no-print" role="status" aria-live="polite">
+            <section className="card outreach-loading-panel">
+              <div className="outreach-section-heading"><span className="outreach-step"><span className="spinner" aria-hidden="true" /></span><div><p className="outreach-eyebrow">{preparing === active ? 'CHECKING THE STOREFRONT' : 'IN THE QUEUE'}</p><h2>{preparing === active ? `Preparing reports for ${current.prospect.agency_name}` : `Waiting to prepare ${current.prospect.agency_name}`}</h2></div></div>
+              <p className="small muted">{preparing === active ? 'Running the public store checks. Your introduction and report previews will be available when this finishes. This can take about a minute.' : 'Another agency is being checked first. Your reports will start automatically when its check finishes.'}</p>
+              <div className="outreach-loading-grid" aria-hidden="true"><div><div className="skeleton outreach-loading-label" /><div className="skeleton outreach-loading-field" /><div className="skeleton outreach-loading-label" /><div className="skeleton outreach-loading-message" /></div><div className="skeleton outreach-loading-preview" /></div>
+            </section>
+            <section className="card outreach-loading-report" aria-hidden="true"><div className="skeleton outreach-loading-label" /><div className="skeleton outreach-loading-field" /><div className="skeleton outreach-loading-field" /></section>
+          </div>}
+          <div className="outreach-dependent-content" hidden={currentLoading} inert={currentLoading}>
           <section className="card no-print outreach-compose-card">
             <div className="outreach-section-heading"><span className="outreach-step">02</span><div><p className="outreach-eyebrow">MAKE IT PERSONAL</p><h2>Your introduction</h2></div></div>
-            <EmailComposer key={current.prospect.agency_url} pack={current} sender={sender} busy={busy} onSubject={subject => update(active, { subject })} onLinks={links => update(active, { links })} editor={<>
-            <div className="field"><label htmlFor="outreach-draft">Email draft</label><textarea id="outreach-draft" rows={13} disabled={busy} value={current.draft} onChange={e => update(active, { draft: e.target.value })} maxLength={20000} /></div>
+            <EmailComposer key={current.prospect.agency_url} pack={current} sender={sender} busy={currentLoading} onSubject={subject => update(active, { subject })} onLinks={links => update(active, { links })} editor={<>
+            <div className="field"><label htmlFor="outreach-draft">Email draft</label><textarea id="outreach-draft" rows={13} disabled={currentLoading} value={current.draft} onChange={e => update(active, { draft: e.target.value })} maxLength={20000} /></div>
             <div className="outreach-actions"><CopyButton text={current.draft} label="Copy email draft" />
-              <button className="btn secondary" disabled={!current.report?.ok} onClick={() => { if (current.report && (!current.draft || window.confirm('Replace your edited draft with a fresh draft from the current check?'))) update(active, { draft: draftMessage(current.prospect, current.report) }); }}>Regenerate draft</button>
+              <button className="btn secondary" disabled={currentLoading || !current.report?.ok} onClick={() => { if (current.report && (!current.draft || window.confirm('Replace your edited draft with a fresh draft from the current check?'))) update(active, { draft: draftMessage(current.prospect, current.report) }); }}>Regenerate draft</button>
             </div>
             </>} />
           </section>
@@ -157,6 +173,7 @@ export function OutreachForm({ sender }: { sender: TestSenderInfo }) {
             <ReportView facts={sample.facts} summary={sample.summary} sections={DEFAULT_SECTIONS} />
             <p className="outreach-sample-notice">{SAMPLE_NOTICE}</p>
           </section>}
+          </div>
         </div>}
       </div>
     </>}

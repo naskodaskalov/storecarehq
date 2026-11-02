@@ -2,7 +2,7 @@
 
 ## Admin outreach preparation
 
-### Email testing
+### Requested agency report delivery
 
 The admin outreach page now resolves the signed-in admin email on the server and passes
 only safe sender/recipient readiness information to `EmailComposer`. Demo mode previews only.
@@ -11,20 +11,29 @@ no email attachments. Standalone report HTML is retained for explicit downloads.
 sending use the same pure template. Subjects and report references are retained in version-1
 JSON backups; older backups still load. Imported report references are never trusted as approval.
 
-`outreach-delivery.ts` is a server-only provider boundary using Resend for self-addressed tests.
-The actual recipient and reply-to are always the authenticated admin email, regardless of the
-prospect/import data. `OUTREACH_FROM` defaults to StoreCare HQ <support@storecarehq.com> and must
+After the user confirmed that the agency requested the report or opted in, production configuration
+now uses agency delivery through Resend. The actual recipient is validated from the saved input's
+CSV `contact_email`; the reply-to remains the authenticated admin email. The exact recipient is shown
+beside approval/send controls. Missing or invalid contacts cannot be approved or sent. No email is sent
+automatically. Legacy internal test-named helpers remain for compatibility; explicit test configurations
+still target only the admin. Approval signatures and idempotency keys include the delivery mode, so an
+old test approval cannot authorize an agency send. `OUTREACH_FROM` defaults to StoreCare HQ <support@storecarehq.com> and must
 be verified in Resend. Credentials stay server-side. Each action calls `requireAdmin` independently.
 Approval is an HMAC-signed digest of the rendered provider payload, bound to sender, recipient,
 subject, text and exact report URLs and valid for 15 minutes. Before approval or sending,
 `requireSavedReports` also verifies owner, token hashes, snapshot digest, expiry and revocation.
 Changed report data cannot reuse a saved version or its approval.
 Resend's idempotency key is the payload digest; renewed approvals/retries use identical payloads
-and keys, deduplicated by Resend for 24 hours. This is test-only deduplication, not a durable
+and keys, deduplicated by Resend for 24 hours. This is provider deduplication, not a durable
 campaign send ledger. Acceptance is displayed separately from confirmed delivery. Unknown
 acceptance permits an explicit same-key retry; no automatic retry occurs. No sends happen on import,
-preview or approval, and a test send never marks an agency contacted. Real agency delivery and
-durable campaign send/suppression state remain later rollout work.
+preview or approval. Outreach status remains manually managed. Cold introductions, automated follow-ups
+and durable campaign send/suppression state remain later rollout work.
+
+Preparation now tracks queued/running agencies separately. Dependent composer and report sections
+stay mounted but hidden/inert while their agency is queued/running, replaced with accessible status
+and reduced-motion-aware skeletons. Already completed agencies remain usable during another scan.
+Completion, failure and stopping clear queue state without discarding edited drafts.
 
 ### Hosted outreach report links
 

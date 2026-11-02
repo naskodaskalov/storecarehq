@@ -6,10 +6,12 @@ import { defaultOutreachSubject, outreachEmail } from '@/lib/outreach-email';
 import type { Pack, ReportLinks } from '@/lib/outreach';
 import { approveOutreachTest, sendOutreachTest, publishOutreachReports, revokeOutreachReports } from './actions';
 
-export type TestSenderInfo = { from: string; to: string; ready: boolean; storageReady: boolean; reason: string };
+export type TestSenderInfo = { from: string; to: string; mode: 'agency' | 'test'; ready: boolean; storageReady: boolean; reason: string };
 
 export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }: { pack: Pack; sender: TestSenderInfo; busy: boolean; onSubject: (value: string) => void; onLinks: (value: ReportLinks | undefined) => void; editor: ReactNode }) {
   const subject = pack.subject ?? defaultOutreachSubject(pack.prospect.agency_name);
+  const recipient = sender.mode === 'agency' ? pack.prospect.contact_email.trim() : sender.to;
+  const recipientReady = /^[^\s@<>;,\r\n]+@[^\s@<>;,\r\n]+\.[^\s@<>;,\r\n]+$/.test(recipient);
   const [approval, setApproval] = useState<{ token: string; expiresAt: number } | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
@@ -37,7 +39,7 @@ export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }
       if (send && approval) {
         const result = await sendOutreachTest(input, approval.token);
         if (original !== currentIdentity.current) return;
-        if (result.state === 'accepted') { setSent(true); setMessage(`Resend accepted the test for ${sender.to}. Message ID: ${result.id}. Delivery is not yet confirmed.`); }
+        if (result.state === 'accepted') { setSent(true); setMessage(`Resend accepted the email for ${recipient}. Message ID: ${result.id}. Delivery is not yet confirmed.`); }
         else setMessage(result.error);
       } else {
         const result = await approveOutreachTest(input);
@@ -68,9 +70,9 @@ export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }
   }
 
   return <div className="outreach-email">
-    <p className="outreach-test-notice"><Icon name="mail" size={16} /><span><strong>Test delivery</strong> · Only you receive the email. Your agency contact stays off the recipient list.</span></p>
+    <p className="outreach-test-notice"><Icon name="mail" size={16} /><span><strong>{sender.mode === 'agency' ? 'Agency delivery' : 'Test delivery'}</strong> · {sender.mode === 'agency' ? 'Send requested reports to the agency contact from your CSV, after reviewing and approving the email.' : 'Only your admin address receives this email.'}</span></p>
     <div className="outreach-compose-grid"><div className="outreach-compose-settings">
-    <dl className="outreach-sender"><dt>From</dt><dd>{sender.from}</dd><dt>Test recipient / reply-to</dt><dd>{sender.to}</dd><dt>Future agency recipient</dt><dd>{pack.prospect.contact_email || 'Not supplied'}</dd></dl>
+    <dl className="outreach-sender"><dt>From</dt><dd>{sender.from}</dd><dt>To</dt><dd>{recipient || 'Missing contact_email in CSV'}</dd><dt>Reply-to</dt><dd>{sender.to}</dd></dl>
     <label className="field">Subject<input type="text" value={subject} maxLength={200} disabled={pending || busy} onChange={e => onSubject(e.target.value)} /></label>
     {editor}
     <div className="outreach-link-tools"><div><strong>Reports for this introduction</strong><p className="small muted">Share two report links. Recipients can view, download or save them as PDF.</p></div>
@@ -93,12 +95,14 @@ export function EmailComposer({ pack, sender, busy, onSubject, onLinks, editor }
     </div></div>
     <div className="outreach-send-panel">
     {!sender.ready && <p className="small muted">{sender.reason}</p>}
+    {!recipientReady && <p className="error" role="alert">Add a valid contact_email for this agency before approving or sending.</p>}
+    <p className="outreach-recipient-confirmation">Recipient: <strong>{recipient || 'Not supplied'}</strong></p>
     <div className="outreach-actions">
-      <button type="button" className="btn secondary" disabled={!sender.ready || !preview || !pack.links || pending || busy || sent} onClick={() => void run(false)}>{pending ? 'Working…' : approval ? 'Renew approval' : 'Approve test email'}</button>
-      <button type="button" className="btn" disabled={!sender.ready || !approval || pending || busy || sent} onClick={() => void run(true)}><Icon name={sent ? 'check' : 'mail'} size={16} />{sent ? 'Test accepted by Resend' : 'Send approved test email'}</button>
+      <button type="button" className="btn secondary" disabled={!sender.ready || !recipientReady || !preview || !pack.links || pending || busy || sent} onClick={() => void run(false)}>{pending ? 'Working…' : approval ? 'Renew approval' : 'Approve email'}</button>
+      <button type="button" className="btn" disabled={!sender.ready || !recipientReady || !approval || pending || busy || sent} onClick={() => void run(true)}><Icon name={sent ? 'check' : 'mail'} size={16} />{sent ? 'Accepted by Resend' : 'Send approved email'}</button>
     </div>
     {message && <p role="status" aria-live="polite">{message}</p>}
-    <p className="small muted">Editing the subject, introduction or reports clears approval. A test send does not mark the agency as contacted.</p>
+    <p className="small muted">Review the recipient before sending. Editing the recipient, subject, introduction or reports requires fresh approval.</p>
     </div>
   </div>;
 }

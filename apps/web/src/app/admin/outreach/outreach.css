@@ -52,6 +52,17 @@
 .outreach-source-links a { text-decoration: none; font-size: 12px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px; color: var(--text-2); }
 .outreach-source-links a:hover { border-color: var(--accent-mid); color: var(--accent); background: #f0f7f5; }
 .outreach-detail { display: grid; gap: 20px; min-width: 0; }
+.outreach-dependent-content, .outreach-preparing { display: grid; gap: 20px; min-width: 0; }
+.outreach-dependent-content[hidden] { display: none; }
+.outreach-loading-panel > p { margin: 0; max-width: 620px; line-height: 1.7; }
+.outreach-loading-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px; padding-top: 12px; }
+.outreach-loading-grid > div:first-child { display: grid; align-content: start; gap: 14px; }
+.outreach-loading-label { width: 38%; height: 12px; }
+.outreach-loading-field { height: 44px; }
+.outreach-loading-message { height: 180px; }
+.outreach-loading-preview { min-height: 300px; }
+@media (max-width: 640px) { .outreach-loading-grid { grid-template-columns: 1fr; gap: 20px; } .outreach-loading-preview { min-height: 180px; } }
+@media (prefers-reduced-motion: reduce) { .outreach-preparing .skeleton, .outreach-preparing .spinner { animation: none; } }
 .outreach-review { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 14px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); font-size: 12px; color: var(--text-2); line-height: 1.7; }
 .outreach-review input { accent-color: var(--accent); margin-top: 4px; }
 .outreach textarea { width: 100%; height: auto; min-height: 240px; padding: 12px; resize: vertical; font: inherit; font-size: 14px; }
@@ -74,6 +85,7 @@
 .outreach-link-tools .small { margin-top: 6px; font-size: 12px; line-height: 1.7; }
 .outreach-send-panel { display: grid; gap: 14px; padding-top: 20px; border-top: 1px solid var(--border); }
 .outreach-send-panel .small { font-size: 11px; }
+.outreach-recipient-confirmation { font-size: 13px; overflow-wrap: anywhere; }
 .outreach-preview-empty { min-height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px; text-align: center; color: var(--muted); font-size: 12px; }
 .outreach-preview-empty svg { color: var(--accent); }
 .outreach-preview-empty p { max-width: 240px; line-height: 1.7; }
