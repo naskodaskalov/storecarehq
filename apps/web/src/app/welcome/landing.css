@@ -40,12 +40,54 @@
 .lp-feed-item.lp-good { border-left-color: #4fc1b2; }
 .lp-feed-item.lp-good .lp-feed-text { color: #a9eadf; }
 
-/* What it checks: a plain definition list, two columns */
-.lp-watch { max-width: var(--lp-max); margin: 96px auto 0; padding: 0 24px; }
-.lp-checks { margin: 28px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); column-gap: 56px; }
-.lp-checks > div { padding: 18px 0; border-top: 1px solid var(--border-strong); }
-.lp-checks dt { font-weight: 700; font-size: 17px; }
-.lp-checks dd { margin: 6px 0 0; color: var(--text-2); line-height: 1.55; max-width: 46ch; }
+/* What it checks: one store's day on a 24-hour dial, in a full-bleed dark band */
+.lp-watch { margin: 110px 0 0; padding: 88px 24px 80px; background: radial-gradient(1100px 520px at 28% 40%, #12302c 0%, #111317 62%); color: #e9ebee;
+  --uptime: #4fc1b2; --storefront: #8fb4ff; --daily: #f0a35c; }
+.lp-watch-inner { max-width: var(--lp-max); margin: 0 auto; }
+.lp-watch-kicker { color: var(--uptime); font-weight: 700; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 12px; }
+.lp-watch h2 { color: #fff; max-width: 24ch; }
+.lp-dial-wrap { margin-top: 44px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 56px; align-items: center; }
+.lp-dial { margin: 0; }
+.lp-dial svg { width: 100%; max-width: 460px; display: block; margin: 0 auto; overflow: visible; }
+.lp-dial-face { fill: #ffffff06; stroke: #ffffff14; }
+.lp-dial-track { fill: none; stroke: #ffffff12; stroke-width: 1; }
+.lp-ring { transition: opacity .35s ease; }
+.lp-ring.is-quiet { opacity: .28; }
+.lp-ring-uptime line { stroke: #3a414c; stroke-width: 3; stroke-linecap: round; }
+.lp-ring-uptime line.is-done { stroke: var(--uptime); }
+.lp-ring-storefront circle { fill: #2c323c; }
+.lp-ring-storefront circle.is-done { fill: var(--storefront); }
+.lp-ring-daily circle:not(.lp-dial-track) { fill: #2c323c; stroke: #111317; stroke-width: 2; transition: r .25s ease; }
+.lp-ring-daily circle.is-done { fill: var(--daily); }
+.lp-ring-daily circle.is-active { stroke: #fff; }
+.lp-dial-hour { fill: #6f7682; font: 600 12px var(--mono); }
+.lp-dial-hand line { stroke: #fff; stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 0 6px #ffffff88); }
+.lp-dial-hand circle { fill: #fff; }
+.lp-dial-big { fill: #fff; font: 700 54px var(--mono); letter-spacing: -0.04em; }
+.lp-dial-small { fill: #9aa1ad; font-size: 13px; }
+.lp-dial figcaption { margin-top: 18px; text-align: center; color: #9aa1ad; font-size: 14px; line-height: 1.5; }
+.lp-dial figcaption b { color: #fff; font-family: var(--mono); font-weight: 600; }
+
+.lp-dial-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.lp-dial-item { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: grid; grid-template-columns: 14px 1fr auto; column-gap: 12px; align-items: baseline; padding: 12px 14px; border-radius: 10px; border: 1px solid transparent; transition: background .2s, border-color .2s; }
+.lp-dial-item:hover, .lp-dial-item[aria-pressed='true'] { background: #ffffff0b; border-color: #ffffff1c; }
+.lp-dial-item:focus-visible { outline: 3px solid var(--uptime); outline-offset: 2px; }
+.lp-dial-dot { width: 10px; height: 10px; border-radius: 50%; align-self: center; background: var(--uptime); }
+.lp-dial-item.lp-ring-storefront .lp-dial-dot { background: var(--storefront); }
+.lp-dial-item.lp-ring-daily .lp-dial-dot { background: var(--daily); }
+.lp-dial-name { font-weight: 700; font-size: 16px; color: #fff; }
+.lp-dial-when { font: 500 12px var(--mono); color: #8d94a0; }
+.lp-dial-detail { grid-column: 2 / -1; color: #aab0ba; font-size: 14px; line-height: 1.5; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .3s ease, opacity .3s ease, margin .3s ease; }
+.lp-dial-item[aria-pressed='true'] .lp-dial-detail { max-height: 80px; opacity: 1; margin-top: 4px; }
+.lp-dial-caught { margin-top: 18px; padding: 16px 18px; border-radius: 12px; background: #0b0c0f; border: 1px solid #2a2e36; border-left: 3px solid var(--daily); }
+.lp-dial-caught-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #8d94a0; font-weight: 700; }
+.lp-dial-caught-when { display: block; margin-top: 8px; font: 500 13px var(--mono); color: #ffd9b3; }
+.lp-dial-caught p { margin: 4px 0 0; color: #e9ebee; line-height: 1.55; }
+.lp-watch-cta { margin: 48px 0 0; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.lp-watch-cta span { color: #9aa1ad; font-size: 15px; }
+@media (prefers-reduced-motion: reduce) { .lp-ring, .lp-dial-item, .lp-dial-detail, .lp-ring-daily circle { transition: none; } }
+@media (max-width: 900px) { .lp-dial-wrap { grid-template-columns: 1fr; gap: 32px; } .lp-dial svg { max-width: 360px; } }
+@media (max-width: 640px) { .lp-watch { padding: 64px 16px 56px; } .lp-dial-wrap { margin-top: 28px; } .lp-dial-item { grid-template-columns: 12px 1fr; } .lp-dial-when { grid-column: 2; } }
 
 /* How it works: a real sequence, so it is numbered */
 .lp-how { max-width: var(--lp-max); margin: 96px auto 0; padding: 0 24px; }

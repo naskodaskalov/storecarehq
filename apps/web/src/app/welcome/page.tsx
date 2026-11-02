@@ -18,6 +18,7 @@ import { PortfolioCheck } from './portfolio-check';
 import { StickyCta } from './sticky-cta';
 import { StickyHeader } from './sticky-header';
 import { MonthReplay, type ReplayDay, type ReplayEvent } from './month-replay';
+import { WatchDial, type WatchCheck } from './watch-dial';
 import './landing.css';
 
 const TITLE = 'StoreCare HQ: monitoring and monthly reports for Shopify care plans';
@@ -110,6 +111,16 @@ const REPLAY_EVENTS: Record<number, { events: ReplayEvent[]; report: string }> =
 const QUIET_REPORT = 'Counts toward 99.9% uptime and 30 of 31 checkout passes. Nothing to explain, which is the point.';
 const SPEED = [61, 62, 60, 61, 62, 61, 60, 62, 61, 63, 62, 61, 60, 62, 63, 62, 61, 63, 62, 63, 62, 63, 71, 72, 73, 72, 73, 74, 73, 74, 74];
 const REPLAY: ReplayDay[] = SPEED.map((speed, i) => ({ day: i + 1, speed, ...(REPLAY_EVENTS[i + 1] ?? { events: [], report: QUIET_REPORT }) }));
+
+// The six checks on the watch dial, at their real cadence, each with something it caught on the sample stores.
+const CHECKS: WatchCheck[] = [
+  { key: 'uptime', name: 'Uptime and response time', ring: 'uptime', detail: 'An alert by email or Slack after two failures in a row.', caught: { when: 'Juniper & Ash · 26 Oct, 03:30', text: 'One check timed out; the next passed, so no alert. Counted honestly in the report: 99.9% over 1,488 checks.' } },
+  { key: 'theme', name: 'Theme and apps', ring: 'storefront', detail: 'Which theme is live and which apps load on the storefront, and when either changes.', caught: { when: 'Juniper & Ash · 17 Oct, 13:05', text: 'Smile.io appeared on the storefront. The client installed it; it wasn’t in the work log, so it was flagged for you.' } },
+  { key: 'products', name: 'Products and stock', ring: 'storefront', detail: 'New products, price changes and what sold out.', caught: { when: 'Bloom Botanics · 11:40', text: 'Prices changed on 42 products, not in the work log. Worth a quick call before the client asks why sales moved.' } },
+  { key: 'checkout', name: 'Checkout', ring: 'daily', at: 360, detail: 'A test purchase on mobile and desktop that stops before payment. Optional, with your consent.', caught: { when: 'Juniper & Ash · 14 Oct, 06:02', text: 'Mobile checkout stuck at the shipping step after an app update. Alert at 06:04, passing again at 06:31.' } },
+  { key: 'speed', name: 'Speed', ring: 'daily', at: 420, detail: 'Google’s lab score every morning, plus how fast the store loads for real Chrome visitors.', caught: { when: 'Juniper & Ash · 23 Oct, morning', text: 'Mobile score up from 63 to 71 the morning after the image work, lined up against the hours you logged.' } },
+  { key: 'renewals', name: 'Renewals and links', ring: 'daily', at: 480, detail: 'SSL certificate and domain expiry, and broken links from the home page.', caught: { when: 'Ferro Coffee · 18:47', text: 'Domain ferrocoffee.co expires in 14 days. Two weeks’ notice instead of a dark store on renewal day.' } },
+];
 
 // The usual care-plan toolkit, side by side with what replaces it.
 const OLD_WAY = [
@@ -315,15 +326,17 @@ export default async function Landing() {
         </BrandProvider>
 
         <section className="lp-watch" aria-labelledby="watch-title">
-          <h2 id="watch-title">What it checks</h2>
-          <dl className="lp-checks">
-            <div><dt>Uptime and response time</dt><dd>Every 30 minutes. An alert by email or Slack after two failures in a row.</dd></div>
-            <div><dt>Checkout</dt><dd>A daily test purchase on mobile and desktop that stops before payment. Optional, with your consent.</dd></div>
-            <div><dt>Speed</dt><dd>Google’s lab score every morning, plus how fast the store loads for real Chrome visitors.</dd></div>
-            <div><dt>Theme and apps</dt><dd>Which theme is live and which apps load on the storefront, and when either changes.</dd></div>
-            <div><dt>Products and stock</dt><dd>New products, price changes and what sold out.</dd></div>
-            <div><dt>Renewals and links</dt><dd>SSL certificate and domain expiry, and broken links from the home page.</dd></div>
-          </dl>
+          <div className="lp-watch-inner">
+            <div className="lp-watch-head">
+              <p className="lp-watch-kicker">What it checks</p>
+              <h2 id="watch-title">75 checks a day on every client store. You read one line when something’s wrong.</h2>
+            </div>
+            <WatchDial checks={CHECKS} />
+            <p className="lp-watch-cta">
+              <a href={signup} className="btn lp-btn-big">Put your stores on watch</a>
+              <span>7 days free. The first checks run within half an hour.</span>
+            </p>
+          </div>
         </section>
 
         <section id="book" className="lp-book-sec" aria-labelledby="book-title">
