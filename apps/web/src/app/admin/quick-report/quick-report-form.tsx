@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { SubmitButton } from '@/components/submit-button';
 import { CopyButton } from '@/components/copy-button';
-import { quickReport, type QuickReportState } from './actions';
+import { quickReport, type QuickReportState } from '../actions';
 import { Icon } from '@/components/icon';
 
 export function QuickReportForm() {

@@ -11,6 +11,19 @@ export function adminEmails(raw = process.env.STORECARE_ADMIN_EMAILS): Set<strin
   );
 }
 
+/** The time zone admin pages count "today" in and show times in: STORECARE_ADMIN_TIMEZONE (an IANA name such as
+ *  Europe/London), Europe/Sofia when unset, UTC when the name is not a real time zone. */
+export function adminTimezone(raw = process.env.STORECARE_ADMIN_TIMEZONE): string {
+  const tz = raw?.trim() || 'Europe/Sofia';
+  // Names only: Postgres reads a bare offset like "+02:00" with POSIX's inverted sign.
+  if (!/^[A-Za-z][\w+-]*(\/[\w+-]+)*$/.test(tz)) return 'UTC';
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: tz }).resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
+
 /** True when this signed-in email is a configured admin. Only trust emails from the auth session, never from a form. */
 export function isAdminEmail(email: string | null | undefined, raw = process.env.STORECARE_ADMIN_EMAILS): boolean {
   if (!email) return false;

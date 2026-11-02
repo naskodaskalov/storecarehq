@@ -1,6 +1,9 @@
 -- Minimal stand-in for the parts of Supabase the migrations rely on, for local tests only.
 create schema if not exists auth;
-create table if not exists auth.users (id uuid primary key, email text);
+create table if not exists auth.users (
+  id uuid primary key, email text, created_at timestamptz default now(), email_confirmed_at timestamptz,
+  last_sign_in_at timestamptz, deleted_at timestamptz, is_anonymous boolean not null default false
+);
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
