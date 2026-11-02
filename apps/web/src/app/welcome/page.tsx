@@ -9,7 +9,7 @@ import { ContactForm } from '@/components/contact-form';
 import { StoreScan } from './store-scan';
 import { BrandReport } from './brand-report';
 import { LiveLog, type LogLine } from './live-log';
-import { ValueCalculator } from './value-calculator';
+import { PlanFinder } from './plan-finder';
 import { MobileMenu } from './mobile-menu';
 import { BrandProvider } from './brand-context';
 import { SampleReportLink } from './sample-report-link';
@@ -44,9 +44,9 @@ export const metadata: Metadata = {
 };
 
 const PLANS = [
-  { name: 'Solo', price: 29, stores: 5, note: 'For freelancers with a handful of care clients.' },
-  { name: 'Agency', price: 79, stores: 20, note: 'For studios running care plans as a service line.' },
-  { name: 'Pro', price: 149, stores: 50, note: 'For agencies with a full maintenance book.' },
+  { key: 'solo' as const, name: 'Solo', price: 29, stores: 5, note: 'For freelancers with a handful of care clients.' },
+  { key: 'agency' as const, name: 'Agency', price: 79, stores: 20, note: 'For studios running care plans as a service line.' },
+  { key: 'pro' as const, name: 'Pro', price: 149, stores: 50, note: 'For agencies with a full maintenance book.' },
 ];
 
 // What the change log shows, in the product's own words. The first seven are the opening state; the rest tick in live.
@@ -335,14 +335,6 @@ export default async function Landing() {
           <PortfolioCheck signup={signup} />
         </section>
 
-        <section className="lp-value" aria-labelledby="value-title">
-          <div className="lp-value-head">
-            <h2 id="value-title">What a care client is worth to you</h2>
-            <p>Care plans are cancelled quietly, when a client stops seeing what they pay for. Move the sliders.</p>
-          </div>
-          <ValueCalculator signup={signup} />
-        </section>
-
         <section id="how" className="lp-how" aria-labelledby="how-title">
           <h2 id="how-title">How it works</h2>
           <ol className="lp-steps">
@@ -363,20 +355,10 @@ export default async function Landing() {
 
         <section id="pricing" className="lp-pricing" aria-labelledby="pricing-title">
           <div className="lp-pricing-head">
-            <h2 id="pricing-title">Pricing</h2>
-            <p>Every plan includes every check, alerts and white-label reports. Plans differ only by how many stores you look after.</p>
+            <h2 id="pricing-title">Pricing that pays for itself</h2>
+            <p>Every plan includes every check, alerts and white-label reports; plans differ only by how many stores you look after. Tell us about your book and we’ll pick one.</p>
           </div>
-          <div className="lp-plans">
-            {PLANS.map((p) => (
-              <div key={p.name} className={`lp-plan${p.name === 'Agency' ? ' lp-plan-mid' : ''}`}>
-                <h3>{p.name}</h3>
-                <div className="lp-price"><span className="lp-amount">${p.price}</span> a month</div>
-                <div className="lp-stores">Up to {p.stores} stores · {`$${(p.price / p.stores).toFixed(2)}`} per store</div>
-                <p>{p.note}</p>
-                <a href={signup} className={`btn${p.name === 'Agency' ? '' : ' secondary'}`}>Start free trial</a>
-              </div>
-            ))}
-          </div>
+          <PlanFinder plans={PLANS} signup={signup} />
           <p className="lp-fine">Prices in US dollars, excluding VAT. Every plan starts with 7 days free: you add a card when you sign up and aren’t charged until the trial ends. Cancel before then and you pay nothing.</p>
         </section>
 

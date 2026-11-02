@@ -526,3 +526,31 @@ html:has(.lp-head) { scroll-padding-top: 92px; }
 @media (prefers-reduced-motion: reduce) {
   .lp-head { transition: none; }
 }
+
+/* Plan finder: pricing that reacts to the agency's own book */
+.lp-finder { margin-top: 30px; display: grid; gap: 18px; }
+.lp-finder-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 48px; padding: 26px 30px; border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); }
+.lp-plans-live { margin-top: 0; }
+.lp-plans-live .lp-plan { position: relative; transition: background-color .25s ease, opacity .25s ease, box-shadow .25s ease; }
+.lp-plans-live .lp-plan-fit { background: var(--accent-soft); box-shadow: inset 0 4px 0 var(--accent); }
+.lp-plans-live .lp-plan-small { opacity: .55; }
+.lp-plan-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 28px; }
+.lp-fit-badge { font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 999px; padding: 4px 10px; white-space: nowrap; animation: lp-pop .3s ease; }
+.lp-small-note { font-size: 12px; color: var(--muted); }
+@keyframes lp-pop { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+.lp-finder-out { display: grid; grid-template-columns: auto 1fr; gap: 14px 40px; align-items: center; padding: 26px 30px; border-radius: 16px; background: var(--ink); color: #e9ebee; }
+.lp-finder-big span { display: block; color: #b9bfc8; font-size: 14px; }
+.lp-finder-big strong { font-size: clamp(34px, 4vw, 48px); letter-spacing: -0.035em; color: #fff; }
+.lp-finder-big small { font-size: 17px; color: #8d94a0; font-weight: 500; letter-spacing: 0; }
+.lp-finder-out ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.lp-finder-out li { padding-left: 22px; position: relative; line-height: 1.5; color: #d3d7dd; }
+.lp-finder-out li::before { content: ''; position: absolute; left: 0; top: 9px; width: 8px; height: 8px; border-radius: 2px; background: #4fc1b2; }
+.lp-finder-out li strong { color: #fff; }
+.lp-finder-over { grid-column: 1 / -1; margin: 0; color: #d3d7dd; }
+.lp-finder-over a { color: #8fe0d2; }
+.lp-finder .lp-calc-assume { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .lp-fit-badge { animation: none; } .lp-plans-live .lp-plan { transition: none; } }
+@media (max-width: 760px) {
+  .lp-finder-controls { grid-template-columns: 1fr; padding: 22px 18px; }
+  .lp-finder-out { grid-template-columns: 1fr; padding: 22px 18px; }
+}

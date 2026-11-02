@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { billingState, PLAN_KEYS, PLANS, TRIAL_DAYS, type PlanKey } from '@/lib/billing';
+import { cookies } from 'next/headers';
+import { billingState, isPlanKey, PLAN_KEYS, PLANS, TRIAL_DAYS, type PlanKey } from '@/lib/billing';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { confirmCheckout } from '@/lib/stripe';
@@ -22,7 +23,9 @@ export default async function Trial({ searchParams }: { searchParams: Promise<{ 
 
   const supabase = await supabaseServer();
   const { data } = await supabase.from('agencies').select('stores_band').eq('id', agency.id).single();
-  const suggested = SUGGEST[data?.stores_band ?? ''] ?? 'agency';
+  // The plan picked on the pricing section of the website, else one from the size given at sign-up.
+  const picked = (await cookies()).get('sc_plan')?.value;
+  const suggested = isPlanKey(picked) ? picked : SUGGEST[data?.stores_band ?? ''] ?? 'agency';
   const chargeDay = new Date(Date.now() + TRIAL_DAYS * 864e5).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 
   return (
