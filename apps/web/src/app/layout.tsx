@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 // Fonts are bundled with the app (SIL Open Font License), so no page load contacts a font provider.
 import '@fontsource/schibsted-grotesk/400.css';
 import '@fontsource/schibsted-grotesk/500.css';
@@ -10,6 +10,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './globals.css';
 import { WEBSITE_ORIGIN } from '@/lib/domains';
 import { SHARE_IMAGE } from '@/lib/share-image';
+import { NavigationProgress } from '@/components/navigation-progress';
 
 const DESCRIPTION = 'Care-plan monitoring and monthly client reports for Shopify agencies.';
 
@@ -27,7 +28,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

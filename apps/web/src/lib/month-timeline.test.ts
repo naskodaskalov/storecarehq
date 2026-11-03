@@ -85,3 +85,9 @@ test('quiet days say what passed; days after today are future', () => {
   assert.equal(days[20].quiet, 'Still to come.');
   assert.deepEqual(days[20].report, []);
 });
+
+test('work logged without client wording reads by its title, as a full sentence', () => {
+  const base = input();
+  const days = buildTimeline({ ...base, work: [{ id: 'w9', work_date: '2026-10-05', minutes: 30, title: 'Review Meta Ads', client_text: null, counts_to_plan: true, created_at: '2026-10-05T12:00:00Z' }] });
+  assert.deepEqual(days[4].report, ['Work we did (0.5 h, counted against the 10 h plan): “Review Meta Ads”. Shown by its log title; add client wording if it should read differently.']);
+});

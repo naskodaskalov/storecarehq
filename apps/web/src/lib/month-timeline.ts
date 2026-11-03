@@ -152,7 +152,7 @@ export function buildTimeline(i: TimelineInput): TimelineDay[] {
     push(d, { time: sameDay ? clock(w.created_at!, tz) : '', text: `You logged: ${w.title}, ${duration(w.minutes)}`, tone: 'work' }, sameDay ? w.created_at! : null);
     if (w.counts_to_plan || w.client_text?.trim()) {
       const plan = f.work.hoursIncluded !== null ? `counted against the ${f.work.hoursIncluded + f.work.rolledOver} h plan` : 'counted in hours used';
-      note(d, `Work we did (${hours1(w.minutes)} h, ${w.counts_to_plan ? plan : 'not counted against the plan'}): “${w.client_text?.trim() || w.title}”${w.client_text?.trim() ? '' : ' Shown by its log title; add client wording if it should read differently.'}`);
+      note(d, `Work we did (${hours1(w.minutes)} h, ${w.counts_to_plan ? plan : 'not counted against the plan'}): “${w.client_text?.trim() || w.title}”${w.client_text?.trim() ? '' : '. Shown by its log title; add client wording if it should read differently.'}`);
     } else {
       note(d, 'Internal work: stays out of the report.');
     }
