@@ -28,6 +28,13 @@ function document(title: string, kicker: string, content: string, brand = 'Store
 <p style="max-width:500px;margin:24px 0 0;font-size:11px;color:#718581">Prepared with StoreCare HQ · Care made visible.</p></td></tr></table></body></html>`;
 }
 
+/** Turns our own site's address in the (already escaped) draft into a link, e.g. the signature's "storecarehq.com".
+ *  Only storecarehq.com: other domains in the draft (the prospect's stores) are left as written. */
+export function linkOwnSite(escaped: string): string {
+  return escaped.replace(/(?<![@\w./-])((?:https?:\/\/)?(?:www\.)?storecarehq\.com)(?![\w-]|\.\w)/gi, (m) =>
+    `<a href="https://www.storecarehq.com" style="color:#2747a8;text-decoration:underline">${m}</a>`);
+}
+
 export function validateTestEmail(input: unknown): TestEmailInput {
   if (!input || typeof input !== 'object') throw new Error('Invalid email.');
   const raw = input as TestEmailInput;
@@ -55,7 +62,7 @@ export function outreachEmail(input: TestEmailInput): OutreachEmail {
   const urls = links ? { health: `${links.origin}/outreach/r/${links.healthToken}`, sample: `${links.origin}/outreach/r/${links.sampleToken}` } : null;
   const button = (url: string, label: string) => `<p style="margin:0 0 14px"><a href="${esc(url)}" style="display:inline-block;padding:15px 24px;border-radius:7px;background:#2747a8;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold">${label}</a></p>`;
   const buttons = urls ? `<div style="margin:26px 0 8px">${button(urls.health, 'View the health check')}${button(urls.sample, 'Sample monthly report')}</div>` : '<p>Create report links in the admin screen before approving this email.</p>';
-  const paragraphs = pack.draft.split(/\n\s*\n/).filter(Boolean).map(p => `<p style="margin:0 0 18px;font-size:16px;line-height:26px;color:#314c50">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  const paragraphs = pack.draft.split(/\n\s*\n/).filter(Boolean).map(p => `<p style="margin:0 0 18px;font-size:16px;line-height:26px;color:#314c50">${linkOwnSite(esc(p)).replace(/\n/g, '<br>')}</p>`).join('');
   const html = document('', `Prepared for ${pack.prospect.agency_name}`, `${paragraphs}${buttons}<table role="presentation" width="100%"><tr><td bgcolor="#f0f7f5" style="padding:14px 16px;border-left:3px solid #2747a8;font-size:13px;line-height:20px;color:#4a6064">${esc(note)}${links ? ` Links work until ${esc(links.expiresAt.slice(0, 10))}.` : ''}</td></tr></table>`);
   return { subject: `${subject}`, html, text: `${pack.draft}\n\n${urls ? `Health check: ${urls.health}\nSample monthly report: ${urls.sample}\n\n` : 'Create report links before approving.\n\n'}${note}\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
 }

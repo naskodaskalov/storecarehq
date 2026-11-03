@@ -61,3 +61,13 @@ test('default subject names the client store the check was run on', async () => 
   assert.equal(defaultOutreachSubject('North', 'https://www.lullenspa.com'), 'Quick health check on lullenspa.com');
   assert.equal(defaultOutreachSubject('North'), 'A quick health check on one of your client stores');
 });
+
+test('the signature links storecarehq.com, and only our own site', async () => {
+  const { linkOwnSite } = await import('./outreach-email.ts');
+  assert.equal(linkOwnSite('StoreCare HQ · storecarehq.com'), 'StoreCare HQ · <a href="https://www.storecarehq.com" style="color:#2747a8;text-decoration:underline">storecarehq.com</a>');
+  assert.match(linkOwnSite('see https://www.storecarehq.com today'), /<a href="https:\/\/www.storecarehq.com"[^>]*>https:\/\/www.storecarehq.com<\/a> today/);
+  for (const untouched of ['support@storecarehq.com', 'app.storecarehq.com/r/x', 'lullenspa.com', 'mystorecarehq.com', 'storecarehq.company'])
+    assert.equal(linkOwnSite(untouched), untouched, untouched);
+  const value = input(); value.pack.draft = 'Hi,\n\nNasko\nStoreCare HQ · storecarehq.com';
+  assert.match(outreachEmail(value).html, /StoreCare HQ · <a href="https:\/\/www.storecarehq.com"[^>]*>storecarehq.com<\/a>/);
+});
