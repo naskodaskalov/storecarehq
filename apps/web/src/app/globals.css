@@ -804,8 +804,13 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
 .tl-box { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .tl-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .tl-months { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; }
-.tl-months a, .tl-month-off { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--border-strong); border-radius: 8px; text-decoration: none; color: var(--text); font-size: 18px; line-height: 1; }
-.tl-months a:hover { background: var(--bg); }
+.tl-months button, .tl-month-off { background: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--border-strong); border-radius: 8px; text-decoration: none; color: var(--text); font-size: 18px; line-height: 1; }
+.tl-months button:hover:not(:disabled) { background: var(--bg); }
+.tl-months button:disabled { cursor: default; opacity: .5; }
+.tl-month-off { cursor: default; }
+.tl-loading { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.tl-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-strong); border-top-color: var(--accent); animation: spin .7s linear infinite; }
+.tl-box.is-loading .tl-strip, .tl-box.is-loading .tl-legend, .tl-box.is-loading .tl-day-detail { opacity: .35; pointer-events: none; transition: opacity .15s; }
 .tl-month-off { color: var(--border-strong); }
 .tl-play { background: var(--text); color: #fff; border: 0; border-radius: 99px; padding: 7px 15px 7px 13px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
 .tl-play::before { content: ''; width: 0; height: 0; border-left: 8px solid currentColor; border-block: 5px solid transparent; }

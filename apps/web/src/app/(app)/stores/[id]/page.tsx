@@ -9,7 +9,7 @@ import { daysUntil, isOutOfStock, type ProductLite } from '@storecare/storefront
 import { HealthCheckStatus, type HealthCheck } from '@/components/health-check-status';
 import { Icon } from '@/components/icon';
 import { MonthTimeline } from '@/components/month-timeline';
-import { buildFacts, defaultReportPeriod, monthPeriod, periodRange, previousPeriod, type Period } from '@storecare/reports';
+import { buildFacts, monthPeriod, periodRange, previousPeriod, type Period } from '@storecare/reports';
 import { loadMonthData } from '@/lib/report-data';
 import { buildTimeline, type TimelineDay } from '@/lib/month-timeline';
 
@@ -97,9 +97,9 @@ export default async function StorePage({ params, searchParams }: { params: Prom
   const lastRun = runList.at(-1);
   const apps = (snap?.apps ?? []) as { key: string; name: string; known: boolean }[];
 
-  // The month view: by default the month the next report covers, so the days line up with that report.
+  // The month view opens on the current month; ?month=YYYY-MM shows an earlier one.
   const current = monthPeriod(new Date().toISOString().slice(0, 10));
-  const period = month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && `${month}-01` <= current.start ? monthPeriod(month) : defaultReportPeriod();
+  const period = month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && `${month}-01` <= current.start ? monthPeriod(month) : current;
   const timeline = await monthTimeline(supabase, id, store.timezone, period).catch(() => null);
   const monthHref = (p: Period) => `/stores/${id}?${filter !== 'all' ? `filter=${encodeURIComponent(filter)}&` : ''}month=${p.start.slice(0, 7)}#month`;
   const nextPeriod = monthPeriod(period.end);
