@@ -12,18 +12,20 @@ function input() {
   return { pack, subject: 'A sample report' };
 }
 
-test('branded email has two report CTAs, fallback links and separate downloadable documents', () => {
+test('plain personal email has two report links, one short note and separate downloadable documents', () => {
   const email = outreachEmail(input());
   assert.equal(email.subject, 'A sample report');
   assert.match(email.html, /max-width:560px/);
-  assert.match(email.html, /\[if mso\]/);
-  assert.match(email.html, /href="https:\/\/www.storecarehq.com"/);
-  assert.match(email.html, /View store health check/);
-  assert.match(email.html, /View sample monthly report/);
+  assert.doesNotMatch(email.html, /<h1|Make your Shopify care work visible|Prepared for/);
+  assert.match(email.html, /View the health check/);
+  assert.match(email.html, /Sample monthly report/);
+  assert.equal((email.html.match(/example data/g) ?? []).length, 1);
+  assert.doesNotMatch(email.html, />https:\/\/app\.storecarehq\.com\/outreach/);
   assert.ok(email.text.includes(`/outreach/r/${'a'.repeat(64)}`));
   assert.ok(email.text.includes(`/outreach/r/${'b'.repeat(64)}`));
   assert.doesNotMatch(email.html, /reports are attached/);
-  assert.match(email.text, /fictional monitoring data/);
+  assert.match(email.text, /The sample report uses example data/);
+  assert.match(email.text, /Reply "no"/);
   assert.equal(email.documents.length, 2);
   assert.match(email.documents[0].html, /2026-11-02T10:00:00Z/);
   assert.doesNotMatch(email.documents[0].html, /Uptime: 100%|fictional store/);
@@ -35,10 +37,8 @@ test('all user content is escaped in email and report documents', () => {
   const value = input();
   if (value.pack.report?.ok) value.pack.report.sections[0].items[0].text = '<img src=x onerror=alert(1)>';
   const email = outreachEmail(value);
-  for (const html of [email.html, ...email.documents.map(d => d.html)]) {
-    assert.doesNotMatch(html, /<script>|<img src=x/);
-    assert.match(html, /North &lt;Studio&gt;/);
-  }
+  for (const html of [email.html, ...email.documents.map(d => d.html)]) assert.doesNotMatch(html, /<script>|<img src=x|North <Studio>/);
+  for (const doc of email.documents) assert.match(doc.html, /North &lt;Studio&gt;/);
   assert.match(email.html, /&lt;script&gt;/);
 });
 test('unreviewed, failed, empty or oversized drafts and injected subject headers cannot be approved', () => {
@@ -48,4 +48,10 @@ test('unreviewed, failed, empty or oversized drafts and injected subject headers
   assert.throws(() => validateTestEmail({ ...value, pack: { ...value.pack, report: { ok: false, error: 'blocked' } } }), /successful/);
   assert.throws(() => validateTestEmail({ ...value, pack: { ...value.pack, draft: ' ' } }), /introduction/);
   assert.throws(() => validateTestEmail({ ...value, pack: { ...value.pack, draft: 'x'.repeat(20001) } }));
+});
+
+test('default subject names the client store the check was run on', async () => {
+  const { defaultOutreachSubject } = await import('./outreach-email.ts');
+  assert.equal(defaultOutreachSubject('North', 'https://www.lullenspa.com'), 'Quick health check on lullenspa.com');
+  assert.equal(defaultOutreachSubject('North'), 'A quick health check on one of your client stores');
 });
