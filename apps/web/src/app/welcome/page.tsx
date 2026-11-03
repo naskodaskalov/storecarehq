@@ -183,6 +183,7 @@ function sampleFacts() {
     changes: [
       { occurred_at: '2026-10-02T09:14:00Z', kind: 'theme_published', summary: 'New live theme: “Dawn – Autumn”', risky: true, work_entry_id: 'w1' },
       { occurred_at: '2026-10-17T13:05:00Z', kind: 'app_added', summary: 'Smile.io added', risky: false, work_entry_id: null },
+      { occurred_at: '2026-10-22T11:10:00Z', kind: 'app_removed', summary: 'Two unused apps removed', risky: false, work_entry_id: 'w3' },
     ],
     work: [
       { id: 'w1', work_date: '2026-10-02', minutes: 150, title: 'Autumn theme', client_text: 'Launched the autumn homepage and collections.', counts_to_plan: true },
@@ -191,6 +192,9 @@ function sampleFacts() {
     ],
     apps: [],
     previousMonthMinutes: 480,
+    stock: { products: 46, outOfStock: 2 },
+    quality: { fieldLcpMs: 2300, fieldInpMs: 180, fieldCategory: 'AVERAGE', seo: 92, accessibility: 88 },
+    site: { sslExpiresAt: '2027-01-09T00:00:00Z', domainExpiresAt: '2027-08-14T00:00:00Z', domain: 'juniperandash.com', pagesChecked: 24, broken: [] },
     asOf: '2026-11-01T00:00:00Z',
   };
   return buildFacts(data);
@@ -279,7 +283,7 @@ export default async function Landing() {
               <a href={signup}>Or start your 7-day free trial →</a> From $29 a month. No Shopify access, no app to install.
             </p>
           </div>
-          <BrandReport facts={facts} summary={templateSummary(facts)} sections={{ ...DEFAULT_SECTIONS, changes: false, site: false }} />
+          <BrandReport facts={facts} summary={templateSummary(facts)} sections={DEFAULT_SECTIONS} />
         </section>
 
         <section className="lp-oldway" aria-labelledby="oldway-title">
