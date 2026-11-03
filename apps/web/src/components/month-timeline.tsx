@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useTransition, type KeyboardEvent } from 'react';
 import type { TimelineDay } from '@/lib/month-timeline';
+import { announceNavigation } from '@/components/navigation-progress';
 
 /** One store's month, day by day, ending in the page the client reads. Arrow keys, tap, or play. */
 export function MonthTimeline({
@@ -27,13 +29,21 @@ export function MonthTimeline({
 }) {
   const past = days.filter((d) => !d.future);
   const lastIndex = Math.max(0, past.length - 1);
-  // Open on the latest day something happened, so the page starts on news rather than a quiet day.
-  const [sel, setSel] = useState(() => {
-    for (let n = lastIndex; n >= 0; n--) if (days[n].events.length) return n;
-    return lastIndex;
-  });
+  // Open on today (the last day so far); an earlier month opens on its last day.
+  const [sel, setSel] = useState(lastIndex);
   const [playing, setPlaying] = useState(false);
+  const [played, setPlayed] = useState(false); // a playback reached the end: offer a replay
   const strip = useRef<HTMLDivElement>(null);
+  // Another month is a server round trip: keep this one on screen, dimmed, until the new one arrives.
+  const router = useRouter();
+  const [loading, startLoading] = useTransition();
+  const [target, setTarget] = useState<'prev' | 'next' | null>(null);
+  function openMonth(href: string, which: 'prev' | 'next') {
+    setPlaying(false);
+    setTarget(which);
+    announceNavigation();
+    startLoading(() => router.push(href, { scroll: false }));
+  }
   const scores = past.map((d) => d.speed).filter((s): s is number => s !== null);
   const max = Math.max(...scores, 1);
   const min = Math.min(...scores, max);
@@ -44,6 +54,7 @@ export function MonthTimeline({
       setSel((s) => {
         if (s >= lastIndex) {
           setPlaying(false);
+          setPlayed(true);
           return s;
         }
         return s + 1;
@@ -72,15 +83,24 @@ export function MonthTimeline({
 
   const d = days[sel];
   return (
-    <div className="tl-box">
+    <div className={`tl-box${loading ? ' is-loading' : ''}`} aria-busy={loading}>
       <div className="tl-top">
         <div className="tl-months">
-          <Link href={prevHref} scroll={false} aria-label="Previous month">‹</Link>
+          <button type="button" onClick={() => openMonth(prevHref, 'prev')} disabled={loading} aria-label="Previous month">‹</button>
           <strong>{label}</strong>
-          {nextHref ? <Link href={nextHref} scroll={false} aria-label="Next month">›</Link> : <span aria-hidden="true" className="tl-month-off">›</span>}
+          {nextHref ? (
+            <button type="button" onClick={() => openMonth(nextHref, 'next')} disabled={loading} aria-label="Next month">›</button>
+          ) : (
+            <span aria-hidden="true" className="tl-month-off">›</span>
+          )}
+          {loading && (
+            <span className="tl-loading" role="status">
+              <span className="tl-spinner" aria-hidden="true" />Loading {target === 'next' ? 'next' : 'previous'} month…
+            </span>
+          )}
         </div>
-        <button type="button" className="tl-play" onClick={play} aria-pressed={playing} disabled={past.length < 2}>
-          {playing ? 'Pause' : sel >= lastIndex ? 'Replay the month' : 'Play the month'}
+        <button type="button" className="tl-play" onClick={play} aria-pressed={playing} disabled={past.length < 2 || loading}>
+          {playing ? 'Pause' : played && sel >= lastIndex ? 'Replay the month' : 'Play the month'}
         </button>
       </div>
 
