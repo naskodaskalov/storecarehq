@@ -8,8 +8,12 @@ import { SubmitButton } from '@/components/submit-button';
 import { daysUntil, isOutOfStock, type ProductLite } from '@storecare/storefront';
 import { HealthCheckStatus, type HealthCheck } from '@/components/health-check-status';
 import { Icon } from '@/components/icon';
+import { MonthTimeline } from '@/components/month-timeline';
+import { buildFacts, defaultReportPeriod, monthPeriod, periodRange, previousPeriod, type Period } from '@storecare/reports';
+import { loadMonthData } from '@/lib/report-data';
+import { buildTimeline, type TimelineDay } from '@/lib/month-timeline';
 
-type Search = { filter?: string; welcome?: string; change?: string };
+type Search = { filter?: string; welcome?: string; change?: string; month?: string };
 
 async function enableCheckout(formData: FormData) {
   'use server';
@@ -21,7 +25,7 @@ async function enableCheckout(formData: FormData) {
 
 export default async function StorePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const { id } = await params;
-  const { filter = 'all', welcome, change } = await searchParams;
+  const { filter = 'all', welcome, change, month } = await searchParams;
   const supabase = await supabaseServer();
 
   const { data: store } = await supabase
@@ -93,6 +97,13 @@ export default async function StorePage({ params, searchParams }: { params: Prom
   const lastRun = runList.at(-1);
   const apps = (snap?.apps ?? []) as { key: string; name: string; known: boolean }[];
 
+  // The month view: by default the month the next report covers, so the days line up with that report.
+  const current = monthPeriod(new Date().toISOString().slice(0, 10));
+  const period = month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && `${month}-01` <= current.start ? monthPeriod(month) : defaultReportPeriod();
+  const timeline = await monthTimeline(supabase, id, store.timezone, period).catch(() => null);
+  const monthHref = (p: Period) => `/stores/${id}?${filter !== 'all' ? `filter=${encodeURIComponent(filter)}&` : ''}month=${p.start.slice(0, 7)}#month`;
+  const nextPeriod = monthPeriod(period.end);
+
   return (
     <div className="store-details">
       <Link href="/#client-stores" className="store-back"><Icon name="arrow" size={15} style={{ transform: 'rotate(180deg)' }} />Client stores</Link>
@@ -121,7 +132,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
       </header>
 
       <nav className="store-section-nav" aria-label="Store sections">
-        <a href="#store-overview">Overview</a><a href="#site-checks">Site checks</a><a href="#change-feed">Change feed</a><a href="#checkout-test">Checkout</a>
+        <a href="#store-overview">Overview</a><a href="#month">Month</a><a href="#site-checks">Site checks</a><a href="#change-feed">Change feed</a><a href="#checkout-test">Checkout</a>
       </nav>
 
       {store.status === 'paused' && (
@@ -179,6 +190,27 @@ export default async function StorePage({ params, searchParams }: { params: Prom
       </section>
 
       <HealthCheckStatus key={id} storeId={id} initial={scan.data as HealthCheck | null} initialTime={Date.now()} paused={store.status === 'paused'} unavailable={!!scan.error} />
+
+      <section className="store-month" id="month" aria-labelledby="month-title">
+        <div className="store-section-heading">
+          <h2 id="month-title">{period.label.split(' ')[0]}, day by day</h2>
+          <span className="small muted">Every check, change and hour logged, and where each day lands in the report.</span>
+        </div>
+        {timeline ? (
+          <MonthTimeline
+            key={period.start}
+            days={timeline}
+            storeId={id}
+            month={period.label.split(' ')[0]}
+            label={period.label}
+            prevHref={monthHref(previousPeriod(period))}
+            nextHref={nextPeriod.start <= current.start ? monthHref(nextPeriod) : null}
+            monthParam={period.start.slice(0, 7)}
+          />
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>This month&apos;s data could not be loaded. Please refresh the page to try again.</p>
+        )}
+      </section>
 
       <div className="store-detail-grid">
         <div className="store-detail-primary">
@@ -346,6 +378,39 @@ export default async function StorePage({ params, searchParams }: { params: Prom
       </div>
     </div>
   );
+}
+
+type Client = Awaited<ReturnType<typeof supabaseServer>>;
+
+/** The store's month for the day-by-day view: the report's facts plus the raw rows behind them. */
+async function monthTimeline(supabase: Client, storeId: string, timeZone: string, period: Period): Promise<TimelineDay[] | null> {
+  const data = await loadMonthData(supabase, storeId, period);
+  if (!data) return null;
+  // A day in the store's time zone can start before the UTC month does; widen by a day either side.
+  const { from, to } = periodRange(period);
+  const lo = new Date(Date.parse(from) - 864e5).toISOString();
+  const hi = new Date(Date.parse(to) + 864e5).toISOString();
+  const [changes, opened, resolved, runs, speed, work] = await Promise.all([
+    supabase.from('changes').select('id, occurred_at, kind, summary, risky, work_entry_id, work_entries(title)').eq('store_id', storeId).gte('occurred_at', lo).lt('occurred_at', hi).order('occurred_at').limit(500),
+    supabase.from('incidents').select('id, kind, opened_at, resolved_at, cause, client_note').eq('store_id', storeId).gte('opened_at', lo).lt('opened_at', hi),
+    supabase.from('incidents').select('id, kind, opened_at, resolved_at, cause, client_note').eq('store_id', storeId).gte('resolved_at', lo).lt('resolved_at', hi),
+    supabase.from('checkout_runs').select('ran_at, result, device, failed_step').eq('store_id', storeId).gte('ran_at', lo).lt('ran_at', hi).order('ran_at').limit(500),
+    supabase.from('speed_samples').select('sampled_at, performance_score').eq('store_id', storeId).eq('page', 'home').gte('sampled_at', lo).lt('sampled_at', hi).order('sampled_at').limit(200),
+    supabase.from('work_entries').select('id, work_date, minutes, title, client_text, counts_to_plan, created_at').eq('store_id', storeId).gte('work_date', period.start).lt('work_date', period.end).order('work_date').limit(500),
+  ]);
+  if ([changes, opened, resolved, runs, speed, work].some((r) => r.error)) return null;
+  const incidents = new Map([...(opened.data ?? []), ...(resolved.data ?? [])].map((i) => [i.id, i]));
+  return buildTimeline({
+    period,
+    timeZone,
+    now: new Date(),
+    facts: buildFacts(data),
+    changes: (changes.data ?? []).map((c) => ({ ...c, work_title: (c.work_entries as unknown as { title: string } | null)?.title ?? null })),
+    incidents: [...incidents.values()],
+    runs: runs.data ?? [],
+    speed: speed.data ?? [],
+    work: work.data ?? [],
+  });
 }
 
 const KIND_LABEL: Record<string, string> = {

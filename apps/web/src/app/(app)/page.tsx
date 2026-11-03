@@ -1,14 +1,16 @@
 import Link from 'next/link';
-import { dashboard, requireAgency } from '@/lib/data';
+import { activity, dashboard, requireAgency } from '@/lib/data';
 import { host, hours, when, monthStartLabel } from '@/lib/format';
 import { Icon } from '@/components/icon';
 import { StoreTable } from '@/components/store-table';
+import { ActivityLog } from '@/components/activity-log';
+import { activityLines } from '@/lib/activity';
 import { briefHeadline, briefItems, monthProgress, pace } from '@/lib/dashboard-brief';
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   const { deleted } = await searchParams;
   const { agency } = await requireAgency();
-  const d = await dashboard(agency.id);
+  const [d, log] = await Promise.all([dashboard(agency.id), activity(agency.id)]);
   const deletedNotice = deleted ? (
     <div className="notice" role="status" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>
       {deleted} was deleted.
@@ -119,6 +121,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <div className="brief-clear"><span className="brief-clear-mark" aria-hidden="true"><Icon name="check" size={18} /></span>Every store is quiet and every plan is on pace. StoreCare keeps watching; nothing needs you right now.</div>
         )}
       </section>
+
+      <ActivityLog
+        lines={activityLines({ now, stores: d.stores, changes: log.changes, incidents: log.incidents })}
+        watching={d.stores.filter((s) => s.status !== 'paused').length}
+        unavailable={log.error}
+      />
 
       <StoreTable stores={storeRows} />
     </div>

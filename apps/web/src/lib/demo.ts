@@ -2,7 +2,7 @@
 // so the app can be shown and reviewed without a Supabase project. Supports only the query
 // features the app uses. Data lives in process memory and resets on restart.
 
-import { buildFacts, DEFAULT_SECTIONS, monthPeriod, previousPeriod, templateSummary } from '@storecare/reports';
+import { assembleMonthData, buildFacts, DEFAULT_SECTIONS, monthPeriod, periodRange, previousPeriod, templateSummary, type MonthRows } from '@storecare/reports';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Tables = Record<string, Row[]>;
@@ -58,7 +58,7 @@ function seed(): Tables {
   const work_entries: Row[] = [
     { store: juniper, ago: 6 * DAY, minutes: 90, title: 'Published autumn theme after testing checkout', client: 'Launched the autumn homepage and tested checkout on mobile and desktop.' },
     { store: juniper, ago: 13 * DAY, minutes: 45, title: 'Removed 2 unused apps and their leftover scripts', client: 'Cleaned up two apps you no longer use; pages load faster.' },
-    { store: juniper, ago: 14 * DAY, minutes: 120, title: 'Fixed add to cart after reviews app update', client: 'Fixed the mobile add-to-cart issue within 34 minutes.' },
+    { store: juniper, ago: 13 * DAY + 17 * 3600e3, minutes: 120, title: 'Fixed add to cart after reviews app update', client: 'Fixed the mobile add-to-cart issue within 34 minutes.' },
     { store: juniper, ago: 20 * DAY, minutes: 180, title: 'Black Friday readiness check', client: 'Tested discount codes, shipping rates and the free-gift threshold ahead of November.' },
     { store: ferro, ago: 1 * DAY, minutes: 150, title: 'Investigating blank payment step on mobile', client: null },
     { store: ferro, ago: 9 * DAY, minutes: 240, title: 'Subscription app migration', client: 'Moved subscriptions to the new app.' },
@@ -111,19 +111,19 @@ function seed(): Tables {
   }));
 
   const incidents: Row[] = [
-    { id: uid(), store_id: ferro.id, agency_id: AGENCY, kind: 'checkout', opened_at: iso(10 * 3600e3), resolved_at: null, cause: 'mobile: checkout — did not reach checkout (payment step shows a blank page)' },
-    { id: uid(), store_id: juniper.id, agency_id: AGENCY, kind: 'checkout', opened_at: iso(13 * DAY + 18 * 3600e3), resolved_at: iso(13 * DAY + 17.4 * 3600e3), cause: 'mobile: add to cart — cart/add.js returned 422' },
+    { id: uid(), store_id: ferro.id, agency_id: AGENCY, kind: 'checkout', opened_at: iso(10 * 3600e3), resolved_at: null, cause: 'mobile: checkout — did not reach checkout (payment step shows a blank page)', client_note: null },
+    { id: uid(), store_id: juniper.id, agency_id: AGENCY, kind: 'checkout', opened_at: iso(13 * DAY + 18 * 3600e3), resolved_at: iso(13 * DAY + 17.4 * 3600e3), cause: 'mobile: add to cart — cart/add.js returned 422', client_note: 'A reviews app update broke add to cart; rolled back.' },
   ];
 
   const checkout_runs: Row[] = [];
   for (const s of [juniper, ferro, bloom, kite, salt]) {
-    for (let d = 13; d >= 0; d--) {
+    for (let d = 39; d >= 0; d--) {
       const fail = (s === juniper && d === 13) || (s === ferro && d === 0);
       checkout_runs.push({
         id: checkout_runs.length + 1,
         store_id: s.id,
         agency_id: AGENCY,
-        ran_at: iso(d * DAY + (d === 0 ? 3 * 3600e3 : 0)),
+        ran_at: iso(d * DAY + (d === 0 ? 3 * 3600e3 : 0) + (s === juniper && d === 13 ? 18.1 * 3600e3 : 0)),
         device: 'mobile',
         result: fail ? 'fail' : 'pass',
         failed_step: fail ? (s === ferro ? 'checkout' : 'add_to_cart') : null,
@@ -135,10 +135,19 @@ function seed(): Tables {
 
   const uptime_checks: Row[] = [];
   for (const s of stores) {
-    for (let k = 0; k < 288; k++) uptime_checks.push({ store_id: s.id, agency_id: AGENCY, checked_at: iso(k * 2.5 * 3600e3), ok: !(s === bloom && k === 40), status: 200, ms: 320 + ((k * 37) % 260) + (s === bloom ? 500 : 0) });
+    for (let k = 0; k < 1920; k++) uptime_checks.push({ store_id: s.id, agency_id: AGENCY, checked_at: iso(k * 1800e3), ok: !(s === bloom && k === 40) && !(s === juniper && k === 913), status: 200, ms: 320 + ((k * 37) % 260) + (s === bloom ? 500 : 0) });
   }
 
+  const daily = (s: Row, i: number, d: number) => {
+    const score = s === juniper ? (d > 12 ? 61 + (d % 3) : 72 + (d % 3)) : 66 + i * 3 + ((d * 7 + i) % 5) - (s === bloom && d < 6 ? 9 : 0);
+    return {
+      store_id: s.id, agency_id: AGENCY, sampled_at: iso(d * DAY + 0.2 * DAY), page: 'home', strategy: 'mobile', performance_score: score,
+      lcp_ms: Math.round(5200 - score * 38), cls: 0.04, tbt_ms: 240, seo_score: 92 - i, accessibility_score: s === bloom ? 74 : 88 + (i % 3), best_practices_score: 96,
+      field_scope: i < 3 ? 'origin' : null, field_lcp_ms: i < 3 ? 2400 + i * 300 : null, field_inp_ms: i < 3 ? 170 + i * 40 : null, field_cls: null, field_category: i < 3 ? (i === 0 ? 'FAST' : 'AVERAGE') : null,
+    };
+  };
   const speed_samples: Row[] = stores.flatMap((s, i) => [
+    ...Array.from({ length: 38 }, (_, k) => daily(s, i, k + 2)),
     {
       store_id: s.id, agency_id: AGENCY, sampled_at: iso(0.2 * DAY), page: 'home', strategy: 'mobile', performance_score: 70 + i * 3,
       lcp_ms: s === bloom ? 3900 : 2100 + i * 150, cls: 0.03, tbt_ms: 200,
@@ -192,7 +201,7 @@ function seed(): Tables {
     broken: s === juniper ? [{ url: `${s.public_url}/pages/summer-sale`, status: 404 }] : [],
   }));
 
-  return {
+  const tables: Tables = {
     site_checks,
     agencies: [{ id: AGENCY, name: 'Northline Studio', brand_color: '#2747A8', created_at: iso(41 * DAY), ...demoBilling() }],
     memberships: [{ agency_id: AGENCY, user_id: USER.id, role: 'owner' }],
@@ -206,8 +215,10 @@ function seed(): Tables {
     uptime_checks,
     speed_samples,
     storefront_snapshots,
-    reports: autoDrafted(stores),
+    reports: [],
   };
+  tables.reports = autoDrafted([juniper, kite, salt], tables);
+  return tables;
 }
 
 /** STORECARE_DEMO_BILLING=trialing (default: Stripe trial, card on file) | new (no plan yet) | legacy (old
@@ -231,25 +242,37 @@ function demoBilling() {
   }
 }
 
-/** Last month's reports, as the worker drafts them on the 1st: two waiting for review. */
-function autoDrafted(stores: Row[]): Row[] {
+/** Last month's reports, as the worker drafts them on the 1st, built from the same rows the store pages
+ *  show (assembleMonthData, as the worker does), so a demo report matches its store's month. */
+function autoDrafted(stores: Row[], t: Tables): Row[] {
   const period = previousPeriod(monthPeriod(new Date(now).toISOString().slice(0, 7)));
-  return stores.slice(3, 5).map((s) => {
-    const facts = buildFacts({
-      period,
-      store: { name: s.name, public_url: s.public_url, health_score: s.health_score, status: s.status, limited_reason: null },
-      agency: { name: 'Northline Studio', brand_color: '#2747A8' },
-      plan: { name: 'Care Plan Starter', hours_included: s._hours, rollover_rule: 'one_month' },
-      uptime: { checks: 1440, ok: 1440, avgMs: 412 },
-      incidents: [],
-      checkoutRuns: [],
-      speed: [],
-      changes: [],
-      work: [{ id: 'w', work_date: `${period.start.slice(0, 8)}12`, minutes: 120, title: 'Updates', client_text: 'Updated apps and checked the theme after Shopify changes.', counts_to_plan: true }],
-      apps: [],
-      previousMonthMinutes: null,
-      asOf: `${period.end}T00:00:00Z`,
-    });
+  const prev = previousPeriod(period);
+  const { from, to } = periodRange(period);
+  const inMonth = (iso: string) => iso >= from && iso < to;
+  const agency = t.agencies[0];
+  return stores.map((s) => {
+    const of = (table: string) => t[table].filter((r) => r.store_id === s.id);
+    const ups = of('uptime_checks').filter((u) => inMonth(u.checked_at));
+    const speed = of('speed_samples').filter((x) => inMonth(x.sampled_at)).sort((a, b) => a.sampled_at.localeCompare(b.sampled_at));
+    const latest = speed.at(-1) ?? null;
+    const site = of('site_checks')[0] ?? null;
+    const data = assembleMonthData(period, {
+      store: s,
+      agency: { name: agency.name, brand_color: agency.brand_color },
+      plan: t.care_plans.find((c) => c.store_id === s.id) ?? null,
+      uptime: { checks: ups.length, ok: ups.filter((u) => u.ok).length, avg_ms: ups.length ? Math.round(ups.reduce((a, u) => a + u.ms, 0) / ups.length) : null },
+      incidents: of('incidents').filter((i) => inMonth(i.opened_at)),
+      checkoutRuns: of('checkout_runs').filter((r) => inMonth(r.ran_at)),
+      speed: speed.map((x) => ({ sampled_at: x.sampled_at, performance_score: x.performance_score, lcp_ms: x.lcp_ms })),
+      changes: of('changes').filter((c) => inMonth(c.occurred_at)),
+      work: of('work_entries').filter((w) => w.work_date >= period.start && w.work_date < period.end),
+      previousWork: of('work_entries').filter((w) => w.counts_to_plan && w.work_date >= prev.start && w.work_date < prev.end),
+      apps: of('storefront_snapshots')[0]?.apps ?? null,
+      products: of('storefront_snapshots')[0]?.products ?? null,
+      quality: latest,
+      site,
+    } as unknown as MonthRows, new Date(to));
+    const facts = buildFacts({ ...data, asOf: to });
     return {
       id: uid(),
       store_id: s.id,
@@ -285,6 +308,7 @@ class Query implements PromiseLike<Result> {
   private sorts: [string, boolean][] = [];
   private max: number | null = null;
   private one = false;
+  private maybe = false;
   private embeds: string[] = [];
   private countOnly = false;
   private wantCount = false;
@@ -322,6 +346,7 @@ class Query implements PromiseLike<Result> {
   order(c: string, o: { ascending?: boolean } = {}) { this.sorts.push([c, o.ascending ?? true]); return this; }
   limit(n: number) { this.max = n; return this; }
   single() { this.one = true; return this; }
+  maybeSingle() { this.one = true; this.maybe = true; return this; }
 
   private run(): Result {
     const t = db();
@@ -371,7 +396,7 @@ class Query implements PromiseLike<Result> {
       return copy;
     });
     if (this.countOnly) return { data: null, error: null, count };
-    if (this.one) return shaped[0] ? { data: shaped[0], error: null } : { data: null, error: { message: 'not found' } };
+    if (this.one) return shaped[0] ? { data: shaped[0], error: null } : { data: null, error: this.maybe ? null : { message: 'not found' } };
     return { data: shaped, error: null, count: this.wantCount ? count : null };
   }
 

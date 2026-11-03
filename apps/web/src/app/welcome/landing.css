@@ -156,7 +156,7 @@
   .lp-feed-text { grid-column: 2; }
   .lp-log, .lp-watch, .lp-how { margin-top: 72px; }
 }
-.lp .lp-report-frame .report h2 { font-size: 17px; letter-spacing: 0; line-height: 1.3; }
+.lp .lp-report-frame .report h2:not(.report-title) { font-size: 17px; letter-spacing: 0; line-height: 1.3; }
 
 /* ---- v2: try it, brand it, watch it live, price it ---- */
 .lp-nav-links { display: flex; align-items: center; gap: 22px; }
