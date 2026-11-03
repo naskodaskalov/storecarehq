@@ -35,10 +35,33 @@ test('drafts use neutral measured scores only; blocked checks are not sales clai
   const p = prospect();
   const report = { ok: true, checkedAt: '2026-11-02T10:00:00Z', sections: [{ title: 'Speed', items: [{ tone: 'look', text: 'The PageSpeed test did not finish.' }] }] } as QuickReport;
   const draft = draftMessage(p, report);
-  assert.doesNotMatch(draft, /One measurement|did not finish|lost sales|broken/);
-  assert.match(draft, /fictional data/);
+  assert.doesNotMatch(draft, /stood out|did not finish|lost sales|broken|error page/);
+  assert.match(draft, /Nothing urgent came up/);
   assert.equal(draftMessage(p, { ok: false, error: 'Blocked' }), '');
   if (report.ok) report.sections[0].items.push({ tone: 'look', text: 'Mobile PageSpeed score 32/100. Slow mobile pages cost sales.' });
-  assert.match(draftMessage(p, report), /score 32\/100/);
+  assert.match(draftMessage(p, report), /scores 32\/100 on Google’s mobile speed test/);
   assert.doesNotMatch(draftMessage(p, report), /cost sales/);
+});
+
+test('the draft leads with the most useful measured finding, in plain words, signed by a person', async () => {
+  const { headlineFinding } = await import('./outreach.ts');
+  const p = { ...prospect(), contact_name: 'Jamie Lee' };
+  const report = { ok: true, checkedAt: '2026-11-02T10:00:00Z', sections: [
+    { title: 'Speed', items: [{ tone: 'look', text: 'Mobile PageSpeed score 41/100. Main content appeared after 4.8s. Slow mobile pages cost sales.' }] },
+    { title: 'Links', items: [{ tone: 'look', text: '3 links from the home page are broken (of 15 checked).' }, { tone: 'look', text: '/pages/old answers 404.' }] },
+    { title: 'SSL and domain', items: [{ tone: 'look', text: 'We could not read the SSL certificate (timeout).' }] },
+  ] } as QuickReport;
+  assert.equal(headlineFinding(report), '3 of the 15 links I checked on the home page return an error page');
+  const draft = draftMessage(p, report);
+  assert.match(draft, /^Hi Jamie,/);
+  assert.match(draft, /I came across .* in your portfolio/);
+  assert.match(draft, /One thing stood out: 3 of the 15 links/);
+  assert.doesNotMatch(draft, /could not read|cost sales|fictional|StoreCareHQ\n/);
+  assert.match(draft, /\n\nNasko\nStoreCare HQ · storecarehq\.com$/);
+  if (report.ok) report.sections.splice(1, 1);
+  assert.match(headlineFinding(report)!, /^it scores 41\/100 on Google’s mobile speed test, with the main content showing after 4\.8s$/);
+  const expiring = { ok: true, checkedAt: 'x', sections: [{ title: 'SSL and domain', items: [{ tone: 'look', text: 'The SSL certificate expires in 6 days (9 Nov 2026). Check it is renewing.' }] }] } as QuickReport;
+  assert.equal(headlineFinding(expiring), 'its SSL certificate expires on 9 Nov 2026');
+  const fine = { ok: true, checkedAt: 'x', sections: [{ title: 'Speed', items: [{ tone: 'good', text: 'Mobile PageSpeed score 88/100.' }] }] } as QuickReport;
+  assert.equal(headlineFinding(fine), null);
 });

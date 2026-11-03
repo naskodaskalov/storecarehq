@@ -6,7 +6,21 @@ export type EmailDocument = { filename: string; html: string };
 export type OutreachEmail = { subject: string; html: string; text: string; documents: EmailDocument[] };
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-export function defaultOutreachSubject(agency: string) { return `A sample care report for ${agency}'s Shopify clients`; }
+/** Names the client store the check was run on: specific, short, and not a sales line. */
+export function defaultOutreachSubject(_agency: string, clientStoreUrl?: string) {
+  let host = '';
+  try { host = clientStoreUrl ? new URL(clientStoreUrl).hostname.replace(/^www\./, '') : ''; } catch { /* fall back below */ }
+  return host ? `Quick health check on ${host}` : `A quick health check on one of your client stores`;
+}
+
+/** A plain, personal-looking email: no banner or headline, so it reads like a note from a person, not a newsletter. */
+function letter(content: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
+<body style="margin:0;padding:0;background:#ffffff;color:#1f2a2c;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:24px 16px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px"><tr><td>${content}</td></tr></table>
+</td></tr></table></body></html>`;
+}
 
 function document(title: string, kicker: string, content: string, brand = 'StoreCare HQ'): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(title)}</title>
@@ -45,12 +59,12 @@ export function outreachEmail(input: TestEmailInput): OutreachEmail {
   const health = document('Current store health check', `Prepared for ${pack.prospect.agency_name}`, `<p><strong>${esc(report.host)}</strong><br>Checked: ${esc(report.checkedAt)}</p><p>A one-off public storefront snapshot. No historical monitoring or full checkout test. Unavailable checks require verification.</p>${report.sections.map(s => `<h2 style="font-size:19px">${esc(s.title)}</h2><ul>${s.items.map(i => `<li>${esc(i.text)}</li>`).join('')}</ul>`).join('')}`);
   const f = sample.facts;
   const sampleHtml = document(`Your ${f.period.label} care report`, SAMPLE_NOTICE, `<p style="padding:16px;background:#fff4cf;border-left:3px solid #a17b24">${esc(SAMPLE_NOTICE)}</p><p><strong>${esc(f.storeName)}</strong><br>${esc(f.storeHost)}</p><h2>Illustrative store health</h2><p>Uptime: ${f.uptimePct}% (${f.uptimeChecks} sample checks) · Health score: ${f.healthScore}/100 · Mobile load: 2.1s. All metrics are fictional.</p><h2>Example work · ${f.work.hoursUsed}h of ${f.work.hoursIncluded}h</h2><table width="100%" cellspacing="0" cellpadding="10">${f.work.entries.map(w => `<tr><td style="border-bottom:1px solid #dce6e3">${esc(w.date)}</td><td style="border-bottom:1px solid #dce6e3">${esc(w.text)}</td><td style="border-bottom:1px solid #dce6e3;white-space:nowrap">${w.hours}h</td></tr>`).join('')}</table><p>${esc(SAMPLE_NOTICE)}</p>`, f.agencyName);
-  const note = 'Open the reports below to view, download or save them as PDF. The health check is a dated public storefront snapshot. The monthly sample uses fictional monitoring data, tasks and hours. No work was performed.';
+  const note = 'The health check is a snapshot from today. The sample report uses example data. Not relevant? Reply "no" and I won\'t follow up.';
   const links = pack.links;
   const urls = links ? { health: `${links.origin}/outreach/r/${links.healthToken}`, sample: `${links.origin}/outreach/r/${links.sampleToken}` } : null;
-  const button = (url: string, label: string) => `<p style="margin:28px 0"><a href="${esc(url)}" style="display:inline-block;padding:16px 26px;border-radius:7px;background:#2747a8;color:#fff;text-decoration:none;font-size:15px;font-weight:bold">${label}</a></p>`;
-  const buttons = urls ? `${button(urls.health, 'View store health check')}${button(urls.sample, 'View sample monthly report')}<p style="font-size:12px;overflow-wrap:anywhere;word-break:break-all">Health check: <a href="${esc(urls.health)}">${esc(urls.health)}</a><br>Sample report: <a href="${esc(urls.sample)}">${esc(urls.sample)}</a></p><p style="font-size:12px">Links expire on ${esc(links!.expiresAt.slice(0, 10))}. Anyone with a link can view its report until expiry or revocation.</p>` : '<p>Create report links in the admin screen before approving this email.</p>';
-  const paragraphs = pack.draft.split(/\n\s*\n/).filter(Boolean).map(p => `<p style="margin:0 0 18px;font-size:16px;line-height:26px;color:#314c50">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
-  const html = document('Make your Shopify care work visible.', `Prepared for ${pack.prospect.agency_name}`, `${paragraphs}<table role="presentation" width="100%"><tr><td bgcolor="#f0f7f5" style="padding:16px 18px;border-left:3px solid #2747a8;font-size:13px;line-height:21px">${esc(note)}</td></tr></table>${buttons}<p style="font-size:12px;color:#687e80">Website: <a href="https://www.storecarehq.com" style="color:#087f75">https://www.storecarehq.com</a></p>`);
-  return { subject: `${subject}`, html, text: `${pack.draft}\n\n${note}\n\n${urls ? `Health check: ${urls.health}\nSample monthly report: ${urls.sample}\nLinks expire: ${links!.expiresAt}` : 'Create report links before approving.'}\n\nhttps://www.storecarehq.com\n\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
+  const button = (url: string, label: string, primary: boolean) => `<a href="${esc(url)}" style="display:inline-block;margin:0 8px 10px 0;padding:11px 18px;border-radius:6px;${primary ? 'background:#0b5c52;color:#ffffff;border:1px solid #0b5c52' : 'background:#ffffff;color:#0b5c52;border:1px solid #9fc2bc'};text-decoration:none;font-size:14px;font-weight:bold">${label}</a>`;
+  const buttons = urls ? `<p style="margin:22px 0 6px">${button(urls.health, 'View the health check', true)}${button(urls.sample, 'Sample monthly report', false)}</p>` : '<p>Create report links in the admin screen before approving this email.</p>';
+  const paragraphs = pack.draft.split(/\n\s*\n/).filter(Boolean).map(p => `<p style="margin:0 0 16px;font-size:15px;line-height:23px;color:#1f2a2c">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  const html = letter(`${paragraphs}${buttons}<p style="margin:14px 0 0;font-size:12px;line-height:18px;color:#6b7b7d">${esc(note)}${links ? ` Links work until ${esc(links.expiresAt.slice(0, 10))}.` : ''}</p>`);
+  return { subject: `${subject}`, html, text: `${pack.draft}\n\n${urls ? `Health check: ${urls.health}\nSample monthly report: ${urls.sample}\n\n` : 'Create report links before approving.\n\n'}${note}\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
 }

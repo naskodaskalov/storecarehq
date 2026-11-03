@@ -70,11 +70,38 @@ export function parseCsv(source: string): Pack[] {
   }));
 }
 
-export function draftMessage(p: Prospect, report: QuickReport): string {
+/** The one finding worth opening the email with, rephrased neutrally. Only measured results qualify: a check that
+ *  failed, was blocked or could not be read never becomes a claim about the client's store. Most useful first. */
+export function headlineFinding(report: QuickReport): string | null {
+  if (!report.ok) return null;
+  const texts = report.sections.flatMap(s => s.items.filter(i => i.tone === 'look').map(i => i.text));
+  const pick = (re: RegExp) => texts.map(t => t.match(re)).find(Boolean) ?? null;
+  let m: RegExpMatchArray | null;
+  if ((m = pick(/^(\d+) links? from the home page (?:is|are) broken \(of (\d+) checked\)/)))
+    return `${m[1]} of the ${m[2]} links I checked on the home page ${m[1] === '1' ? 'returns' : 'return'} an error page`;
+  if ((m = pick(/^The SSL certificate expires in (\d+) days? \(([^)]+)\)/))) return `its SSL certificate expires on ${m[2]}`;
+  if ((m = pick(/^The domain (\S+) expires in (\d+) days? \(([^)]+)\)/))) return `the domain ${m[1]} is due for renewal on ${m[3]}`;
+  if ((m = pick(/^Mobile PageSpeed score (\d+)\/100\.(?: Main content appeared after ([\d.]+)s\.)?/)))
+    return `it scores ${m[1]}/100 on Google’s mobile speed test${m[2] ? `, with the main content showing after ${m[2]}s` : ''}`;
+  if ((m = pick(/^(\d+) products? (?:has|have) sold-out sizes or variants still listed/)))
+    return `${m[1]} product${m[1] === '1' ? '' : 's'} still list${m[1] === '1' ? 's' : ''} sold-out sizes or variants`;
+  return null;
+}
+
+/** First name for the greeting: the contact's first word, or "there". */
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || 'there';
+
+export function draftMessage(p: Prospect, report: QuickReport, sender = 'Nasko'): string {
   if (!report.ok) return '';
-  // Neutral measurements only: errors and blocked checks must never become sales claims.
-  const observation = report.sections.flatMap(s => s.items).find(f => /^Mobile PageSpeed score \d+\/100\./.test(f.text))?.text.match(/^Mobile PageSpeed score \d+\/100\./)?.[0];
-  return `Hi ${p.contact_name || 'there'},\n\nI saw ${p.agency_name}'s portfolio reference to ${new URL(p.client_store_url).hostname}. I prepared a one-off public storefront check on ${report.checkedAt.slice(0, 10)}.${observation ? ` One measurement: ${observation}` : ''}\n\nStoreCareHQ helps Shopify agencies monitor client stores and prepare branded monthly care reports. I can share the health check and an illustrative monthly report showing example maintenance work and hours. The sample uses fictional data; the health check is a current snapshot, not historical monitoring or a full checkout test.\n\nWould these be useful for your care-plan workflow?\n\nStoreCareHQ\nhttps://www.storecarehq.com\n\nIf this is not relevant, let me know and I won't follow up.`;
+  const store = new URL(p.client_store_url).hostname.replace(/^www\./, '');
+  const finding = headlineFinding(report);
+  return [
+    `Hi ${firstName(p.contact_name)},`,
+    `I came across ${store} in your portfolio and ran a quick outside check on it. ${finding ? `One thing stood out: ${finding}.` : 'Nothing urgent came up.'} The full one-page result is linked below.`,
+    `I'm building StoreCare HQ. It runs that check every day on all your client stores (uptime, a daily checkout test, theme and app changes) and turns it into a branded monthly report you send under your own name.`,
+    `Would that help with your care plans? I'm setting up the first agencies free.`,
+    `${sender}\nStoreCare HQ · storecarehq.com`,
+  ].join('\n\n');
 }
 
 export function exportCsv(packs: Pack[]): string {
