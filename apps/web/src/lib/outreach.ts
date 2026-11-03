@@ -98,7 +98,7 @@ export function draftMessage(p: Prospect, report: QuickReport, sender = 'Nasko')
   return [
     `Hi ${firstName(p.contact_name)},`,
     `I came across ${store} in your portfolio and ran a quick outside check on it. ${finding ? `One thing stood out: ${finding}.` : 'Nothing urgent came up.'} The full one-page result is linked below.`,
-    `I'm building StoreCare HQ. It runs that check every day on all your client stores (uptime, a daily checkout test, theme and app changes) and turns it into a branded monthly report you send under your own name.`,
+    `I'm building StoreCare HQ. It watches all your client stores every day (uptime, a daily checkout test, speed, theme and app changes), alerts you the moment something breaks, and turns it into a branded monthly report with your work log and hours, sent under your name.`,
     `Would that help with your care plans? I'm setting up the first agencies free.`,
     `${sender}\nStoreCare HQ · storecarehq.com`,
   ].join('\n\n');

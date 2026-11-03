@@ -58,6 +58,8 @@ test('the draft leads with the most useful measured finding, in plain words, sig
   assert.match(draft, /One thing stood out: 3 of the 15 links/);
   assert.doesNotMatch(draft, /could not read|cost sales|fictional|StoreCareHQ\n/);
   assert.match(draft, /\n\nNasko\nStoreCare HQ · storecarehq\.com$/);
+  assert.match(draft, /alerts you the moment something breaks/);
+  assert.match(draft, /work log and hours/);
   if (report.ok) report.sections.splice(1, 1);
   assert.match(headlineFinding(report)!, /^it scores 41\/100 on Google’s mobile speed test, with the main content showing after 4\.8s$/);
   const expiring = { ok: true, checkedAt: 'x', sections: [{ title: 'SSL and domain', items: [{ tone: 'look', text: 'The SSL certificate expires in 6 days (9 Nov 2026). Check it is renewing.' }] }] } as QuickReport;
