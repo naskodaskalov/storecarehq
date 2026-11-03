@@ -7,7 +7,7 @@ import type { Pack, ReportLinks } from '@/lib/outreach';
 import { contactDay, type OutreachContact } from '@/lib/outreach-history';
 import { approveOutreachTest, sendOutreachTest, publishOutreachReports, revokeOutreachReports } from './actions';
 
-export type TestSenderInfo = { from: string; to: string; mode: 'agency' | 'test'; ready: boolean; storageReady: boolean; reason: string };
+export type TestSenderInfo = { from: string; to: string; replyTo?: string; mode: 'agency' | 'test'; ready: boolean; storageReady: boolean; reason: string };
 
 export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubject, onLinks, onSent, editor }: { pack: Pack; sender: TestSenderInfo; busy: boolean; previous: OutreachContact | null; timeZone: string; onSubject: (value: string) => void; onLinks: (value: ReportLinks | undefined) => void; onSent: (contact: OutreachContact | undefined, accepted: boolean) => void; editor: ReactNode }) {
   const subject = pack.subject ?? defaultOutreachSubject(pack.prospect.agency_name);
@@ -76,7 +76,7 @@ export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubjec
   return <div className="outreach-email">
     <p className="outreach-test-notice"><Icon name="mail" size={16} /><span><strong>{sender.mode === 'agency' ? 'Agency delivery' : 'Test delivery'}</strong> · {sender.mode === 'agency' ? 'Send requested reports to the agency contact from your CSV, after reviewing and approving the email.' : 'Only your admin address receives this email.'}</span></p>
     <div className="outreach-compose-grid"><div className="outreach-compose-settings">
-    <dl className="outreach-sender"><dt>From</dt><dd>{sender.from}</dd><dt>To</dt><dd>{recipient || 'Missing contact_email in CSV'}</dd><dt>Reply-to</dt><dd>{sender.to}</dd></dl>
+    <dl className="outreach-sender"><dt>From</dt><dd>{sender.from}</dd><dt>To</dt><dd>{recipient || 'Missing contact_email in CSV'}</dd><dt>Reply-to</dt><dd>{sender.replyTo || sender.to}</dd></dl>
     <label className="field">Subject<input type="text" value={subject} maxLength={200} disabled={pending || busy} onChange={e => onSubject(e.target.value)} /></label>
     {editor}
     <div className="outreach-link-tools"><div><strong>Reports for this introduction</strong><p className="small muted">Share two report links. Recipients can view, download or save them as PDF.</p></div>
