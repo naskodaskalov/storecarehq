@@ -2,13 +2,23 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { outreachEmail, type TestEmailInput } from './outreach-email.ts';
 
-export type TestDeliveryConfig = { apiKey: string; from: string; adminEmail: string; demo: boolean; mode?: 'agency' | 'test' };
+export type TestDeliveryConfig = {
+  apiKey: string;
+  from: string;
+  adminEmail: string;
+  /** Where prospects' replies go: OUTREACH_REPLY_TO when set, otherwise the signed-in admin's email. */
+  replyTo?: string;
+  demo: boolean;
+  mode?: 'agency' | 'test';
+};
 export type TestDeliveryResult = { state: 'accepted'; id: string } | { state: 'failed' | 'unknown'; error: string };
 const emailAddress = /^[^\s@<>;,\r\n]+@[^\s@<>;,\r\n]+\.[^\s@<>;,\r\n]+$/;
 const ttl = 15 * 60_000;
 
 export function testDeliveryConfig(adminEmail: string, env: Record<string, string | undefined> = process.env): TestDeliveryConfig {
-  return { apiKey: env.RESEND_API_KEY || '', from: env.OUTREACH_FROM || 'StoreCare HQ <support@storecarehq.com>', adminEmail: adminEmail.trim().toLowerCase(), demo: env.STORECARE_DEMO === '1', mode: 'agency' };
+  const admin = adminEmail.trim().toLowerCase();
+  const replyTo = (env.OUTREACH_REPLY_TO || '').trim().toLowerCase() || admin;
+  return { apiKey: env.RESEND_API_KEY || '', from: env.OUTREACH_FROM || 'StoreCare HQ <support@storecarehq.com>', adminEmail: admin, replyTo, demo: env.STORECARE_DEMO === '1', mode: 'agency' };
 }
 
 function assertReady(c: TestDeliveryConfig) {
@@ -16,8 +26,11 @@ function assertReady(c: TestDeliveryConfig) {
   if (!c.apiKey) throw new Error('Configure RESEND_API_KEY to send email.');
   const sender = c.from.match(/<([^<>]+)>$/)?.[1] || c.from;
   if (!emailAddress.test(sender) || /[\r\n]/.test(c.from)) throw new Error('Configure a valid OUTREACH_FROM sender on a verified domain.');
-  if (!emailAddress.test(c.adminEmail)) throw new Error('Your signed-in admin email is not a valid reply address.');
+  if (!emailAddress.test(c.adminEmail)) throw new Error('Your signed-in admin email is not a valid address.');
+  if (!emailAddress.test(replyAddress(c))) throw new Error('Configure a valid OUTREACH_REPLY_TO address, or leave it empty to use your admin email.');
 }
+
+const replyAddress = (c: TestDeliveryConfig) => c.replyTo || c.adminEmail;
 
 function payloadFor(input: TestEmailInput, c: TestDeliveryConfig) {
   assertReady(c);
@@ -25,7 +38,7 @@ function payloadFor(input: TestEmailInput, c: TestDeliveryConfig) {
   const email = outreachEmail(input);
   const to = c.mode === 'agency' ? input.pack.prospect.contact_email.trim().toLowerCase() : c.adminEmail;
   if (!emailAddress.test(to)) throw new Error('Add one valid agency contact_email to the CSV before approving or sending.');
-  return { from: c.from, to: [to], reply_to: c.adminEmail, subject: email.subject, html: email.html, text: email.text };
+  return { from: c.from, to: [to], reply_to: replyAddress(c), subject: email.subject, html: email.html, text: email.text };
 }
 const digestOf = (payload: unknown) => createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 

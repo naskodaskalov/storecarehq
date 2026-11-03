@@ -91,3 +91,20 @@ test('production sends the requested report to CSV contact_email and keeps repli
   const injected = input(); injected.pack.prospect.contact_email = 'victim@example.com\r\nBcc: other@example.com';
   assert.throws(() => approveTestDelivery(injected, live, now));
 });
+
+test('replies go to OUTREACH_REPLY_TO when it is set, otherwise to the signed-in admin', async () => {
+  const value = input();
+  const branded = testDeliveryConfig('owner@example.com', { RESEND_API_KEY: 'fake-test-key', OUTREACH_FROM: config.from, OUTREACH_REPLY_TO: ' Support@StoreCareHQ.com ' });
+  assert.equal(branded.replyTo, 'support@storecarehq.com');
+  const approval = approveTestDelivery(value, branded, now);
+  const request: typeof fetch = async (_url, options) => {
+    const payload = JSON.parse(String(options?.body));
+    assert.equal(payload.reply_to, 'support@storecarehq.com');
+    assert.deepEqual(payload.to, ['prospect@north.example.com']);
+    return Response.json({ id: 'branded-reply-id' });
+  };
+  assert.equal((await sendApprovedTest(value, approval.token, branded, request, now)).state, 'accepted');
+  assert.equal(testDeliveryConfig('owner@example.com', { RESEND_API_KEY: 'k' }).replyTo, 'owner@example.com');
+  const broken = testDeliveryConfig('owner@example.com', { RESEND_API_KEY: 'k', OUTREACH_REPLY_TO: 'not-an-email' });
+  assert.throws(() => approveTestDelivery(value, broken, now), /OUTREACH_REPLY_TO/);
+});

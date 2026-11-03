@@ -13,7 +13,7 @@ export const maxDuration = 60;
 export default async function OutreachPage() {
   const { email } = await requireAdmin();
   const config = testDeliveryConfig(email);
-  const sender = { from: config.from, to: config.adminEmail, mode: config.mode || 'agency' as const, ready: !config.demo && !!config.apiKey, storageReady: config.demo || !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  const sender = { from: config.from, to: config.adminEmail, replyTo: config.replyTo, mode: config.mode || 'agency' as const, ready: !config.demo && !!config.apiKey, storageReady: config.demo || !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     reason: config.demo ? 'Demo mode previews only. Sign in to send the email.' : 'Configure RESEND_API_KEY and a verified OUTREACH_FROM sender to enable delivery.' };
   const history = await loadOutreachHistory();
   return <div className="outreach">
