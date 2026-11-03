@@ -1,60 +1,99 @@
-# Agency outreach preparation
+# BFCM readiness audit
 
-Status: proposed; no product code, production data, or email sending changed.
+Status: proposed. No code, data or emails changed yet.
 
 ## Outcome
 
-Prepare personalized outreach packs inside the existing admin area. Each pack contains a dated real storefront health check, a clearly labeled illustrative monthly report, and an editable outreach message. Start with 20 reviewed agencies from Shopify's ongoing website management directory.
+One click on a new **BFCM audit** page checks every client store and produces a branded one-page
+"Black Friday readiness" sheet per store (agency logo, colour, name). The agency saves it as PDF or turns
+on a client link. The same one-pager becomes the outreach hook for prospect agencies (part 2).
+Black Friday 27 Nov, Cyber Monday 30 Nov (computed: day after the fourth Thursday of November).
 
 ## Existing behavior verified
 
-- Admin quick reports require the configured admin session, run public storefront checks, support printing/saving as PDF, and generate a copyable note. Results are currently transient.
-- Monthly reporting loads dated monitoring and work records. The scheduled worker skips stores created after the reported month ended.
-- The existing ReportView renders both internal previews and shared client reports.
-- Adding a store now and backdating example hours does not recreate last month's monitoring history.
+- Monitoring already stores what most checks need: daily speed (`speed_samples`), checkout runs, uptime,
+  daily SSL/domain/broken links (`site_checks`), hourly theme/apps and a daily product feed with stock.
+- `quick-report.ts` runs live public checks for any URL (probe, SSL, RDAP, links, PageSpeed); nothing saved.
+- `ReportView` + browser print is the PDF path; `/r/<token>` (public, noindex) is the client-link pattern.
+- Nothing checks password mode or noindex today (backlog item 2). A password page may even look "blocked".
+- Shopify's default robots.txt disallows `/collections/*sort_by*`, and sales need store access, so true
+  "best sellers" are not readable. Proxy: **products featured on the home page** (what the store promotes).
 
-## First implementation: preparation only
+## Decisions (defaults; say if you want otherwise)
 
-### Workflow
+1. In-app audit = latest monitoring data + a light live pass at click time (robots.txt, home page,
+   up to 3 featured product pages; ~5 polite requests per store as StoreCareBot). No PageSpeed or checkout
+   run at click time: stale or missing data is shown with its date or as "not checked", never as a failure.
+2. Runs 2 stores at a time from the browser, one server action per store, with per-row progress.
+   A store audited in the last 2 minutes returns that audit instead of re-checking. Paused stores are skipped.
+3. Each run is saved (`store_audits`). The client link is off until the agency turns it on; can be turned off.
+4. PDF = browser print, laid out to fit one A4/Letter page. No new dependencies.
 
-1. Add an Outreach tab/link under admin alongside Quick report.
-2. Import a CSV of reviewed agencies: agency_name, agency_url, directory_url, contact_name, contact_email, client_store_url, portfolio_source_url. Also allow entering a single agency. Validate URLs, field lengths, CSV quoting, duplicate agency domains, and duplicate contacts. Never invent emails or assume an agency's own website is a Shopify store.
-3. Require review of the portfolio link/store match before scanning. A public portfolio is evidence of past work, not proof of a current maintenance contract.
-4. Prepare selected packs sequentially in small batches using the existing admin quick-report action. Show per-agency progress, blocked/failed checks, and retry only failures. No checkout automation or recurring monitoring is enabled for prospects.
-5. Build a separate illustrative monthly report with the prospect agency's name and a fictional store, reusing ReportView. Default period: October 2026 when prepared in November 2026, calculated dynamically thereafter. Example work: theme adjustments 2h, image optimization 1.5h, app review 1h, maintenance review 0.5h. All hours and any illustrative metrics are visibly marked as sample data in both screen and print views. Do not claim that these tasks were performed or that the agency endorsed the report.
-6. Draft a short email from verified agency details and actual scan results, linking the observed facts to monitoring/reporting benefits. Include scan date and limitations. Unavailable checks are not failures; do not invent incidents, historic uptime, lost revenue, or improvements.
-7. Let the admin edit/copy the message, print either report, and export a resumable JSON pack plus a spreadsheet-safe CSV summary. Warn before leaving with unsaved work. Export/import retains drafts and statuses without adding prospect data to operational store/work tables.
+## What the one-pager checks
 
-### Exact files
+| Check | Source (app) | Fix before BF | Worth a look |
+| --- | --- | --- | --- |
+| Store open to shoppers | live home page | password page on | — |
+| Google can index it | live home + robots.txt | noindex on home, or Googlebot blocked from `/` | noindex on a featured product |
+| Checkout works | checkout runs, 48h | last run failed | not enabled → "turn it on before the sale" (not checked) |
+| Store up | incidents, uptime 30d | open "down" incident | uptime under 99.5% |
+| Mobile speed | latest speed sample (≤3 days) | — | LCP over 4s, score under 50, or real visitors "poor" |
+| Featured products | live home links + product snapshot | linked product returns 404 | featured product sold out |
+| Links | latest site check (≤3 days) | — | any broken link |
+| SSL certificate | latest site check | expired | 14 days or less left |
+| Domain | latest site check | expires before 7 Dec | 45 days or less left |
+| App weight | latest snapshot + live scripts | — | 12+ apps or 3+ unknown script hosts |
+| Recent changes | changes, 14 days | — | theme published / apps added → test and freeze |
 
-- [MODIFY] apps/web/src/app/admin/page.tsx — link to outreach preparation.
-- [NEW] apps/web/src/app/admin/outreach/page.tsx — admin outreach page, request duration/dynamic settings consistent with admin quick reports.
-- [NEW] apps/web/src/app/admin/outreach/outreach-form.tsx — CSV/manual input, review, sequential preparation, editable drafts, print and export/import controls.
-- [NEW] apps/web/src/app/admin/outreach/outreach.css — scoped outreach and print layout, always-visible sample labels.
-- [NEW] apps/web/src/lib/outreach.ts — typed prospect/pack models, CSV parsing and safe export, normalization/deduplication, pack serialization, factual message templates.
-- [NEW] apps/web/src/lib/sample-month-report.ts — deterministic illustrative monthly facts/summary using the existing report types, without database writes.
-- [NEW] apps/web/src/lib/outreach.test.ts — malformed imports, deduplication, formula-safe exports, round-trip state, drafts without fabricated findings.
-- [NEW] apps/web/src/lib/sample-month-report.test.ts — month/year boundaries, explicitly illustrative content, correct hours totals and report type compatibility.
-- [MODIFY] system_architecture.md — document admin-only preparation and isolation from real work/monitoring records.
+Verdict: "N things to fix before Black Friday" / "Ready · N worth a look" / "Ready for Black Friday", plus a
+countdown, a short fix list, check dates, and "Prepared by <agency> · public storefront checks, no store access".
 
-### Verification
+## Part 1: in the app
 
-- Run web unit tests and repository type checks, then the web production build.
-- Exercise one manual prospect and a small CSV, including failed/blocked scans and export/import recovery.
-- Inspect both print views for sample labels and separation of measured versus illustrative data.
-- Verify admin access is enforced by the existing layout and every reused server action.
-- Confirm preparing packs does not add stores, work, monitoring consent, or outgoing emails.
+- [NEW] `packages/storefront/src/states.ts` — pure detectors: password page (final URL `/password` or its
+  form, whatever the status code), noindex (meta + `X-Robots-Tag`), robots blocks Googlebot, featured product handles.
+- [MODIFY] `packages/storefront/src/index.ts` — export them; [MODIFY] `packages/storefront/test/storefront.test.ts` — fixtures.
+- [NEW] `apps/web/src/lib/bfcm.ts` — sale dates/countdown, audit types, `buildBfcmAudit()` (pure), `liveBfcmChecks()`.
+- [NEW] `apps/web/src/lib/bfcm.test.ts` — thresholds, unknown/stale data, blocked store, password page, dates, verdict.
+- [NEW] `apps/web/src/lib/bfcm-data.ts` — loads one store's latest monitoring rows as the signed-in user (RLS).
+- [NEW] `supabase/migrations/20261104000001_store_audits.sql` — `store_audits` (agency-scoped RLS; members read/insert,
+  update only `shared_at`; store must belong to the agency; size cap) and `public_audit(token)` (shared audits only).
+- [MODIFY] `supabase/tests/rls.test.sql` — cross-agency isolation, insert check, share gating, anonymous token read.
+- [NEW] `apps/web/src/components/bfcm-audit-view.tsx` — the branded one-pager (app, client link, admin).
+- [MODIFY] `apps/web/src/app/globals.css` — one-pager styles, one-page print layout, 390px layout.
+- [NEW] `apps/web/src/app/(app)/bfcm/page.tsx`, `bfcm-board.tsx`, `actions.ts` — store list with latest audit,
+  "Run on all N stores", per-row spinner/queued/failed/retry (visible loading feedback throughout), plan access check.
+- [NEW] `apps/web/src/app/(app)/bfcm/[id]/page.tsx` — one-pager, Save as PDF, client link on/off, run again.
+- [NEW] `apps/web/src/app/r/audit/[token]/page.tsx` — client view, no login, noindex (already public under `/r/`).
+- [MODIFY] `apps/web/src/app/(app)/nav-links.tsx` — "BFCM audit" nav item.
+- [MODIFY] `apps/web/src/app/(app)/page.tsx` — countdown banner with the one-click button until Cyber Monday.
+- [MODIFY] `apps/web/src/lib/demo.ts` — audits table, `public_audit`, canned live results (one store in password
+  mode, a sold-out featured product, an expiring domain) so the demo and videos show a real-looking audit.
+- [MODIFY] `apps/web/src/lib/workspace-data.ts` — include audits in the workspace export.
 
-## Outreach launch
+## Part 2: outreach hook (after part 1)
 
-Review the first 20 agencies and their public business contact details. Send reviewed messages to agency contacts, not their portfolio merchants. Lead with one current observation and offer the sample report; do not imply a current client relationship. Initial sending uses the user's mailbox after preparation and recipient/message review.
+- [MODIFY] `apps/web/src/lib/quick-report.ts` — reuse the robots/home responses it already fetches; add `bfcm` to the report.
+- [MODIFY] `apps/web/src/app/admin/quick-report/quick-report-form.tsx` — "BFCM one-pager" view and print.
+- [MODIFY] `apps/web/src/lib/outreach.ts` — validate optional `bfcm` in backups; before Cyber Monday the draft opens
+  with the Black Friday finding ("23 days to Black Friday: …").
+- [MODIFY] `apps/web/src/lib/outreach-email.ts` — subject "Black Friday check on <store>" before Cyber Monday;
+  the health document becomes the one-pager. Old backups and links keep working.
+- [MODIFY] `apps/web/src/app/outreach/r/[token]/page.tsx` — render the one-pager for BFCM snapshots.
+- [MODIFY] `quick-report.test.ts`, `outreach.test.ts`, `outreach-email.test.ts`.
+- For prospects: checkout shows "not tested (needs the owner's OK)"; uptime/recent changes "not monitored yet".
 
-## Later automation, after validating the first batch
+## Verification
 
-- Directory ingestion: bounded, resumable collection of public profiles with source URLs, pagination, deduplication and respectful request pacing; verify permitted access before running collection. Discover agency business contacts and portfolio candidates for human review.
-- Durable admin prospect database and scan queue, separate from operational agency/store records; status history, resuming jobs and saved report snapshots.
-- Expiring/revocable unlisted report links that are excluded from indexing and retain sample notices. Publishing links must be an explicit action.
-- Outbound sending with a configured sender and reply address, reviewed recipients/messages, durable send deduplication, delivery status and opt-out suppression. Do not reuse ordinary client-report sending as a marketing campaign sender without these changes.
-- Follow-ups stop on replies, opt-outs and bounces; automate sending only once inbound reply detection and suppression are reliable.
+- `npm run typecheck`, `npm test`, web production build; RLS SQL test on a local Postgres.
+- Demo mode in the browser: run all 6 stores, progress states, one-pager at desktop and 390px, print preview is
+  one page, link on/off, signed-out client view, 404 after turning the link off.
+- Live: this sandbox can't reach stores, so a real-store pass needs you (any Shopify development store is
+  password-protected by default, a good password-mode test).
 
-These later phases require a separate concrete implementation plan after sender choice, storage and campaign behavior are settled. No production account seeding or backdated operational records are needed for the first implementation.
+## Rollout (needs your go-ahead)
+
+- Apply the migration to StoreCare HQ (additive) before deploying.
+- This session can read the repo but not push yet: approve and I'll request push access and open a PR,
+  or hand you a patch.
+- [MODIFY] `system_architecture.md`, `task.md` after the build.
