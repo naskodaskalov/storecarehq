@@ -14,6 +14,7 @@
   --warn-bg: #fdf6ec;
   --warn-border: #f1ddbf;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --nav-bar-h: 56px;
 }
 
 * { box-sizing: border-box; }
@@ -36,24 +37,48 @@ h2 { margin: 0; font-size: 18px; font-weight: 700; }
 /* Shell */
 .shell { display: flex; min-height: 100vh; }
 .nav { width: 232px; flex: 0 0 232px; background: #17252b; color: #ecf3f5; padding: 26px 14px 20px; display: flex; flex-direction: column; gap: 30px; position: sticky; top: 0; height: 100dvh; overflow-y: auto; }
+.nav-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nav-panel { display: flex; flex-direction: column; gap: 30px; flex: 1 0 auto; }
+.nav-toggle, .nav-backdrop { display: none; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; font-weight: 700; font-size: 17px; color: inherit; text-decoration: none; letter-spacing: -0.03em; }
 .mark { width: 30px; height: 30px; border-radius: 7px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
 .nav-links { display: flex; flex-direction: column; gap: 2px; }
-.nav-links a { display: flex; align-items: center; gap: 14px; min-height: 48px; padding: 0 14px; border-radius: 7px; color: #cbd9df; text-decoration: none; font-size: 14px; transition: background .15s; }
+/* position: relative keeps screen-reader-only text inside its link, so it can never widen the page. */
+.nav-links a { position: relative; display: flex; align-items: center; gap: 14px; min-height: 48px; padding: 0 14px; border-radius: 7px; color: #cbd9df; text-decoration: none; font-size: 14px; transition: background .15s; }
 .nav-links a:hover { background: #24383f; color: white; }
 .nav-links a[aria-current='page'] { background: #164c51; color: #fff; font-weight: 600; }
 .nav-foot { margin-top: auto; border-top: 1px solid #34454d; padding: 20px 8px 0; }
 .nav-foot .muted { color: #b5c6ce; margin-top: 12px; font-size: 11px; }
+.nav-password { color: #cbd9df; }
 .main { min-width: 0; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 26px; max-width: 1680px; margin: 0 auto; }
+/* Phones: a top bar with the brand and a menu button; the sidebar's content opens as a panel under it. */
+.nav-toggle { place-content: center; gap: 4px; width: 44px; height: 44px; padding: 0; border: 1px solid #41535b; border-radius: 8px; background: transparent; color: #ecf3f5; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nav-toggle:hover { background: #24383f; }
+.nav-toggle:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+.nav-toggle span { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; transition: transform .2s ease, opacity .2s ease; }
+.nav-toggle[aria-expanded='true'] { background: #24383f; }
+.nav-toggle[aria-expanded='true'] span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.nav-toggle[aria-expanded='true'] span:nth-child(2) { opacity: 0; }
+.nav-toggle[aria-expanded='true'] span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 @media (max-width: 640px) {
   .main { padding: 24px 16px 40px; }
   .shell { flex-direction: column; }
-  .nav { width: 100%; flex: none; height: auto; position: static; flex-direction: row; align-items: center; gap: 12px; padding: 12px; overflow-x: auto; }
-  .nav .brand { padding: 0; flex: none; }
-  .nav .brand-name { display: none; }
-  .nav-links { flex-direction: row; flex: none; }
-  .nav-links a { min-height: 40px; white-space: nowrap; padding: 0 10px; }
-  .nav-foot { display: none; }
+  .nav { width: 100%; flex: none; height: auto; overflow: visible; gap: 0; padding: 0; z-index: 40; }
+  .nav-bar { height: var(--nav-bar-h); padding: 0 10px 0 16px; }
+  .nav .brand { padding: 0; font-size: 16px; }
+  .nav-toggle { display: inline-grid; }
+  .nav-backdrop { display: block; position: fixed; inset: var(--nav-bar-h) 0 0; z-index: 0; background: #0d181c73; touch-action: none; }
+  .nav-panel { position: absolute; top: 100%; left: 0; right: 0; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px 12px; max-height: calc(100dvh - var(--nav-bar-h)); overflow-y: auto; overscroll-behavior: contain; padding: 10px 12px 20px; background: #17252b; border-top: 1px solid #2c3d44; box-shadow: 0 22px 36px -18px #0b1519b3; visibility: hidden; opacity: 0; transform: translateY(-6px); transition: opacity .16s ease, transform .16s ease, visibility 0s linear .16s; }
+  .nav-panel[data-open] { visibility: visible; opacity: 1; transform: none; transition: opacity .16s ease, transform .16s ease; }
+  .nav-panel > * { grid-column: 1 / -1; }
+  .nav-links a { min-height: 44px; font-size: 15px; }
+  /* Password and sign out share the last row. */
+  .nav-panel > .nav-password { grid-column: 1; display: flex; align-items: center; min-height: 44px; padding: 0 8px; }
+  .nav-panel > .signout-form { grid-column: 2; margin: 0; }
+  .signout-form .btn.secondary { width: auto; min-height: 44px; }
+  /* The page stays put behind the open menu; links to a section land below the bar. */
+  html:has(.nav-panel[data-open]) { overflow: hidden; }
+  html:has(.shell > .nav) { scroll-padding-top: var(--nav-bar-h); }
 }
 
 /* Blocks */
@@ -179,6 +204,7 @@ h2 { margin: 0; font-size: 18px; font-weight: 700; }
 
 @media (prefers-reduced-motion: reduce) {
   .spinner, .page-progress::after, .skeleton { animation-duration: 2.4s; }
+  .nav-panel, .nav-panel[data-open], .nav-toggle span { transition: none; }
 }
 
 label { font-size: 14px; font-weight: 500; }
@@ -385,12 +411,6 @@ th:first-child, td:first-child { padding-left: 0; }
 .signout-form { margin-top: -12px; }
 .signout-form .btn.secondary { justify-content: flex-start; width: 100%; color: #cbd9df; background: transparent; border-color: #41535b; font-size: 12px; }
 .signout-form .btn.secondary:hover:not(:disabled) { color: white; background: #24383f; }
-@media (max-width: 640px) {
-  .nav { flex-wrap: wrap; overflow: visible; }
-  .nav-links { order: 3; width: 100%; overflow-x: auto; }
-  .signout-form { margin: 0 0 0 auto; flex-shrink: 0; }
-  .signout-form .btn.secondary { height: 36px; white-space: nowrap; }
-}
 .demo-dot { width: 7px; height: 7px; border-radius: 50%; background: #169b76; box-shadow: 0 0 0 3px #169b7610; display: inline-block; flex-shrink: 0; }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
 .page-heading h1 { font-size: 32px; letter-spacing: -.04em; }
@@ -711,7 +731,7 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
 }
 @media (min-width: 641px) and (max-width: 1100px) { .nav { width: 200px; flex-basis: 200px; }.brand { font-size: 14px; }.main { padding: 24px; }.dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
-  .workspace-identity { display: none; }.workspace-header { height: 50px; padding: 0 16px; }.nav-links a { gap: 7px; font-size: 12px; }.nav-links a svg { width: 16px; }.nav .mark { width: 27px; height: 27px; }.nav-links { gap: 3px; }
+  .workspace-identity { display: none; }.workspace-header { height: 50px; padding: 0 16px; }.nav .mark { width: 27px; height: 27px; }
   .main { gap: 22px; }.dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.dashboard-kpis .kpi { padding: 16px 12px; }.metric-icon { position: static; width: 28px; height: 28px; margin-bottom: 7px; }.kpi .value { font-size: 27px; }.dashboard-kpis .small { font-size: 10px; }
   .page-heading h1 { font-size: 28px; }.page-actions { width: 100%; justify-content: space-between; }.attention-row { gap: 10px; padding: 13px 12px; flex-wrap: wrap; }.attention-copy { flex-basis: calc(100% - 55px); }.attention-row .btn { margin-left: 48px; height: 34px; }.attention-icon { width: 32px; height: 32px; }
   .store-panel-heading { flex-wrap: wrap; padding: 16px; }.store-search { max-width: none; width: 100%; }.store-filters { padding: 0 16px 15px; }.store-filters button { font-size: 10px; padding: 6px 8px; }.store-panel-footer { padding: 14px 16px; flex-wrap: wrap; }
