@@ -1,4 +1,5 @@
 import type { QuickReport } from './quick-report.ts';
+import { inSeason, leadFinding, saleDates, validAudit } from './bfcm.ts';
 
 export const COLUMNS = ['agency_name', 'agency_url', 'directory_url', 'contact_name', 'contact_email', 'client_store_url', 'portfolio_source_url'] as const;
 export type Prospect = Record<typeof COLUMNS[number], string>;
@@ -91,9 +92,25 @@ export function headlineFinding(report: QuickReport): string | null {
 /** First name for the greeting: the contact's first word, or "there". */
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || 'there';
 
-export function draftMessage(p: Prospect, report: QuickReport, sender = 'Nasko'): string {
+/** Until the day before Black Friday (from two months out), outreach leads with the Black Friday one-pager. */
+export function bfcmOutreach(report: QuickReport, now = Date.now()): boolean {
+  return report.ok && !!report.bfcm && validAudit(report.bfcm) && inSeason(now) && saleDates(now).daysToBlackFriday >= 1;
+}
+
+export function draftMessage(p: Prospect, report: QuickReport, sender = 'Nasko', now = Date.now()): string {
   if (!report.ok) return '';
   const store = new URL(p.client_store_url).hostname.replace(/^www\./, '');
+  if (bfcmOutreach(report, now)) {
+    const days = saleDates(now).daysToBlackFriday;
+    const lead = leadFinding(report.bfcm!);
+    return [
+      `Hi ${firstName(p.contact_name)},`,
+      `I came across ${store} in your portfolio and, with Black Friday ${days} day${days === 1 ? '' : 's'} out, ran a quick readiness check on it from the outside. ${lead ? `One thing stood out: ${lead}.` : 'It looks ready from the outside.'} The one-page result is linked below.`,
+      `I'm building StoreCare HQ. It runs the same check on all your client stores in one click and gives you a one-pager for each client in your branding. After the sale it keeps watching them every day (uptime, a daily test checkout, speed, theme and app changes) and sends a monthly report under your name.`,
+      `Want me to run it on your other client stores before Black Friday? I'm setting up the first agencies free.`,
+      `${sender}\nStoreCare HQ · storecarehq.com`,
+    ].join('\n\n');
+  }
   const finding = headlineFinding(report);
   return [
     `Hi ${firstName(p.contact_name)},`,
@@ -135,6 +152,7 @@ export function restorePacks(source: string): Pack[] {
         if (typeof report.url !== 'string' || typeof report.host !== 'string' || typeof report.checkedAt !== 'string' || !Number.isFinite(Date.parse(report.checkedAt)) || !Array.isArray(report.sections)) throw new Error('Invalid report snapshot.');
         publicUrl(report.url);
         if (report.sections.some(s => !object(s) || typeof s.title !== 'string' || !Array.isArray(s.items) || s.items.some((f: unknown) => !object(f) || typeof f.text !== 'string' || !['good', 'look'].includes(String(f.tone))))) throw new Error('Invalid report findings.');
+        if (report.bfcm !== undefined && !validAudit(report.bfcm)) throw new Error('Invalid Black Friday check.');
       }
     }
     return { prospect: validateProspect(raw.prospect), reviewed: raw.reviewed, draft: raw.draft, preparedAt: raw.preparedAt, status: raw.status as Pack['status'], report: report as QuickReport | null, ...(raw.subject !== undefined ? { subject: raw.subject as string } : {}), ...(links ? { links } : {}) };

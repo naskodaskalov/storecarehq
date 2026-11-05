@@ -1,99 +1,83 @@
 # BFCM readiness audit
 
-Status: proposed. No code, data or emails changed yet.
+Status: approved 5 Nov 2026, revised after review against main (28e1edd) and live Shopify checks.
 
 ## Outcome
 
-One click on a new **BFCM audit** page checks every client store and produces a branded one-page
-"Black Friday readiness" sheet per store (agency logo, colour, name). The agency saves it as PDF or turns
-on a client link. The same one-pager becomes the outreach hook for prospect agencies (part 2).
-Black Friday 27 Nov, Cyber Monday 30 Nov (computed: day after the fourth Thursday of November).
+One click on **BFCM audit** checks every client store and produces a branded one-page
+"Black Friday readiness" sheet per store (agency logo, colour, name). The agency saves it as PDF, turns on a
+client link, or sends it to the client by email. The same one-pager becomes the outreach hook for prospect
+agencies. Black Friday 27 Nov, Cyber Monday 30 Nov (day after the fourth Thursday of November).
 
-## Existing behavior verified
+## Review findings (live checks, 5 Nov)
 
-- Monitoring already stores what most checks need: daily speed (`speed_samples`), checkout runs, uptime,
-  daily SSL/domain/broken links (`site_checks`), hourly theme/apps and a daily product feed with stock.
-- `quick-report.ts` runs live public checks for any URL (probe, SSL, RDAP, links, PageSpeed); nothing saved.
-- `ReportView` + browser print is the PDF path; `/r/<token>` (public, noindex) is the client-link pattern.
-- Nothing checks password mode or noindex today (backlog item 2). A password page may even look "blocked".
-- Shopify's default robots.txt disallows `/collections/*sort_by*`, and sales need store access, so true
-  "best sellers" are not readable. Proxy: **products featured on the home page** (what the store promotes).
+- Password page: `/` redirects to `/password`, which answers **200** (not 401) with `Server-Timing: pageType;desc="password"`,
+  `X-Robots-Tag: nofollow` and `<form action="/password" id="login_form">`. Today the landing scan calls such a store
+  "headless" when the password page has no theme block. `/products.json` and `/products/<handle>.js` answer 401 there,
+  which `looksBlocked` reads as a bot block.
+- Worker bug found: the hourly snapshot treats the 200 password page as a readable home page, so turning the password
+  page on logs "apps removed" (the password page loads none) and sets "limited: no product feed"; turning it off logs
+  "apps added". Fixed here by skipping snapshots of password and "Store unavailable" pages.
+- "Store unavailable" (closed or frozen store): 404 with title "Store unavailable".
+- `/products/<handle>.js` returns JSON with `available`; 404 when the product is gone. Reliable stock check for the
+  products the home page promotes. Best sellers stay unreadable: the 2026 default robots.txt still disallows `sort_by`.
+- Product links on real home pages: plain hrefs (Kith, Death Wish, Taylor Stitch), Alpine `:href` expressions (Allbirds),
+  or only JSON menu data (Brooklinen). Extraction scans `/products/<handle>` paths, `<main>` first, not only `href="…"`.
 
-## Decisions (defaults; say if you want otherwise)
+## Design changes from the first plan
 
-1. In-app audit = latest monitoring data + a light live pass at click time (robots.txt, home page,
-   up to 3 featured product pages; ~5 polite requests per store as StoreCareBot). No PageSpeed or checkout
-   run at click time: stale or missing data is shown with its date or as "not checked", never as a failure.
-2. Runs 2 stores at a time from the browser, one server action per store, with per-row progress.
-   A store audited in the last 2 minutes returns that audit instead of re-checking. Paused stores are skipped.
-3. Each run is saved (`store_audits`). The client link is off until the agency turns it on; can be turned off.
-4. PDF = browser print, laid out to fit one A4/Letter page. No new dependencies.
+1. Detectors run inside `probeStore` (it already fetches robots.txt and the home page), so the landing scan, theme
+   detector, quick report and worker all get password / unavailable / noindex states without extra requests.
+   The audit's live pass is a probe without feed and cart plus up to 3 product JSON requests.
+2. Added **Send to client** (Resend when configured, otherwise mailto + mark as sent) and a short agency note on the
+   one-pager: sending is the step after the audit.
+3. Each audit is an immutable, dated snapshot with its own link (off until shared). Re-running makes a new one-pager.
+4. 3 stores at a time (different hosts), 10 s per request, a store re-checked within 2 minutes reuses its audit.
+   Each store is one `POST /api/bfcm/<id>` (same-origin only): Next.js runs a page's server actions one at a time,
+   so actions could not check stores in parallel.
+5. A fourth verdict, **Not fully checked** (`partial`): when the storefront could not be loaded (firewall, timeout,
+   error) and nothing needs fixing, the store is never called ready on checks that did not run. Failed checks carry
+   no email phrase, so they never become a claim in an email.
 
-## What the one-pager checks
+## Checks
 
-| Check | Source (app) | Fix before BF | Worth a look |
-| --- | --- | --- | --- |
-| Store open to shoppers | live home page | password page on | — |
-| Google can index it | live home + robots.txt | noindex on home, or Googlebot blocked from `/` | noindex on a featured product |
-| Checkout works | checkout runs, 48h | last run failed | not enabled → "turn it on before the sale" (not checked) |
-| Store up | incidents, uptime 30d | open "down" incident | uptime under 99.5% |
-| Mobile speed | latest speed sample (≤3 days) | — | LCP over 4s, score under 50, or real visitors "poor" |
-| Featured products | live home links + product snapshot | linked product returns 404 | featured product sold out |
-| Links | latest site check (≤3 days) | — | any broken link |
-| SSL certificate | latest site check | expired | 14 days or less left |
-| Domain | latest site check | expires before 7 Dec | 45 days or less left |
-| App weight | latest snapshot + live scripts | — | 12+ apps or 3+ unknown script hosts |
-| Recent changes | changes, 14 days | — | theme published / apps added → test and freeze |
+| Check | Source | Fix before BF | Worth a look | Not checked |
+| --- | --- | --- | --- | --- |
+| Open to shoppers | live home | password page, "Store unavailable", open down incident | home error now | firewall blocked |
+| Google can index | live home + robots.txt | noindex (meta or header), Googlebot blocked from `/` | — | home unreadable |
+| Checkout | checkout runs 48h | latest run failed | — | test off / no recent run |
+| Uptime | incidents, 30 days | — | under 99.5% | no checks |
+| Mobile speed | latest sample ≤3 days | — | LCP > 4 s, score < 50, real visitors poor | stale |
+| Featured products | live `/products/<h>.js` (≤3) | gone (404) or sold out | — | none linked / blocked |
+| Links | site check ≤3 days | — | broken links | stale |
+| SSL | site check, else live | expired or expires before Cyber Monday | ≤14 days | unreadable |
+| Domain | site check, else live RDAP | expires before 7 Dec | ≤45 days | not published |
+| App weight | live home scripts | — | 12+ apps or 3+ unknown hosts | home unreadable |
+| Recent changes | changes, 14 days | — | theme published / apps added | — |
 
-Verdict: "N things to fix before Black Friday" / "Ready · N worth a look" / "Ready for Black Friday", plus a
-countdown, a short fix list, check dates, and "Prepared by <agency> · public storefront checks, no store access".
+Prospect one-pagers (outreach) use the quick report's live data; checkout, uptime and recent changes show as not checked.
 
-## Part 1: in the app
+## Files
 
-- [NEW] `packages/storefront/src/states.ts` — pure detectors: password page (final URL `/password` or its
-  form, whatever the status code), noindex (meta + `X-Robots-Tag`), robots blocks Googlebot, featured product handles.
-- [MODIFY] `packages/storefront/src/index.ts` — export them; [MODIFY] `packages/storefront/test/storefront.test.ts` — fixtures.
-- [NEW] `apps/web/src/lib/bfcm.ts` — sale dates/countdown, audit types, `buildBfcmAudit()` (pure), `liveBfcmChecks()`.
-- [NEW] `apps/web/src/lib/bfcm.test.ts` — thresholds, unknown/stale data, blocked store, password page, dates, verdict.
-- [NEW] `apps/web/src/lib/bfcm-data.ts` — loads one store's latest monitoring rows as the signed-in user (RLS).
-- [NEW] `supabase/migrations/20261104000001_store_audits.sql` — `store_audits` (agency-scoped RLS; members read/insert,
-  update only `shared_at`; store must belong to the agency; size cap) and `public_audit(token)` (shared audits only).
-- [MODIFY] `supabase/tests/rls.test.sql` — cross-agency isolation, insert check, share gating, anonymous token read.
-- [NEW] `apps/web/src/components/bfcm-audit-view.tsx` — the branded one-pager (app, client link, admin).
-- [MODIFY] `apps/web/src/app/globals.css` — one-pager styles, one-page print layout, 390px layout.
-- [NEW] `apps/web/src/app/(app)/bfcm/page.tsx`, `bfcm-board.tsx`, `actions.ts` — store list with latest audit,
-  "Run on all N stores", per-row spinner/queued/failed/retry (visible loading feedback throughout), plan access check.
-- [NEW] `apps/web/src/app/(app)/bfcm/[id]/page.tsx` — one-pager, Save as PDF, client link on/off, run again.
-- [NEW] `apps/web/src/app/r/audit/[token]/page.tsx` — client view, no login, noindex (already public under `/r/`).
-- [MODIFY] `apps/web/src/app/(app)/nav-links.tsx` — "BFCM audit" nav item.
-- [MODIFY] `apps/web/src/app/(app)/page.tsx` — countdown banner with the one-click button until Cyber Monday.
-- [MODIFY] `apps/web/src/lib/demo.ts` — audits table, `public_audit`, canned live results (one store in password
-  mode, a sold-out featured product, an expiring domain) so the demo and videos show a real-looking audit.
-- [MODIFY] `apps/web/src/lib/workspace-data.ts` — include audits in the workspace export.
-
-## Part 2: outreach hook (after part 1)
-
-- [MODIFY] `apps/web/src/lib/quick-report.ts` — reuse the robots/home responses it already fetches; add `bfcm` to the report.
-- [MODIFY] `apps/web/src/app/admin/quick-report/quick-report-form.tsx` — "BFCM one-pager" view and print.
-- [MODIFY] `apps/web/src/lib/outreach.ts` — validate optional `bfcm` in backups; before Cyber Monday the draft opens
-  with the Black Friday finding ("23 days to Black Friday: …").
-- [MODIFY] `apps/web/src/lib/outreach-email.ts` — subject "Black Friday check on <store>" before Cyber Monday;
-  the health document becomes the one-pager. Old backups and links keep working.
-- [MODIFY] `apps/web/src/app/outreach/r/[token]/page.tsx` — render the one-pager for BFCM snapshots.
-- [MODIFY] `quick-report.test.ts`, `outreach.test.ts`, `outreach-email.test.ts`.
-- For prospects: checkout shows "not tested (needs the owner's OK)"; uptime/recent changes "not monitored yet".
+- `packages/storefront/src/states.ts` [NEW]: `readPageState`, `productHandles`, `checkProducts`; `probe.ts` adds `page` + `timeoutMs`.
+- `apps/worker/src/jobs/storefront.ts`: skip snapshots of password/unavailable pages (+ test).
+- `apps/web/src/lib/bfcm.ts` [NEW]: dates, types, pure `buildBfcmAudit`, `prospectAudit`; `bfcm-data.ts` [NEW]: RLS loads,
+  live pass, demo results; `bfcm-email.ts` [NEW]; tests.
+- `supabase/migrations/20261105120000_store_audits.sql` [NEW]: table, RLS (members read/insert, update only note/share/sent
+  fields, store must belong to the agency, active plan), `public_audit(token)`; `supabase/tests/rls.test.sql`.
+- UI: `components/bfcm-one-pager.tsx`, `app/(app)/bfcm/{page,bfcm-board,actions}.tsx`, `app/(app)/bfcm/[id]/page.tsx`,
+  `app/r/audit/[token]/page.tsx`, nav item (in season), Overview banner, print CSS (one A4/Letter page), demo data.
+- Outreach: quick report adds `bfcm`; until the day before Black Friday the subject is "Black Friday check on <host>",
+  the draft opens with the readiness finding, and the hosted health link renders the one-pager. Only a fix or a specific
+  finding (speed, links, SSL, domain) opens the email, never app weight; a prospect whose storefront blocked us gets the
+  plain health check instead of a "Not fully checked" one-pager. Old backups and links keep working.
 
 ## Verification
 
-- `npm run typecheck`, `npm test`, web production build; RLS SQL test on a local Postgres.
-- Demo mode in the browser: run all 6 stores, progress states, one-pager at desktop and 390px, print preview is
-  one page, link on/off, signed-out client view, 404 after turning the link off.
-- Live: this sandbox can't reach stores, so a real-store pass needs you (any Shopify development store is
-  password-protected by default, a good password-mode test).
+Typecheck, unit tests, web build, RLS + worker DB tests on local Postgres 16, demo mode in a browser at desktop and 390 px
+(run all, progress, one-pager, print preview, link on/off, signed-out client view), and the live pass against real stores
+(a password-protected dev store, a store with sold-out/missing featured products).
 
-## Rollout (needs your go-ahead)
+## Rollout (needs the owner)
 
-- Apply the migration to StoreCare HQ (additive) before deploying.
-- This session can read the repo but not push yet: approve and I'll request push access and open a PR,
-  or hand you a patch.
-- [MODIFY] `system_architecture.md`, `task.md` after the build.
+Apply the migration (additive) before deploying the web app. Worker change ships with the merge to main.

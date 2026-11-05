@@ -7,6 +7,8 @@ import { CopyButton } from '@/components/copy-button';
 import { COLUMNS, draftMessage, ensureUnique, exportCsv, newPack, parseCsv, restorePacks, serializePacks, validateProspect, type Pack } from '@/lib/outreach';
 import { SAMPLE_NOTICE, sampleMonthReport } from '@/lib/sample-month-report';
 import { quickReport } from '../actions';
+import { BfcmOnePager } from '@/components/bfcm-one-pager';
+import { validAudit } from '@/lib/bfcm';
 import { EmailComposer, type TestSenderInfo } from './email-composer';
 import { OutreachHistory } from './outreach-history';
 import { contactDay, previousContacts, type OutreachContact } from '@/lib/outreach-history';
@@ -175,6 +177,7 @@ export function OutreachForm({ sender, history, historyError, timeZone }: { send
             <button className={`btn ${view === 'sample' ? '' : 'secondary'}`} aria-pressed={view === 'sample'} onClick={() => setView('sample')}>Sample monthly report</button>
             <button className="btn secondary" disabled={view === 'health' && !current.report?.ok} onClick={() => window.print()}>Print / save selected report as PDF</button>
           </div>
+          {view === 'health' && current.report?.ok && current.report.bfcm && validAudit(current.report.bfcm) && <div className="outreach-print"><BfcmOnePager audit={current.report.bfcm} brand={{ name: 'StoreCare HQ', brandColor: '#2747A8' }} preparedFor={current.prospect.agency_name} embedded /></div>}
           {view === 'health' && (current.report?.ok ? <article className="card outreach-print">
             <p className="small muted">StoreCareHQ · current public storefront snapshot</p>
             <h2>{current.report.host}</h2><p>Checked: {current.report.checkedAt}</p>

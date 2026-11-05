@@ -4,7 +4,7 @@ import { supabaseServer } from './supabase';
 import type { BillingFields } from './billing';
 
 export type Agency = { id: string; name: string; plan: string; brand_color: string } & BillingFields;
-const AGENCY_COLUMNS =
+export const AGENCY_COLUMNS =
   'id, name, plan, brand_color, trial_ends_at, subscription_status, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_subscription_id';
 
 /** The signed-in user's agency, or a redirect to onboarding. */

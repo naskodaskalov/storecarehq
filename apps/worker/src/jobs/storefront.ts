@@ -61,7 +61,8 @@ export async function runStorefrontDiff(
     : null;
 
   // Skip a snapshot entirely when the page itself could not be read: a blocked visit is not "all apps removed".
-  const readable = !result.home.blocked && result.home.status === 200;
+  // Nor is the password page (it answers 200 but loads none of the store's apps) or Shopify's "Store unavailable" page.
+  const readable = !result.home.blocked && result.home.status === 200 && !result.page?.password && !result.page?.unavailable;
   let changes: Change[] = [];
   if (readable) {
     await db.query(

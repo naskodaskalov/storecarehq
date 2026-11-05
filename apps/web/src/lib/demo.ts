@@ -216,6 +216,7 @@ function seed(): Tables {
     speed_samples,
     storefront_snapshots,
     reports: [],
+    store_audits: [],
   };
   tables.reports = autoDrafted([juniper, kite, salt], tables);
   return tables;
@@ -356,6 +357,7 @@ class Query implements PromiseLike<Result> {
         id: this.table === 'changes' ? rows.length + 1 : uid(),
         created_at: new Date().toISOString(),
         ...(this.table === 'reports' ? { share_token: [uid(), uid()].join('').replace(/-/g, ''), status: 'draft' } : {}),
+        ...(this.table === 'store_audits' ? { kind: 'bfcm', share_token: [uid(), uid()].join('').replace(/-/g, ''), shared_at: null, note: null, sent_at: null, sent_to: null } : {}),
         ...v,
       }));
       rows.push(...list);
@@ -419,6 +421,14 @@ export function demoClient() {
           data: { period: r.period, status: r.status, summary_text: r.summary_text, facts: r.facts, sections: r.sections, store_name: s?.name, agency_name: a?.name, brand_color: a?.brand_color, logo_url: a?.logo_url ?? null },
           error: null,
         };
+      }
+      if (fn === 'public_audit') {
+        const t = db();
+        const r = (t.store_audits ?? []).find((x) => x.share_token === args.token && x.shared_at);
+        if (!r) return { data: null, error: null };
+        const s = t.stores.find((x) => x.id === r.store_id);
+        const a = t.agencies.find((x) => x.id === r.agency_id);
+        return { data: { audit: r.audit, note: r.note, created_at: r.created_at, store_name: s?.name, agency_name: a?.name, brand_color: a?.brand_color, logo_url: a?.logo_url ?? null }, error: null };
       }
       if (fn === 'uptime_stats') {
         const rows = db().uptime_checks.filter((u) => u.store_id === args.p_store && u.checked_at >= args.p_from && u.checked_at < args.p_to);

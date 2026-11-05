@@ -1,16 +1,28 @@
-import { restorePacks, type Pack } from './outreach.ts';
+import { bfcmOutreach, restorePacks, type Pack } from './outreach.ts';
 import { SAMPLE_NOTICE, sampleMonthReport } from './sample-month-report.ts';
+import { CHECK_LABELS, headline, longDate, shortDate, validAudit, type BfcmAudit } from './bfcm.ts';
 
 export type TestEmailInput = { pack: Pack; subject: string };
 export type EmailDocument = { filename: string; html: string };
 export type OutreachEmail = { subject: string; html: string; text: string; documents: EmailDocument[] };
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-/** Names the client store the check was run on: specific, short, and not a sales line. */
-export function defaultOutreachSubject(_agency: string, clientStoreUrl?: string) {
+/** Names the client store the check was run on: specific, short, and not a sales line. Before Black Friday it
+ *  names the Black Friday check instead. */
+export function defaultOutreachSubject(_agency: string, clientStoreUrl?: string, blackFriday = false) {
   let host = '';
   try { host = clientStoreUrl ? new URL(clientStoreUrl).hostname.replace(/^www\./, '') : ''; } catch { /* fall back below */ }
+  if (blackFriday) return host ? `Black Friday check on ${host}` : `A Black Friday check on one of your client stores`;
   return host ? `Quick health check on ${host}` : `A quick health check on one of your client stores`;
+}
+
+const TONE_WORD = { fix: 'Fix before the sale', look: 'Worth a look', good: 'Fine', unknown: 'Not checked' } as const;
+/** The one-pager as plain email-safe HTML for the downloadable health document. Every value is escaped. */
+function bfcmSection(a: BfcmAudit): string {
+  const fixes = a.items.filter(i => i.tone === 'fix');
+  return `<h2 style="font-size:22px;margin:0 0 6px">Black Friday readiness: ${esc(headline(a))}</h2><p style="margin:0 0 16px;color:#596f72">Checked ${esc(longDate(a.checkedAt))} · Black Friday ${esc(shortDate(a.sale.blackFriday))}, Cyber Monday ${esc(shortDate(a.sale.cyberMonday))}</p>`
+    + (fixes.length ? `<h3 style="font-size:17px">Fix before the sale</h3><ol>${fixes.map(i => `<li><strong>${esc(CHECK_LABELS[i.key])}.</strong> ${esc(i.text)}</li>`).join('')}</ol>` : '')
+    + `<h3 style="font-size:17px">What we checked</h3><ul>${a.items.map(i => `<li><strong>${esc(CHECK_LABELS[i.key])}</strong> · ${esc(TONE_WORD[i.tone])}: ${esc(i.text)}</li>`).join('')}</ul><hr style="border:0;border-top:1px solid #dce6e3;margin:28px 0">`;
 }
 
 function document(title: string, kicker: string, content: string, brand = 'StoreCare HQ'): string {
@@ -54,15 +66,17 @@ export function outreachEmail(input: TestEmailInput): OutreachEmail {
   const report = pack.report;
   if (!report?.ok) throw new Error('Health check is unavailable.');
   const sample = sampleMonthReport(pack.prospect.agency_name, pack.preparedAt || report.checkedAt);
-  const health = document('Current store health check', `Prepared for ${pack.prospect.agency_name}`, `<p><strong>${esc(report.host)}</strong><br>Checked: ${esc(report.checkedAt)}</p><p>A one-off public storefront snapshot. No historical monitoring or full checkout test. Unavailable checks require verification.</p>${report.sections.map(s => `<h2 style="font-size:19px">${esc(s.title)}</h2><ul>${s.items.map(i => `<li>${esc(i.text)}</li>`).join('')}</ul>`).join('')}`);
+  const bfcm = report.bfcm && validAudit(report.bfcm) ? report.bfcm : null;
+  const health = document(bfcm ? 'Black Friday readiness check' : 'Current store health check', `Prepared for ${pack.prospect.agency_name}`, `${bfcm ? bfcmSection(bfcm) : ''}<p><strong>${esc(report.host)}</strong><br>Checked: ${esc(report.checkedAt)}</p><p>A one-off public storefront snapshot. No historical monitoring or full checkout test. Unavailable checks require verification.</p>${report.sections.map(s => `<h2 style="font-size:19px">${esc(s.title)}</h2><ul>${s.items.map(i => `<li>${esc(i.text)}</li>`).join('')}</ul>`).join('')}`);
   const f = sample.facts;
   const sampleHtml = document(`Your ${f.period.label} care report`, SAMPLE_NOTICE, `<p style="padding:16px;background:#fff4cf;border-left:3px solid #a17b24">${esc(SAMPLE_NOTICE)}</p><p><strong>${esc(f.storeName)}</strong><br>${esc(f.storeHost)}</p><h2>Illustrative store health</h2><p>Uptime: ${f.uptimePct}% (${f.uptimeChecks} sample checks) · Health score: ${f.healthScore}/100 · Mobile load: 2.1s. All metrics are fictional.</p><h2>Example work · ${f.work.hoursUsed}h of ${f.work.hoursIncluded}h</h2><table width="100%" cellspacing="0" cellpadding="10">${f.work.entries.map(w => `<tr><td style="border-bottom:1px solid #dce6e3">${esc(w.date)}</td><td style="border-bottom:1px solid #dce6e3">${esc(w.text)}</td><td style="border-bottom:1px solid #dce6e3;white-space:nowrap">${w.hours}h</td></tr>`).join('')}</table><p>${esc(SAMPLE_NOTICE)}</p>`, f.agencyName);
   const note = 'The health check is a snapshot from today. The sample report uses example data. Not relevant? Reply "no" and I won\'t follow up.';
   const links = pack.links;
   const urls = links ? { health: `${links.origin}/outreach/r/${links.healthToken}`, sample: `${links.origin}/outreach/r/${links.sampleToken}` } : null;
   const button = (url: string, label: string) => `<p style="margin:0 0 14px"><a href="${esc(url)}" style="display:inline-block;padding:15px 24px;border-radius:7px;background:#2747a8;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold">${label}</a></p>`;
-  const buttons = urls ? `<div style="margin:26px 0 8px">${button(urls.health, 'View the health check')}${button(urls.sample, 'Sample monthly report')}</div>` : '<p>Create report links in the admin screen before approving this email.</p>';
+  const healthLabel = bfcmOutreach(report) ? 'View the Black Friday check' : 'View the health check';
+  const buttons = urls ? `<div style="margin:26px 0 8px">${button(urls.health, healthLabel)}${button(urls.sample, 'Sample monthly report')}</div>` : '<p>Create report links in the admin screen before approving this email.</p>';
   const paragraphs = pack.draft.split(/\n\s*\n/).filter(Boolean).map(p => `<p style="margin:0 0 18px;font-size:16px;line-height:26px;color:#314c50">${linkOwnSite(esc(p)).replace(/\n/g, '<br>')}</p>`).join('');
   const html = document('', `Prepared for ${pack.prospect.agency_name}`, `${paragraphs}${buttons}<table role="presentation" width="100%"><tr><td bgcolor="#f0f7f5" style="padding:14px 16px;border-left:3px solid #2747a8;font-size:13px;line-height:20px;color:#4a6064">${esc(note)}${links ? ` Links work until ${esc(links.expiresAt.slice(0, 10))}.` : ''}</td></tr></table>`);
-  return { subject: `${subject}`, html, text: `${pack.draft}\n\n${urls ? `Health check: ${urls.health}\nSample monthly report: ${urls.sample}\n\n` : 'Create report links before approving.\n\n'}${note}\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
+  return { subject: `${subject}`, html, text: `${pack.draft}\n\n${urls ? `${bfcmOutreach(report) ? 'Black Friday check' : 'Health check'}: ${urls.health}\nSample monthly report: ${urls.sample}\n\n` : 'Create report links before approving.\n\n'}${note}\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
 }

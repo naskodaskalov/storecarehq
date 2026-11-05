@@ -6,6 +6,8 @@ import { ReportView } from '@/components/report-view';
 import { PrintButton } from '@/components/copy-button';
 import { readPublicReport, reportStore } from '@/lib/outreach-report-links';
 import { SAMPLE_NOTICE } from '@/lib/sample-month-report';
+import { BfcmOnePager } from '@/components/bfcm-one-pager';
+import { validAudit } from '@/lib/bfcm';
 import { logReportView, viewerIsAdmin } from '@/lib/outreach-report-views-store';
 
 export const dynamic = 'force-dynamic';
@@ -28,10 +30,10 @@ export default async function OutreachReport({ params }: { params: Promise<{ tok
       <p style={{ padding: 16, border: '2px solid #a17b24', background: '#fff4cf' }}>{SAMPLE_NOTICE}</p>
       <ReportView facts={report.sample.facts} summary={report.sample.summary} sections={DEFAULT_SECTIONS} />
       <p style={{ padding: 16, border: '2px solid #a17b24' }}>{SAMPLE_NOTICE}</p>
-    </> : <article className="card">
+    </> : <>{report.health.bfcm && validAudit(report.health.bfcm) && <BfcmOnePager audit={report.health.bfcm} brand={{ name: 'StoreCare HQ', brandColor: '#2747A8' }} preparedFor={report.health.preparedFor} />}<article className="card">
       <p className="small muted">StoreCare HQ · Public storefront snapshot</p><h1>{report.health.host}</h1>
       <p>Checked {report.health.checkedAt}</p><p>One outside look, with no historical monitoring or full checkout test. Unavailable checks require verification.</p>
       {report.health.sections.map(s => <section key={s.title}><h2>{s.title}</h2><ul>{s.items.map((item, i) => <li key={i}>{item.text}</li>)}</ul></section>)}
-    </article>}
+    </article></>}
   </main>;
 }

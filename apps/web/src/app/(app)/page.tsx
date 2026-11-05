@@ -6,6 +6,7 @@ import { StoreTable } from '@/components/store-table';
 import { ActivityLog } from '@/components/activity-log';
 import { activityLines } from '@/lib/activity';
 import { briefHeadline, briefItems, monthProgress, pace } from '@/lib/dashboard-brief';
+import { countdown, inSeason, saleDates, shortDate } from '@/lib/bfcm';
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   const { deleted } = await searchParams;
@@ -68,6 +69,15 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <div className="page-actions"><span className="period-label"><Icon name="calendar" size={18} />{monthStartLabel()}</span><Link className="btn" href="/onboarding/store"><Icon name="plus" size={18} />Add store</Link></div>
       </div>
       {deletedNotice}
+      {inSeason(now.getTime()) && (
+        <section className="bfcm-banner" aria-labelledby="bfcm-banner-title">
+          <div>
+            <strong id="bfcm-banner-title">{countdown(now.getTime())}</strong>
+            <p>Check all {d.stores.filter((s) => s.status !== 'paused').length} stores for Black Friday ({shortDate(saleDates(now.getTime()).blackFriday)}) and send each client a one-page result in your branding.</p>
+          </div>
+          <Link className="btn" href="/bfcm?run=all"><Icon name="tag" size={16} />Check all stores</Link>
+        </section>
+      )}
 
       <div className="kpis dashboard-kpis">
         <div className="kpi">
