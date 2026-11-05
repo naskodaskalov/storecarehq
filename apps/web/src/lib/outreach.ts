@@ -1,5 +1,5 @@
 import type { QuickReport } from './quick-report.ts';
-import { inSeason, leadFinding, saleDates, validAudit } from './bfcm.ts';
+import { currentOffer, inSeason, leadFinding, offerDay, offerTrialEnd, saleDates, validAudit } from './bfcm.ts';
 
 export const COLUMNS = ['agency_name', 'agency_url', 'directory_url', 'contact_name', 'contact_email', 'client_store_url', 'portfolio_source_url'] as const;
 export type Prospect = Record<typeof COLUMNS[number], string>;
@@ -103,11 +103,13 @@ export function draftMessage(p: Prospect, report: QuickReport, sender = 'Nasko',
   if (bfcmOutreach(report, now)) {
     const days = saleDates(now).daysToBlackFriday;
     const lead = leadFinding(report.bfcm!);
+    // The button on the hosted one-pager signs them up with this store filled in; until the offer's end it's free.
+    const free = offerTrialEnd(currentOffer(now), now);
     return [
       `Hi ${firstName(p.contact_name)},`,
       `I came across ${store} in your portfolio and, with Black Friday ${days} day${days === 1 ? '' : 's'} out, ran a quick readiness check on it from the outside. ${lead ? `One thing stood out: ${lead}.` : 'It looks ready from the outside.'} The one-page result is linked below.`,
       `I'm building StoreCare HQ. It runs the same check on all your client stores in one click and gives you a one-pager for each client in your branding. After the sale it keeps watching them every day (uptime, a daily test checkout, speed, theme and app changes) and sends a monthly report under your name.`,
-      `Want me to run it on your other client stores before Black Friday? I'm setting up the first agencies free.`,
+      `There's a button on the one-pager to run it on your other client stores${free ? `, free until ${offerDay(free)}` : ' with a free trial'}. Or reply and I'll set it up with you.`,
       `${sender}\nStoreCare HQ · storecarehq.com`,
     ].join('\n\n');
   }

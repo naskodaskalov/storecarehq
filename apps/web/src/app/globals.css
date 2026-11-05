@@ -993,6 +993,24 @@ a.activity-text:hover { text-decoration: underline; text-underline-offset: 3px; 
 .bfcm-audit-preview { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 @media (max-width: 1000px) { .bfcm-audit-layout { grid-template-columns: minmax(0, 1fr); } }
 
+.bfcm-welcome { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; border-left: 3px solid var(--accent); }
+.bfcm-welcome > div:first-child { flex: 1 1 420px; min-width: 0; }
+.bfcm-welcome-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* "Check all your client stores" on hosted outreach links. */
+.signup-cta-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; background: #17252b; color: #ecf3f5; border-radius: 8px; }
+.signup-cta-bar p { margin: 0; font-size: 14px; }
+.signup-cta-bar p span { color: #9fe8dc; font-weight: 600; }
+.signup-cta-bar .btn, .signup-cta .btn { background: #2bd0ba; color: #08262a; }
+.signup-cta-bar .btn:hover, .signup-cta .btn:hover { background: #5adcc9; }
+.signup-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; padding: 22px 24px; background: #17252b; color: #ecf3f5; border-radius: 8px; }
+.signup-cta > div { flex: 1 1 360px; min-width: 0; }
+.signup-cta h2 { margin: 0 0 6px; font-size: 20px; color: #fff; }
+.signup-cta p { margin: 0; color: #c9d8dc; line-height: 1.5; }
+.signup-cta p strong { color: #fff; }
+.signup-cta .signup-cta-terms { margin-top: 10px; font-size: 13px; color: #9fb4ba; }
+@media (max-width: 560px) { .signup-cta-bar .btn, .signup-cta .btn { width: 100%; justify-content: center; } }
+
 @media print {
   body:has(.bfcm-print) .nav, body:has(.bfcm-print) .workspace-header, body:has(.bfcm-print) .trial-bar, body:has(.bfcm-print) .page-progress { display: none !important; }
   body:has(.bfcm-print) .main { padding: 0; max-width: none; }

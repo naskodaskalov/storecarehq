@@ -31,7 +31,7 @@ export function websiteLink(host: string) {
 }
 
 const matches = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
-export const isOutreachReportPath = (path: string) => /^\/outreach\/r\/[^/]+(?:\/download)?\/?$/.test(path);
+export const isOutreachReportPath = (path: string) => /^\/outreach\/r\/[^/]+(?:\/download|\/start)?\/?$/.test(path);
 /** Search-engine files: served on every host (each host answers for itself) without a session. */
 const CRAWLER_FILES = ['/robots.txt', '/sitemap.xml'];
 export function isPublicPath(path: string) {

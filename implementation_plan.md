@@ -1,83 +1,73 @@
-# BFCM readiness audit
+# Outreach sign-up path (BFCM step 2)
 
-Status: approved 5 Nov 2026, revised after review against main (28e1edd) and live Shopify checks.
+Status: approved 5 Nov 2026 (trial until 2 December), built. The previous plan is in `bfcm_audit_plan.md`.
 
 ## Outcome
 
-One click on **BFCM audit** checks every client store and produces a branded one-page
-"Black Friday readiness" sheet per store (agency logo, colour, name). The agency saves it as PDF, turns on a
-client link, or sends it to the client by email. The same one-pager becomes the outreach hook for prospect
-agencies. Black Friday 27 Nov, Cyber Monday 30 Nov (day after the fourth Thursday of November).
+An agency that opens its Black Friday one-pager from an outreach email clicks **Check all your client stores**, signs
+up with that client store already filled in, and ends on the BFCM page, where the check runs by itself. Sign-ups from
+an outreach link until Black Friday get a trial that ends on **2 December** instead of after 7 days.
 
-## Review findings (live checks, 5 Nov)
+## Flow
 
-- Password page: `/` redirects to `/password`, which answers **200** (not 401) with `Server-Timing: pageType;desc="password"`,
-  `X-Robots-Tag: nofollow` and `<form action="/password" id="login_form">`. Today the landing scan calls such a store
-  "headless" when the password page has no theme block. `/products.json` and `/products/<handle>.js` answer 401 there,
-  which `looksBlocked` reads as a bot block.
-- Worker bug found: the hourly snapshot treats the 200 password page as a readable home page, so turning the password
-  page on logs "apps removed" (the password page loads none) and sets "limited: no product feed"; turning it off logs
-  "apps added". Fixed here by skipping snapshots of password and "Store unavailable" pages.
-- "Store unavailable" (closed or frozen store): 404 with title "Store unavailable".
-- `/products/<handle>.js` returns JSON with `available`; 404 when the product is gone. Reliable stock check for the
-  products the home page promotes. Best sellers stay unreadable: the 2026 default robots.txt still disallows `sort_by`.
-- Product links on real home pages: plain hrefs (Kith, Death Wish, Taylor Stitch), Alpine `:href` expressions (Allbirds),
-  or only JSON menu data (Brooklinen). Extraction scans `/products/<handle>` paths, `<main>` first, not only `href="…"`.
+1. **Hosted one-pager** (`/outreach/r/<token>`): a "Check all your client stores" button in the top bar and a short
+   panel under the one-pager: one page per store in your branding, ready to send before the sale; the client store is
+   filled in; "Free until 2 December, then from $29 a month. Card required, cancel any time." From Black Friday on it
+   reads "Start your free trial" with the usual 7 days. Hidden when printing. The sample monthly report gets the panel too.
+2. **`GET /outreach/r/<token>/start`** (public like the view and download routes; checks the link is still live):
+   sets `sc_store` to the client store (the cookie the landing-page check already uses to prefill onboarding) and,
+   until Black Friday, `sc_offer`: a signed, expiring offer (httpOnly). Redirects to sign-up (`/login?trial=1`), which
+   shows the offer. A signed-in visitor goes to their workspace as today.
+3. **Sign-up → workspace → plan**: the plan step says "Nothing is charged until 2 December". Checkout gets
+   `trial_end` = 2 Dec 12:00 UTC (a 2 December charge from the US to Australia) instead of 7 days, and the Stripe
+   subscription metadata records the offer and the outreach snapshot (attribution). Whichever is longer wins, so a
+   sign-up close to Black Friday still gets 7 days. Only an agency's first plan, as today.
+4. **Store step**: prefilled (existing). After the store is added, `sc_store` is cleared, so "add another store" starts empty.
+5. **Care plan step** → `/bfcm?run=all&welcome=1` for offer sign-ups (others keep the store page). A welcome notice says
+   the store's first health check takes a few minutes and invites them to add their other client stores meanwhile.
+6. **BFCM board**: a store whose first health check is still running shows "First health check running…" and its
+   Black Friday check starts as soon as that finishes (polls the existing status endpoint; after 10 minutes it stops
+   with a Retry). The server refuses to audit such a store: a one-pager made a minute after adding a store would show
+   speed, links, checkout and uptime as "not checked".
 
-## Design changes from the first plan
+## Choices
 
-1. Detectors run inside `probeStore` (it already fetches robots.txt and the home page), so the landing scan, theme
-   detector, quick report and worker all get password / unavailable / noindex states without extra requests.
-   The audit's live pass is a probe without feed and cart plus up to 3 product JSON requests.
-2. Added **Send to client** (Resend when configured, otherwise mailto + mark as sent) and a short agency note on the
-   one-pager: sending is the step after the audit.
-3. Each audit is an immutable, dated snapshot with its own link (off until shared). Re-running makes a new one-pager.
-4. 3 stores at a time (different hosts), 10 s per request, a store re-checked within 2 minutes reuses its audit.
-   Each store is one `POST /api/bfcm/<id>` (same-origin only): Next.js runs a page's server actions one at a time,
-   so actions could not check stores in parallel.
-5. A fourth verdict, **Not fully checked** (`partial`): when the storefront could not be loaded (firewall, timeout,
-   error) and nothing needs fixing, the store is never called ready on checks that did not run. Failed checks carry
-   no email phrase, so they never become a claim in an email.
-
-## Checks
-
-| Check | Source | Fix before BF | Worth a look | Not checked |
-| --- | --- | --- | --- | --- |
-| Open to shoppers | live home | password page, "Store unavailable", open down incident | home error now | firewall blocked |
-| Google can index | live home + robots.txt | noindex (meta or header), Googlebot blocked from `/` | — | home unreadable |
-| Checkout | checkout runs 48h | latest run failed | — | test off / no recent run |
-| Uptime | incidents, 30 days | — | under 99.5% | no checks |
-| Mobile speed | latest sample ≤3 days | — | LCP > 4 s, score < 50, real visitors poor | stale |
-| Featured products | live `/products/<h>.js` (≤3) | gone (404) or sold out | — | none linked / blocked |
-| Links | site check ≤3 days | — | broken links | stale |
-| SSL | site check, else live | expired or expires before Cyber Monday | ≤14 days | unreadable |
-| Domain | site check, else live RDAP | expires before 7 Dec | ≤45 days | not published |
-| App weight | live home scripts | — | 12+ apps or 3+ unknown hosts | home unreadable |
-| Recent changes | changes, 14 days | — | theme published / apps added | — |
-
-Prospect one-pagers (outreach) use the quick report's live data; checkout, uptime and recent changes show as not checked.
+- **Signed cookie, not a public promo code**: only people with an outreach link get the longer trial. It survives email
+  confirmation because confirmation already has to happen in the same browser (PKCE). Signed with `STRIPE_SECRET_KEY`
+  (or `SIGNUP_OFFER_SECRET` if set); without Stripe there is no offer. No new required env var.
+- **No migration**: attribution goes to Stripe metadata; outreach history is unchanged.
+- **Draft email**: the Black Friday draft's closing changes from "I'm setting up the first agencies free" to "There's a
+  button on the one-pager to run it on your other client stores, free until 2 December. Or reply and I'll set it up
+  with you."
 
 ## Files
 
-- `packages/storefront/src/states.ts` [NEW]: `readPageState`, `productHandles`, `checkProducts`; `probe.ts` adds `page` + `timeoutMs`.
-- `apps/worker/src/jobs/storefront.ts`: skip snapshots of password/unavailable pages (+ test).
-- `apps/web/src/lib/bfcm.ts` [NEW]: dates, types, pure `buildBfcmAudit`, `prospectAudit`; `bfcm-data.ts` [NEW]: RLS loads,
-  live pass, demo results; `bfcm-email.ts` [NEW]; tests.
-- `supabase/migrations/20261105120000_store_audits.sql` [NEW]: table, RLS (members read/insert, update only note/share/sent
-  fields, store must belong to the agency, active plan), `public_audit(token)`; `supabase/tests/rls.test.sql`.
-- UI: `components/bfcm-one-pager.tsx`, `app/(app)/bfcm/{page,bfcm-board,actions}.tsx`, `app/(app)/bfcm/[id]/page.tsx`,
-  `app/r/audit/[token]/page.tsx`, nav item (in season), Overview banner, print CSS (one A4/Letter page), demo data.
-- Outreach: quick report adds `bfcm`; until the day before Black Friday the subject is "Black Friday check on <host>",
-  the draft opens with the readiness finding, and the hosted health link renders the one-pager. Only a fix or a specific
-  finding (speed, links, SSL, domain) opens the email, never app weight; a prospect whose storefront blocked us gets the
-  plain health check instead of a "Not fully checked" one-pager. Old backups and links keep working.
+- `apps/web/src/lib/signup-offer.ts` [NEW] + test: offer window and trial end from `saleDates`, sign/verify, cookie options.
+- `apps/web/src/app/outreach/r/[token]/start/route.ts` [NEW]: the button's target (step 2).
+- `apps/web/src/components/signup-cta.tsx` [NEW]: the panel and the top-bar button.
+- `apps/web/src/app/outreach/r/[token]/page.tsx` [MODIFY]: render them.
+- `apps/web/src/lib/outreach-report-links.ts` [MODIFY]: `readStartTarget(token)`, the client store for either token.
+- `apps/web/src/lib/domains.ts` [MODIFY] + test: `/outreach/r/<token>/start` is public.
+- `apps/web/src/lib/billing.ts` [MODIFY] + test: `checkoutTrial(agency, offerEnd, now)`, the charge date.
+- `apps/web/src/app/(app)/billing/actions.ts` [MODIFY]: offer → `trial_end` and metadata.
+- `apps/web/src/app/login/page.tsx`, `onboarding/page.tsx`, `onboarding/trial/page.tsx`, `(app)/billing/page.tsx` [MODIFY]: offer copy.
+- `apps/web/src/app/onboarding/actions.ts` [MODIFY]: clear `sc_store` after adding; offer sign-ups finish on `/bfcm`.
+- `apps/web/src/lib/bfcm-run.ts`, `(app)/bfcm/bfcm-board.tsx`, `(app)/bfcm/page.tsx` [MODIFY]: first-health-check wait, welcome notice.
+- `apps/web/src/lib/outreach.ts` [MODIFY] + test: the draft's closing.
+- `apps/web/src/app/(legal)/privacy/page.tsx` [MODIFY]: list the `sc_offer` cookie.
+- `apps/web/src/lib/demo.ts` [MODIFY]: an opt-in demo store with a first health check in progress, for browser checks.
 
 ## Verification
 
-Typecheck, unit tests, web build, RLS + worker DB tests on local Postgres 16, demo mode in a browser at desktop and 390 px
-(run all, progress, one-pager, print preview, link on/off, signed-out client view), and the live pass against real stores
-(a password-protected dev store, a store with sold-out/missing featured products).
+Unit tests (offer signing: tampered, expired, other key; trial parameters by date; public routes; draft copy),
+typecheck, build, and a demo browser run at desktop and 390 px: hosted link → button → cookies and the sign-up page
+with the offer; plan step copy; the board's first-health-check state, then the one-pager.
 
-## Rollout (needs the owner)
+## Rollout
 
-Apply the migration (additive) before deploying the web app. Worker change ships with the merge to main.
+Merge = deploy. No migration, no new required env var.
+
+## Decision
+
+Trial end **2 December** (charge that day) for sign-ups from outreach links until the day before Black Friday.
+Approved 5 Nov.

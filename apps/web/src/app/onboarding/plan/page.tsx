@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase';
 import { host } from '@/lib/format';
 import { SubmitButton } from '@/components/submit-button';
+import { offerFromCookies } from '@/lib/signup-offer-cookie';
 import { savePlan } from '../actions';
 import { OnboardingFrame } from '../steps';
 
@@ -17,6 +18,7 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
   if (!store) redirect('/');
   const { data: plans, error: planReadError } = await supabase.from('care_plans').select('name, hours_included, rollover_rule').eq('store_id', storeId).limit(1);
   const plan = plans?.[0];
+  const fromOutreach = !!(await offerFromCookies());
 
   return (
     <OnboardingFrame step={4}>
@@ -71,7 +73,9 @@ export default async function Step3({ searchParams }: { searchParams: Promise<{ 
           </div>
 
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
-            <span className="small muted">Your first health check is queued automatically. Follow its progress on the store page.</span>
+            <span className="small muted">{fromOutreach
+              ? 'Your first health check is queued automatically. The Black Friday check runs as soon as it finishes.'
+              : 'Your first health check is queued automatically. Follow its progress on the store page.'}</span>
             <SubmitButton disabled={!!planReadError} pendingText="Saving…">Start caring for this store →</SubmitButton>
           </div>
         </form>

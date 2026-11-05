@@ -7,8 +7,8 @@ import { BfcmBoard, type BoardAudit, type BoardStore } from './bfcm-board';
 
 export const metadata = { title: 'BFCM audit · StoreCare HQ' };
 
-export default async function BfcmPage({ searchParams }: { searchParams: Promise<{ run?: string }> }) {
-  const { run } = await searchParams;
+export default async function BfcmPage({ searchParams }: { searchParams: Promise<{ run?: string; welcome?: string }> }) {
+  const { run, welcome } = await searchParams;
   const { agency } = await requireAgency();
   const supabase = await supabaseServer();
   const [{ data: stores }, { data: audits }] = await Promise.all([
@@ -28,6 +28,22 @@ export default async function BfcmPage({ searchParams }: { searchParams: Promise
           <p><strong>{countdown()}</strong> · Black Friday {shortDate(sale.blackFriday)}, Cyber Monday {shortDate(sale.cyberMonday)}. One page per store, in your branding, ready to send to the client.</p>
         </div>
       </header>
+      {welcome && rows.length > 0 && (
+        // The last onboarding step for agencies that came from "Check all your client stores" on an outreach link.
+        <section className="workspace-section bfcm-welcome" aria-label="Welcome">
+          <div>
+            <h2>You’re set up</h2>
+            <p className="muted" style={{ margin: '6px 0 0' }}>
+              {rows.length === 1 ? `${rows[0].name}’s` : 'Your new store’s'} first health check takes a few minutes; its Black Friday check runs as soon as that finishes.
+              Meanwhile, add your other client stores: each gets its own one-page result in your branding.
+            </p>
+          </div>
+          <div className="bfcm-welcome-actions">
+            <Link className="btn" href="/onboarding/store">Add another store</Link>
+            <Link className="btn secondary" href="/settings">Add your logo and colour</Link>
+          </div>
+        </section>
+      )}
       {rows.length ? (
         <BfcmBoard stores={rows} autoStart={run === 'all'} />
       ) : (

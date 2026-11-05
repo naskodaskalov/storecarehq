@@ -1,9 +1,10 @@
 // Black Friday / Cyber Monday readiness: one page per store saying what to fix before the sale.
-// Pure and client-safe (type-only imports): built from a store's monitoring rows plus a light live check
-// in the app, or from the quick report's live checks for a prospect. Missing or stale data is shown as
-// "not checked" with its reason, never as a problem.
+// Pure and client-safe (type-only imports, and billing.ts, which has none): built from a store's monitoring rows
+// plus a light live check in the app, or from the quick report's live checks for a prospect. Missing or stale data
+// is shown as "not checked" with its reason, never as a problem.
 
 import type { PageState, ProbeResult, ProductCheck } from '@storecare/storefront';
+import { TRIAL_DAYS } from './billing.ts';
 
 const DAY = 864e5;
 
@@ -35,6 +36,33 @@ export function countdown(now = Date.now()): string {
   if (s.phase === 'cyber-monday') return 'Cyber Monday is today';
   if (s.phase === 'weekend') return s.daysToBlackFriday === 0 ? 'Black Friday is today' : 'Black Friday weekend';
   return s.daysToBlackFriday === 1 ? 'Black Friday is tomorrow' : `${s.daysToBlackFriday} days to Black Friday`;
+}
+
+/** The sign-up offer for agencies that come from an outreach link (cookie and signing: signup-offer.ts): open in the
+ *  same window as the Black Friday outreach, 60 days before Black Friday until the day before. Its trial ends at noon
+ *  UTC two days after Cyber Monday, so the first charge falls on that date from the US to Australia. */
+export function currentOffer(now = Date.now()): { id: string; trialEnd: number; signupBy: number } | null {
+  const s = saleDates(now);
+  if (s.phase !== 'before' || s.daysToBlackFriday < 1 || s.daysToBlackFriday > 60) return null;
+  const blackFriday = Date.parse(`${s.blackFriday}T00:00:00Z`);
+  return { id: `bfcm-${s.blackFriday.slice(0, 4)}`, trialEnd: blackFriday + 5 * DAY + DAY / 2, signupBy: blackFriday };
+}
+
+/** The offer's trial end when it beats the usual first trial, else null: a late sign-up keeps its 7 days. */
+export const offerTrialEnd = (o: { trialEnd: number } | null | undefined, now = Date.now()) => (o && o.trialEnd > now + TRIAL_DAYS * DAY ? o.trialEnd : null);
+
+/** "2 December" */
+export const offerDay = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+
+/** A first health check still unfinished after this long no longer holds the audit back. */
+export const FIRST_CHECK_WAIT_MS = 20 * 60_000;
+/** A store's newest health check request. */
+export type LatestScan = { source: string; status: string; requested_at: string };
+
+/** A store added minutes ago has no monitoring yet. Until its first health check finishes, an audit would show speed,
+ *  links, checkout and uptime as "not checked", so it waits for that check (but not forever). */
+export function firstCheckRunning(scan: LatestScan | null, now = Date.now()): boolean {
+  return !!scan && scan.source === 'initial' && (scan.status === 'queued' || scan.status === 'running') && now - Date.parse(scan.requested_at) < FIRST_CHECK_WAIT_MS;
 }
 
 /** "Fri 27 Nov" */

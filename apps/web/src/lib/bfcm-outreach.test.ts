@@ -54,6 +54,8 @@ test('before Black Friday the outreach draft and subject lead with the readiness
   const draft = draftMessage(prospect(), r, 'Nasko', NOW);
   assert.match(draft, /^Hi Ana,/);
   assert.match(draft, /with Black Friday 22 days out, ran a quick readiness check on it from the outside\. One thing stood out: the home page promotes “Hearthwood Candle”, which is sold out\./);
+  assert.match(draft, /There's a button on the one-pager to run it on your other client stores, free until 2 December\. Or reply and I'll set it up with you\./);
+  assert.match(draftMessage(prospect(), r, 'Nasko', Date.parse('2026-11-26T09:00:00Z')), /other client stores with a free trial\./, 'when 7 days run longer than the offer');
   assert.equal(defaultOutreachSubject('North Studio', 'https://www.store.example.com', true), 'Black Friday check on store.example.com');
   assert.equal(defaultOutreachSubject('North Studio', 'https://store.example.com'), 'Quick health check on store.example.com');
   const after = Date.parse('2026-11-27T10:00:00Z');

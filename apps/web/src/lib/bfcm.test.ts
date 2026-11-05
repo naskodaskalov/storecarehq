@@ -1,7 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PageState } from '@storecare/storefront';
-import { buildBfcmAudit, countdown, headline, inSeason, leadFinding, saleDates, validAudit, type AuditInput, type LiveCheck } from './bfcm.ts';
+import { buildBfcmAudit, countdown, firstCheckRunning, headline, inSeason, leadFinding, saleDates, validAudit, type AuditInput, type LiveCheck } from './bfcm.ts';
+
+test('a new store’s audit waits for its first health check, but not forever, and not for later checks', () => {
+  const now = Date.parse('2026-11-05T15:00:00Z');
+  const scan = (source: string, status: string, minutesAgo: number) => ({ source, status, requested_at: new Date(now - minutesAgo * 60_000).toISOString() });
+  assert.equal(firstCheckRunning(scan('initial', 'running', 2), now), true);
+  assert.equal(firstCheckRunning(scan('initial', 'queued', 1), now), true);
+  assert.equal(firstCheckRunning(scan('initial', 'completed', 2), now), false);
+  assert.equal(firstCheckRunning(scan('initial', 'partial', 2), now), false);
+  assert.equal(firstCheckRunning(scan('initial', 'queued', 25), now), false, 'a stuck first check no longer blocks');
+  assert.equal(firstCheckRunning(scan('manual', 'running', 1), now), false, 'a store with history can be audited during a re-check');
+  assert.equal(firstCheckRunning(null, now), false);
+});
 
 const NOW = Date.parse('2026-11-05T12:00:00Z');
 const DAY = 864e5;
