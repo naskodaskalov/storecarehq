@@ -9,14 +9,17 @@ const LINKS = [
   { href: '/#client-stores', label: 'Stores', icon: 'store', match: (p: string) => p.startsWith('/stores') },
   { href: '/work', label: 'Work log', icon: 'work', match: (p: string) => p.startsWith('/work') },
   { href: '/reports', label: 'Reports', icon: 'report', match: (p: string) => p.startsWith('/reports') },
+  { href: '/bfcm', label: 'BFCM audit', icon: 'tag', match: (p: string) => p.startsWith('/bfcm') },
   { href: '/settings', label: 'Agency settings', icon: 'settings', match: (p: string) => p.startsWith('/settings') },
   { href: '/billing', label: 'Billing', icon: 'billing', match: (p: string) => p.startsWith('/billing') },
   { href: '/contact', label: 'Contact', icon: 'mail', match: (p: string) => p === '/contact' },
 ];
 
-export function NavLinks({ isAdmin = false, themeDetector }: { isAdmin?: boolean; themeDetector?: string }) {
+/** bfcm: the Black Friday audit is in season (two months before Black Friday through Cyber Monday), or open. */
+export function NavLinks({ isAdmin = false, themeDetector, bfcm = false }: { isAdmin?: boolean; themeDetector?: string; bfcm?: boolean }) {
   const path = usePathname();
-  const links = isAdmin ? [...LINKS, { href: '/admin', label: 'Admin workspace', icon: 'report', match: (p: string) => p.startsWith('/admin') }] : LINKS;
+  const shown = LINKS.filter((l) => l.href !== '/bfcm' || bfcm || path.startsWith('/bfcm'));
+  const links = isAdmin ? [...shown, { href: '/admin', label: 'Admin workspace', icon: 'report', match: (p: string) => p.startsWith('/admin') }] : shown;
   return (
     <div className="nav-links">
       {links.map((l) => (

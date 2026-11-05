@@ -156,3 +156,47 @@ sign-ups with their workspace, plan state and store count; last-7-day product ac
 `monitoring_freshness()` result. Days start at midnight in `STORECARE_ADMIN_TIMEZONE` (default
 Europe/Sofia). Deleted and anonymous auth users are excluded; deleted stores and workspaces are not
 counted. Demo mode shows sample numbers.
+
+# BFCM readiness audit
+
+`/bfcm` (nav item "BFCM audit", shown from 60 days before Black Friday until Cyber Monday, or while on the page;
+the Overview shows a countdown banner) checks every unpaused client store and keeps one dated one-pager per run in
+`store_audits` (migration `20261105120000_store_audits.sql`). Black Friday is the day after the fourth Thursday of
+November; `saleDates` in `lib/bfcm.ts` rolls to next year after Cyber Monday.
+
+The board posts each store to `POST /api/bfcm/<id>`, three at a time, and shows Waiting / Checking / result /
+Retry per row. It is a route handler, not a server action, because Next.js runs a page's server actions one after
+another. The handler rejects other origins and calls `runAudit` (`lib/bfcm-run.ts`): signed in, agency member, billing
+access, store found and not paused; a check of the same store in the last 2 minutes is returned instead of a new one.
+`runStoreAudit` (`lib/bfcm-data.ts`) reads monitoring data under RLS (latest home speed sample, latest site check,
+checkout runs from 48 hours, open incidents, 30-day uptime, 14 days of theme/app changes) and runs one live pass:
+`probeStore` without feed or cart, 10 s per request, plus up to 3 product JSON requests. Certificate and domain are
+re-read live only when the site check is older than 3 days. `buildBfcmAudit` is pure and shared with outreach.
+Verdicts: `fix` (anything to fix), `partial` ("Not fully checked": the storefront could not be loaded and nothing
+needs fixing, so a store is never called ready on checks that did not run), `look`, `ready`. Failed checks have no
+email phrase, so they never become a claim in an email. Demo mode returns fixed results per store after a short delay.
+
+An audit row is immutable apart from `note`, `shared_at`, `sent_at` and `sent_to` (column grants). RLS lets members
+read their agency's audits and insert only for their own agency's unpaused stores, as themselves, while the plan has
+access; there are no deletes (they go with the store). Each row gets a 64-character random `share_token`; the client
+link `/r/audit/<token>` is public (middleware passes `/r/`) and reads only through `public_audit(token)`, a security
+definer function that returns the audit, note and agency branding when `shared_at` is set and the token is at least 32
+characters. Turning the link off clears `shared_at`; the page is noindex/nofollow/noarchive. Sending uses the agency's
+branded email layout (`brandedEmailHtml`, shared with monthly reports) through Resend with an idempotency key per
+audit, note version and recipient; without Resend the agency gets a mailto link and marks it as sent. Sending turns
+the link on. The one-pager prints on one A4 or Letter page through the browser print dialog (`body:has(.bfcm-print)`).
+
+Storefront states live in `packages/storefront/src/states.ts` and run inside `probeStore` with no extra requests: the
+password page (`/password` answers 200 with `pageType` "password"), "Store unavailable" (404), noindex (meta in the
+head or `X-Robots-Tag` for all bots or Googlebot), Googlebot disallowed from `/`, and product handles the home page
+links to (`<main>` first, own host only). `checkProducts` reads `/products/<handle>.js` (stock from `available`,
+404 = gone) within robots.txt rules. On a password or unavailable page the probe skips the feed and cart. The worker's
+hourly storefront snapshot skips both states, so turning a password page on or off no longer logs apps as removed
+or added; the landing scan no longer calls a password page "headless".
+
+Outreach: the quick report carries a prospect one-pager (live checks only; checkout, uptime and recent changes show
+as not checked), except when the storefront blocked us and nothing needs fixing. Until the day before Black Friday
+the default subject is "Black Friday check on <host>" and the draft opens with the first fix or specific finding
+(speed, links, SSL, domain; never app weight). Hosted health links and the email's health document include the
+one-pager only for reports that have one, so earlier snapshots, links and JSON backups are unchanged; a tampered
+one-pager in a backup is rejected.

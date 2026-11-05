@@ -85,3 +85,26 @@ local demo mode verified manual entry, review gating, sample and print isolation
 390px mobile width, edited-draft backup restore and interrupted-request retry.
 The restored-draft textarea label was corrected during browser verification.
 No deployment, production data changes, directory collection or emails were performed.
+
+## BFCM readiness audit (approved)
+- [x] Review the plan against latest main and live Shopify storefronts; revise it.
+- [x] Detect password pages, "Store unavailable", noindex, Googlebot blocks and featured-product stock in the probe.
+- [x] Fix the worker logging "apps removed/added" when a store's password page goes on or off.
+- [x] Add immutable, shareable `store_audits` with RLS and the `public_audit(token)` client view.
+- [x] Build the one-click board (3 stores at a time), branded one-pager, print, client link, note and send.
+- [x] Use the one-pager as the outreach hook until the day before Black Friday.
+- [x] Verify tests, type checks, RLS, build, demo browser run and live stores.
+- [ ] Apply migration `20261105120000_store_audits.sql` to production (owner approval), then deploy.
+
+Verification: storefront 23/23, reports 11/11, web 172 passed / 1 existing opt-in routing check skipped,
+worker 75/75 (one run of the full suite hit a teardown race in the untouched health-check-requests file;
+it passed alone 3/3 and in a full worker re-run). All workspace type checks and the production build
+passed. On local Postgres 16, `rls.test.sql` passed with the new audit section: cross-agency and forged
+`created_by` inserts rejected, results immutable, no deletes, paused stores and expired plans can't
+audit, anonymous visitors read only shared audits through `public_audit`, tokens under 32 characters fail.
+Demo browser run (production build): one click checked 6 stores with progress (3 need fixes, 1 ready
+with notes, 1 ready, 1 not fully checked), one-pager printed to 1 page on A4 and Letter, client
+link on/off (200 then 404, signed-out 390px view, noindex), mailto + mark as sent, re-check within
+2 minutes reused the audit, 0px overflow at 390px, no console errors. Live probes: password and
+"Store unavailable" dev stores detected; featured products read on Kith, Allbirds, Brooklinen and
+Death Wish Coffee. No production data change, deployment or email.

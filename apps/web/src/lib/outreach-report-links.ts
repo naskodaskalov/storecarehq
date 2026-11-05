@@ -4,8 +4,10 @@ import { sampleMonthReport } from './sample-month-report.ts';
 import { APP_ORIGIN } from './domains.ts';
 import type { ReportLinks } from './outreach.ts';
 import type { QuickReport } from './quick-report.ts';
+import type { BfcmAudit } from './bfcm.ts';
 
-type Health = Pick<Extract<QuickReport, { ok: true }>, 'host' | 'checkedAt' | 'sections'>;
+/** The prospect's health check; with a Black Friday one-pager (and the agency it was prepared for) when one was made. */
+type Health = Pick<Extract<QuickReport, { ok: true }>, 'host' | 'checkedAt' | 'sections'> & { bfcm?: BfcmAudit; preparedFor?: string };
 export type Snapshot = { health: Health; sample: ReturnType<typeof sampleMonthReport>; documents: { filename: string; html: string }[] };
 export type SnapshotRow = { id: string; owner_email: string; health_hash: string; sample_hash: string; source_digest: string; snapshot: Snapshot; created_at: string; expires_at: string; revoked_at: string | null };
 export interface ReportStore {
@@ -27,7 +29,9 @@ export function reportOrigin(value = process.env.NEXT_PUBLIC_APP_URL || APP_ORIG
 export function buildSnapshot(input: TestEmailInput): Snapshot {
   const { pack } = validateTestEmail(input);
   if (!pack.report?.ok) throw new Error('Prepare the health check first.');
-  return { health: { host: pack.report.host, checkedAt: pack.report.checkedAt, sections: pack.report.sections },
+  // Older reports have no one-pager: their snapshot (and its digest) stays exactly as it was.
+  const bfcm = pack.report.bfcm ? { bfcm: pack.report.bfcm, preparedFor: pack.prospect.agency_name } : {};
+  return { health: { host: pack.report.host, checkedAt: pack.report.checkedAt, sections: pack.report.sections, ...bfcm },
     sample: sampleMonthReport(pack.prospect.agency_name, pack.preparedAt || pack.report.checkedAt), documents: outreachEmail(input).documents };
 }
 const snapshotDigest = (snapshot: Snapshot) => tokenHash(JSON.stringify(snapshot));
