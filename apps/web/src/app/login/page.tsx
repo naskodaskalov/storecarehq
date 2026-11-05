@@ -4,6 +4,8 @@ import { PasswordField } from '@/components/password-field';
 import { SubmitButton } from '@/components/submit-button';
 import { signInPassword, signUpPassword, sendSignInLink } from '@/app/auth/password-actions';
 import { supabaseServer } from '@/lib/supabase';
+import { offerDay, offerTrialEnd } from '@/lib/signup-offer';
+import { offerFromCookies } from '@/lib/signup-offer-cookie';
 import { redirect } from 'next/navigation';
 
 export default async function Login({ searchParams }: {
@@ -16,10 +18,13 @@ export default async function Login({ searchParams }: {
   const signup = q.trial === '1';
   const link = !signup && q.method === 'link';
   const sent = link && q.sent;
+  // From "Check all your client stores" on an outreach link: the Black Friday trial.
+  const offerEnd = signup && !q.verify ? offerTrialEnd(await offerFromCookies()) : null;
   return <AuthShell>
     <span className="login-form-kicker">YOUR AGENCY WORKSPACE</span>
     <h1 id="login-title">{q.verify ? 'Confirm your email.' : sent ? 'Check your inbox.' : signup ? 'Better care starts here.' : 'Welcome back.'}</h1>
     <p className="login-description">{signup ? 'Create your account, then set up your agency workspace and free trial.' : 'A clear view of your stores. A little peace of mind.'}</p>
+    {offerEnd && <div className="login-feedback" role="status">Black Friday offer: your free trial runs until {offerDay(offerEnd)}. The client store you checked is filled in for you.</div>}
     {q.signed_out && <div className="login-feedback" role="status">You&apos;ve been signed out successfully.</div>}
     {q.deleted && <div className="login-feedback" role="status">{q.deleted === 'account' ? 'Your workspace, its data and your sign-in account were deleted.' : 'Your workspace and its data were deleted. Your sign-in account is kept for your other workspaces.'}</div>}
     {q.error && <div className="error" role="alert">{q.error}</div>}

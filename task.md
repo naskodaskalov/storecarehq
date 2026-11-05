@@ -108,3 +108,23 @@ link on/off (200 then 404, signed-out 390px view, noindex), mailto + mark as sen
 2 minutes reused the audit, 0px overflow at 390px, no console errors. Live probes: password and
 "Store unavailable" dev stores detected; featured products read on Kith, Allbirds, Brooklinen and
 Death Wish Coffee. No production data change, deployment or email.
+
+## Outreach sign-up path (approved)
+- [x] Signed outreach offer (trial until 2 December) and `checkoutTrial` with the offer end.
+- [x] "Check all your client stores" bar and panel on hosted outreach links; public `/outreach/r/<token>/start`.
+- [x] Offer copy on sign-up, workspace, plan and Billing; `trial_end` and attribution metadata in Checkout.
+- [x] Prefilled store cleared once added; offer sign-ups finish on `/bfcm?run=all&welcome=1`.
+- [x] BFCM board waits for a new store's first health check (server refuses to audit until then, 20-minute cap).
+- [x] Draft email closing points at the button; privacy page lists `sc_offer`.
+- [x] Verify tests, type checks, build and the demo walkthrough.
+
+Verification: web 181 passed / 1 existing opt-in routing check skipped (new: offer signing, window and trial
+end, start-route cookies for health and sample links, bad and revoked links, first-check wait, draft closing),
+storefront 23/23, reports 11/11, worker non-database tests pass; all workspace type checks and the production
+build passed. Demo browser run (production build): hosted link with the bar and panel at 1440px and 390px (0px
+overflow), both hidden in print; the button set `sc_store` (kith.com) and an httpOnly `sc_offer` expiring at
+Black Friday, then opened sign-up with the offer note; workspace, store (prefilled), care-plan, plan and Billing
+steps show "free until 2 December" with the cookie and the usual 7 days without it or with a tampered one; a bad
+link opens sign-up without cookies; the board showed "First health check running…" for a store whose first check
+was in progress and ran its check when it finished (28 s, no console errors), keeping the welcome notice. Stripe
+Checkout itself was not run (no keys here): the trial parameters are unit-tested. No migration, deployment or email.

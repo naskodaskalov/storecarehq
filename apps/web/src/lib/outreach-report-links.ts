@@ -65,6 +65,15 @@ export async function readPublicReport(token: string, store: ReportStore, now = 
     : { kind, snapshotId: row.id, sample: row.snapshot.sample, document: row.snapshot.documents[1], expiresAt: row.expires_at } as const;
 }
 
+/** The client store behind either of a bundle's links, for "Check all your client stores". Server only: the
+ *  snapshot id never reaches the page, it goes into the signed offer cookie and Stripe metadata. */
+export async function readStartTarget(token: string, store: ReportStore, now = Date.now()): Promise<{ snapshotId: string; host: string } | null> {
+  if (!validToken(token)) return null;
+  const hash = tokenHash(token), row = await store.byHash(hash);
+  if (!row || !alive(row, now) || (row.health_hash !== hash && row.sample_hash !== hash)) return null;
+  return { snapshotId: row.id, host: row.snapshot.health.host };
+}
+
 export async function revokeReportLinks(id: string, owner: string, store: ReportStore, now = Date.now()) {
   const row = await store.byId(id);
   if (!row || row.owner_email !== owner.toLowerCase()) throw new Error('Report links could not be found for this admin.');

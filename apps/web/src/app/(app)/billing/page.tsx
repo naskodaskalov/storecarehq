@@ -3,6 +3,8 @@ import { billingState, checkoutTrial, PLAN_KEYS, PLANS, TRIAL_DAYS, TRIAL_STORE_
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { confirmCheckout } from '@/lib/stripe';
+import { offerDay, offerTrialEnd } from '@/lib/signup-offer';
+import { offerFromCookies } from '@/lib/signup-offer-cookie';
 import { SubmitButton } from '@/components/submit-button';
 import { Icon } from '@/components/icon';
 import { choosePlan, openPortal } from './actions';
@@ -22,7 +24,10 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
   const { count } = await supabase.from('stores').select('id', { count: 'exact', head: true }).eq('agency_id', agency.id);
   const stores = count ?? 0;
   const s = billingState(agency);
-  const firstPlan = 'trial_period_days' in checkoutTrial(agency); // never subscribed: 7 days free with a card
+  const firstPlan = Object.keys(checkoutTrial(agency)).length > 0; // never subscribed: free days with a card
+  // From an outreach link before Black Friday: the first plan is free until the offer's end instead of 7 days.
+  const offerEnd = firstPlan ? offerTrialEnd(await offerFromCookies()) : null;
+  const freeDays = offerEnd ? `free until ${offerDay(offerEnd)}` : `${TRIAL_DAYS} free days`;
 
   return (
     <div className="workspace-page billing-page">
@@ -64,13 +69,13 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
             <strong>Free trial</strong>: {s.trialDaysLeft} day{s.trialDaysLeft === 1 ? '' : 's'} left, until {day(agency.trial_ends_at!)} · {stores} of {TRIAL_STORE_LIMIT} stores.
             <span className="muted">
               {firstPlan
-                ? ` Choose a plan to keep monitoring: it starts with ${TRIAL_DAYS} free days, then your card is charged.`
+                ? ` Choose a plan to keep monitoring: it starts ${offerEnd ? freeDays : `with ${freeDays}`}, then your card is charged.`
                 : ' Choose a plan to keep monitoring.'}
             </span>
           </p>
         ) : firstPlan ? (
           <p style={{ margin: 0, fontSize: 17 }}>
-            <strong>No plan yet.</strong> Choose one to start your {TRIAL_DAYS}-day free trial. You add a card now and pay nothing until the trial ends.
+            <strong>No plan yet.</strong> Choose one to start your {offerEnd ? `free trial, which runs until ${offerDay(offerEnd)}` : `${TRIAL_DAYS}-day free trial`}. You add a card now and pay nothing until the trial ends.
           </p>
         ) : (
           <p style={{ margin: 0, fontSize: 17 }}>

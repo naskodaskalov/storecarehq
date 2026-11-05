@@ -94,9 +94,20 @@ export function agencyUpdateFromSubscription(sub: SubscriptionLike) {
 }
 
 /** The free days Checkout gives: 7 on an agency's first subscription (card taken now, charged after),
- *  none for an agency that has subscribed before. Always 7, also for accounts from before card-first sign-up. */
-export function checkoutTrial(a: Pick<BillingFields, 'stripe_subscription_id'> & Partial<BillingFields>): { trial_period_days: number } | Record<string, never> {
-  return a.stripe_subscription_id ? {} : { trial_period_days: TRIAL_DAYS };
+ *  none for an agency that has subscribed before. Always 7, also for accounts from before card-first sign-up.
+ *  With an outreach offer (`offerEnd`, ms) the first trial runs until then instead, when that is later. */
+export function checkoutTrial(
+  a: Pick<BillingFields, 'stripe_subscription_id'> & Partial<BillingFields>,
+  offerEnd: number | null = null,
+  now = Date.now(),
+): { trial_period_days: number } | { trial_end: number } | Record<string, never> {
+  if (a.stripe_subscription_id) return {};
+  return offerEnd && offerEnd > now + TRIAL_DAYS * 864e5 ? { trial_end: Math.floor(offerEnd / 1000) } : { trial_period_days: TRIAL_DAYS };
+}
+
+/** When a first plan started now is first charged (ms). */
+export function firstChargeAt(offerEnd: number | null = null, now = Date.now()): number {
+  return offerEnd && offerEnd > now + TRIAL_DAYS * 864e5 ? offerEnd : now + TRIAL_DAYS * 864e5;
 }
 
 export const formatUsd = (n: number) => `$${n}`;

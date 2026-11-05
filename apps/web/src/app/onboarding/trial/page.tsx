@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { billingState, isPlanKey, PLAN_KEYS, PLANS, TRIAL_DAYS, type PlanKey } from '@/lib/billing';
+import { billingState, firstChargeAt, isPlanKey, PLAN_KEYS, PLANS, TRIAL_DAYS, type PlanKey } from '@/lib/billing';
+import { offerDay, offerTrialEnd } from '@/lib/signup-offer';
+import { offerFromCookies } from '@/lib/signup-offer-cookie';
 import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { confirmCheckout } from '@/lib/stripe';
@@ -26,7 +28,9 @@ export default async function Trial({ searchParams }: { searchParams: Promise<{ 
   // The plan picked on the pricing section of the website, else one from the size given at sign-up.
   const picked = (await cookies()).get('sc_plan')?.value;
   const suggested = isPlanKey(picked) ? picked : SUGGEST[data?.stores_band ?? ''] ?? 'agency';
-  const chargeDay = new Date(Date.now() + TRIAL_DAYS * 864e5).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  // An outreach sign-up's trial runs until the offer's end (2 December) when that is longer than 7 days.
+  const offerEnd = offerTrialEnd(await offerFromCookies());
+  const chargeDay = offerEnd ? offerDay(offerEnd) : new Date(firstChargeAt()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 
   return (
     <OnboardingFrame step={2}>
@@ -37,6 +41,7 @@ export default async function Trial({ searchParams }: { searchParams: Promise<{ 
             Pick a plan and add a card. Nothing is charged until {chargeDay}; cancel before then and you pay nothing.
           </p>
         </div>
+        {offerEnd && <div className="notice" role="status"><strong>Black Friday offer:</strong> free until {chargeDay}, so you can check and watch your client stores through the sale weekend.</div>}
         {q.error && <div className="notice error" role="alert">{q.error}</div>}
         <div className="plans pricing-plans setup-pricing">
           {PLAN_KEYS.map((key) => {
@@ -49,7 +54,7 @@ export default async function Trial({ searchParams }: { searchParams: Promise<{ 
                 <h3>{p.name}</h3>
                 <div className="pricing-price"><span className="plan-price"><span className="pricing-currency">$</span>{p.usd}</span><span className="pricing-price-period">/ month</span></div>
                 <div className="pricing-capacity"><Icon name="store" size={16} /><strong>Up to {p.stores} stores</strong></div>
-                <ul className="pricing-features"><li><Icon name="check" size={14} />Every feature included</li><li><Icon name="check" size={14} />First {TRIAL_DAYS} days free</li></ul>
+                <ul className="pricing-features"><li><Icon name="check" size={14} />Every feature included</li><li><Icon name="check" size={14} />{offerEnd ? `Free until ${chargeDay}` : `First ${TRIAL_DAYS} days free`}</li></ul>
                 <SubmitButton secondary={key !== suggested} pendingText="Opening checkout…">
                   Start free trial
                 </SubmitButton>

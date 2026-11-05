@@ -4,7 +4,7 @@ import { request as httpRequest } from 'node:http';
 import { APP_ORIGIN, WEBSITE_ORIGIN, SHARE_IMAGE_PATH, WEBSITE_PAGES, appLink, websiteLink, hostRouting, sessionRouting, authCallbackUrl, isPublicPath } from './domains.ts';
 
 test('outreach report views and downloads are public while admin and other outreach routes stay private', () => {
-  for (const path of ['/outreach/r/' + 'a'.repeat(64), '/outreach/r/' + 'b'.repeat(64) + '/download']) {
+  for (const path of ['/outreach/r/' + 'a'.repeat(64), '/outreach/r/' + 'b'.repeat(64) + '/download', '/outreach/r/' + 'c'.repeat(64) + '/start']) {
     assert.equal(isPublicPath(path), true);
     assert.equal(hostRouting('www.storecarehq.com', path), null);
     assert.equal(sessionRouting('app.storecarehq.com', path, false), null);

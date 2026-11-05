@@ -62,7 +62,8 @@ export default function Privacy() {
       <h2 id="cookies">Cookies and local storage</h2>
       <ul>
         <li><strong>Sign-in cookies</strong> keep you signed in to the app. They are strictly necessary.</li>
-        <li><strong>A short-lived “store you checked” cookie</strong> (<code>sc_store</code>, 7 days) pre-fills the store address when you start a trial after checking a store.</li>
+        <li><strong>A short-lived “store you checked” cookie</strong> (<code>sc_store</code>, 7 days) pre-fills the store address when you start a trial after checking a store, or from the report link we sent you.</li>
+        <li><strong>An offer cookie</strong> (<code>sc_offer</code>, until Black Friday) remembers that you started from a report link we sent you, so your free trial runs until the offer date. It is removed once you finish setting up.</li>
         <li><strong>Local storage</strong> in your browser for the stores you checked on our website, as above, and your cookie choice (<code>sc_analytics</code>).</li>
         <li><strong>Google Analytics cookies</strong> (<code>_ga</code>, <code>_ga_*</code>, up to 2 years), only on our public website and only if you click “Accept”. They count visits, pages viewed, how you reached us and clicks such as “Start free trial”. Google signals and ad personalisation are off. You can change your mind any time with “Cookie settings” at the bottom of the page; declining removes these cookies.</li>
       </ul>

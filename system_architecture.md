@@ -200,3 +200,31 @@ the default subject is "Black Friday check on <host>" and the draft opens with t
 (speed, links, SSL, domain; never app weight). Hosted health links and the email's health document include the
 one-pager only for reports that have one, so earlier snapshots, links and JSON backups are unchanged; a tampered
 one-pager in a backup is rejected.
+
+## Outreach sign-up path
+
+Hosted outreach links (`/outreach/r/<token>`, health and sample) show a "Check all your client stores" bar above
+the report and a panel under it (`components/signup-cta.tsx`, hidden in print). Both go to
+`/outreach/r/<token>/start` (public like view and download; `isOutreachReportPath`), which resolves the bundle with
+`readStartTarget` (server only: the snapshot id never reaches the page) and redirects to sign-up (`/login?trial=1`)
+with two cookies: `sc_store`, the client store (the same cookie the landing-page check sets, on `.storecarehq.com` in
+production so it replaces that one; onboarding's store step prefills from it and `addStore` clears it), and, while
+the offer is open, `sc_offer` (httpOnly, expires at Black Friday). An unknown, expired or revoked link opens sign-up
+without cookies.
+
+The offer (`currentOffer` in `lib/bfcm.ts`, pure; signing in `lib/signup-offer.ts`, server only) is open in the
+Black Friday outreach window (60 days before Black Friday until the day before) and ends its trial at noon UTC two
+days after Cyber Monday (2 December 2026). The cookie is `v1.<offer>.<snapshot>.<trialEnd>.<expires>.<HMAC>`, signed
+with `SIGNUP_OFFER_SECRET` or else `STRIPE_SECRET_KEY` (no key: no offer, and the page doesn't promise one).
+`offerFromCookies()` (`lib/signup-offer-cookie.ts`) verifies it for sign-up, workspace, plan and Billing copy and
+for Checkout: `checkoutTrial(agency, offerEnd)` returns `trial_end` instead of `trial_period_days: 7` when the offer
+ends later than 7 days from now (so a late sign-up keeps 7 days), and never for an agency that subscribed before.
+The subscription metadata records `outreach_snapshot` and, when the offer applied, `offer` (attribution in Stripe;
+no database column). `billingState` already reads a Stripe trial's end from `current_period_end`. After the
+care-plan step an offer sign-up goes to `/bfcm?run=all&welcome=1` and the cookie is cleared; others keep the store page.
+
+The BFCM board waits for a new store's first health check: `runAudit` answers 202 `{ waiting: true }` while the
+store's newest `health_check_requests` row is the `initial` one and still queued or running (`firstCheckRunning`,
+ignored after 20 minutes), so no one-pager is made from empty monitoring. The board shows "First health check
+running…", polls `/api/stores/<id>/health-check` every 5 s for up to 10 minutes, then asks again (or offers a
+retry). Demo: `STORECARE_DEMO_FIRST_CHECK=1` gives Kite & Kin a first check that finishes 25 s after the data loads.

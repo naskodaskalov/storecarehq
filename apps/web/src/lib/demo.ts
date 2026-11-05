@@ -217,9 +217,20 @@ function seed(): Tables {
     storefront_snapshots,
     reports: [],
     store_audits: [],
+    health_check_requests: demoFirstCheck(kite.id),
   };
   tables.reports = autoDrafted([juniper, kite, salt], tables);
   return tables;
+}
+
+/** STORECARE_DEMO_FIRST_CHECK=1: Kite & Kin's first health check is still running, and finishes 25 seconds after the
+ *  demo data is first loaded, to see the BFCM board wait for a newly added store. Off by default. */
+function demoFirstCheck(storeId: string): Row[] {
+  if (process.env.STORECARE_DEMO_FIRST_CHECK !== '1') return [];
+  const at = new Date().toISOString();
+  const row: Row = { id: uid(), store_id: storeId, agency_id: AGENCY, source: 'initial', status: 'running', requested_at: at, started_at: at, finished_at: null, phase: 'speed', results: { uptime: { status: 'completed' }, storefront: { status: 'completed' } } };
+  setTimeout(() => Object.assign(row, { status: 'completed', phase: null, finished_at: new Date().toISOString() }), 25_000).unref?.();
+  return [row];
 }
 
 /** STORECARE_DEMO_BILLING=trialing (default: Stripe trial, card on file) | new (no plan yet) | legacy (old

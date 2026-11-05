@@ -4,12 +4,13 @@
 import { billingState } from './billing.ts';
 import { AGENCY_COLUMNS, type Agency } from './data.ts';
 import { runStoreAudit } from './bfcm-data.ts';
-import type { BfcmAudit } from './bfcm.ts';
+import { firstCheckRunning, type BfcmAudit, type LatestScan } from './bfcm.ts';
 import { supabaseServer } from './supabase.ts';
 
 export type AuditRun =
   | { ok: true; id: string; verdict: BfcmAudit['verdict']; fixes: number; looks: number; checkedAt: string }
-  | { ok: false; error: string };
+  /** `waiting`: the store's first health check is still running; the board waits for it, then asks again. */
+  | { ok: false; error: string; waiting?: true };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** A store checked this recently returns that audit: a double click or a second tab doesn't visit the store again. */
@@ -30,6 +31,13 @@ export async function runAudit(storeId: string): Promise<{ status: number; body:
   if (error) return fail(503, 'The store could not be loaded. Try again.');
   if (!store || store.agency_id !== agency.id) return fail(404, 'Store not found.');
   if (store.status === 'paused') return fail(409, 'Monitoring is paused for this store.');
+
+  const { data: scan } = await supabase.from('health_check_requests').select('source, status, requested_at')
+    .eq('store_id', storeId).order('requested_at', { ascending: false }).limit(1).maybeSingle();
+  if (firstCheckRunning(scan as LatestScan | null)) {
+    // 202: not an error, just not ready yet (the board waits and asks again).
+    return { status: 202, body: { ok: false, waiting: true, error: 'The first health check of this store is still running. Its Black Friday check starts when that finishes.' } };
+  }
 
   const { data: recent } = await supabase.from('store_audits').select('id, verdict, fixes, looks, created_at')
     .eq('store_id', storeId).gte('created_at', new Date(Date.now() - REUSE_MS).toISOString()).order('created_at', { ascending: false }).limit(1);

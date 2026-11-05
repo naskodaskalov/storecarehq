@@ -1,6 +1,6 @@
 # Outreach sign-up path (BFCM step 2)
 
-Status: proposed 5 Nov 2026, waiting for approval. The previous plan is in `bfcm_audit_plan.md`.
+Status: approved 5 Nov 2026 (trial until 2 December), built. The previous plan is in `bfcm_audit_plan.md`.
 
 ## Outcome
 
@@ -67,6 +67,7 @@ with the offer; plan step copy; the board's first-health-check state, then the o
 
 Merge = deploy. No migration, no new required env var.
 
-## Decision needed
+## Decision
 
 Trial end **2 December** (charge that day) for sign-ups from outreach links until the day before Black Friday.
+Approved 5 Nov.

@@ -8,10 +8,37 @@ import type { AuditRun } from '@/lib/bfcm-run';
 
 export type BoardAudit = { id: string; created_at: string; verdict: 'fix' | 'look' | 'ready' | 'partial'; fixes: number; looks: number; shared_at: string | null; sent_at: string | null };
 export type BoardStore = { id: string; name: string; host: string; paused: boolean; limited: boolean; audit: BoardAudit | null };
-type Row = { state: 'queued' | 'running' } | { state: 'failed'; error: string };
+type Row = { state: 'queued' | 'running' | 'first-check' } | { state: 'failed'; error: string };
 
 /** Stores are different hosts, so a few can be checked at once without being impolite to any of them. */
 const AT_ONCE = 3;
+/** How long a run waits for a new store's first health check before offering a retry. */
+const FIRST_CHECK_MS = 10 * 60_000;
+
+async function post(storeId: string): Promise<AuditRun> {
+  try {
+    const res = await fetch(`/api/bfcm/${storeId}`, { method: 'POST', headers: { accept: 'application/json' } });
+    return res.headers.get('content-type')?.includes('json') ? await res.json() : { ok: false, error: res.status === 401 ? 'Sign in again to continue.' : 'The check did not finish. Try again.' };
+  } catch {
+    return { ok: false, error: 'The check did not finish. Check your connection and try again.' };
+  }
+}
+
+/** Polls the store's health check (the endpoint the store page uses) until its first one has finished. */
+async function firstCheckFinished(storeId: string): Promise<boolean> {
+  for (const until = Date.now() + FIRST_CHECK_MS; Date.now() < until;) {
+    await new Promise((r) => setTimeout(r, 5000));
+    try {
+      const res = await fetch(`/api/stores/${storeId}/health-check`, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+      if (!res.ok) continue;
+      const { scan } = (await res.json()) as { scan: { status: string } | null };
+      if (!scan || !['queued', 'running'].includes(scan.status)) return true;
+    } catch {
+      // A missed poll is retried on the next tick.
+    }
+  }
+  return false;
+}
 
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -40,12 +67,16 @@ export function BfcmBoard({ stores, autoStart }: { stores: BoardStore[]; autoSta
       for (let id = queue.shift(); id; id = queue.shift()) {
         const storeId = id;
         setRows((r) => ({ ...r, [storeId]: { state: 'running' } }));
-        let result: AuditRun;
-        try {
-          const res = await fetch(`/api/bfcm/${storeId}`, { method: 'POST', headers: { accept: 'application/json' } });
-          result = res.headers.get('content-type')?.includes('json') ? await res.json() : { ok: false, error: res.status === 401 ? 'Sign in again to continue.' : 'The check did not finish. Try again.' };
-        } catch {
-          result = { ok: false, error: 'The check did not finish. Check your connection and try again.' };
+        let result = await post(storeId);
+        // A store added minutes ago: wait for its first health check, so the one-pager has monitoring data to show.
+        if (!result.ok && result.waiting) {
+          setRows((r) => ({ ...r, [storeId]: { state: 'first-check' } }));
+          if (await firstCheckFinished(storeId)) {
+            setRows((r) => ({ ...r, [storeId]: { state: 'running' } }));
+            result = await post(storeId);
+          } else {
+            result = { ok: false, error: 'The first health check is taking longer than usual. Try again in a few minutes.' };
+          }
         }
         if (result.ok) {
           const r = result;
@@ -63,11 +94,15 @@ export function BfcmBoard({ stores, autoStart }: { stores: BoardStore[]; autoSta
     router.refresh();
   }
 
-  // "Check all stores" on the Overview links here with ?run=all: start once, then drop the parameter so a reload doesn't re-run.
+  // "Check all stores" on the Overview (and the end of onboarding) links here with ?run=all: start once, then drop
+  // the parameter so a reload doesn't re-run. Others (the welcome notice) stay.
   useEffect(() => {
     if (!autoStart || started.current) return;
     started.current = true;
-    router.replace('/bfcm', { scroll: false });
+    const query = new URLSearchParams(window.location.search);
+    query.delete('run');
+    const rest = query.toString();
+    router.replace(rest ? `/bfcm?${rest}` : '/bfcm', { scroll: false });
     void run(runnable.map((s) => s.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart]);
@@ -110,10 +145,11 @@ export function BfcmBoard({ stores, autoStart }: { stores: BoardStore[]; autoSta
                 const a = audits[s.id];
                 const row = rows[s.id];
                 return (
-                  <tr key={s.id} aria-busy={row?.state === 'running'}>
+                  <tr key={s.id} aria-busy={row?.state === 'running' || row?.state === 'first-check'}>
                     <td><div style={{ fontWeight: 600 }}>{s.name}</div><div className="small muted">{s.host}{s.limited ? ' · limited monitoring' : ''}</div></td>
                     <td>
                       {row?.state === 'running' ? <span className="bfcm-row-state"><span className="spinner" aria-hidden="true" />Checking…</span>
+                        : row?.state === 'first-check' ? <span className="bfcm-row-state"><span className="spinner" aria-hidden="true" />First health check running… the Black Friday check follows</span>
                         : row?.state === 'queued' ? <span className="bfcm-row-state"><Icon name="clock" size={14} />Waiting</span>
                         : row?.state === 'failed' ? <span className="bfcm-row-error" role="alert">{row.error}</span>
                         : s.paused ? <span className="muted small">Paused, skipped</span>
