@@ -1,9 +1,12 @@
+import { cookies, headers } from 'next/headers';
+import { after } from 'next/server';
 import { notFound } from 'next/navigation';
 import { DEFAULT_SECTIONS } from '@storecare/reports';
 import { ReportView } from '@/components/report-view';
 import { PrintButton } from '@/components/copy-button';
 import { readPublicReport, reportStore } from '@/lib/outreach-report-links';
 import { SAMPLE_NOTICE } from '@/lib/sample-month-report';
+import { logReportView, viewerIsAdmin } from '@/lib/outreach-report-views-store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,6 +17,8 @@ export default async function OutreachReport({ params }: { params: Promise<{ tok
   if (!/^[a-f0-9]{64}$/.test(token)) notFound();
   const report = await readPublicReport(token, await reportStore());
   if (!report) notFound();
+  const context = { headers: new Headers(await headers()), admin: await viewerIsAdmin((await cookies()).getAll().map((c) => c.name)) };
+  after(() => logReportView(report.snapshotId, report.kind, context));
   return <main style={{ maxWidth: 850, margin: '0 auto', padding: '32px 16px', display: 'grid', gap: 20 }}>
     <nav className="no-print" aria-label="Report downloads" style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
       <PrintButton /><a className="btn secondary" href={`/outreach/r/${token}/download`}>Download HTML</a>

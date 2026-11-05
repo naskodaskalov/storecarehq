@@ -55,9 +55,10 @@ export async function readPublicReport(token: string, store: ReportStore, now = 
   const kind = row.health_hash === hash ? 'health' : row.sample_hash === hash ? 'sample' : null;
   if (!kind) return null;
   // Explicit projection: never expose an owner, contact, draft or the other report token.
+  // snapshotId stays on the server: the routes use it to log the view and never render it.
   return kind === 'health'
-    ? { kind, health: row.snapshot.health, document: row.snapshot.documents[0], expiresAt: row.expires_at } as const
-    : { kind, sample: row.snapshot.sample, document: row.snapshot.documents[1], expiresAt: row.expires_at } as const;
+    ? { kind, snapshotId: row.id, health: row.snapshot.health, document: row.snapshot.documents[0], expiresAt: row.expires_at } as const
+    : { kind, snapshotId: row.id, sample: row.snapshot.sample, document: row.snapshot.documents[1], expiresAt: row.expires_at } as const;
 }
 
 export async function revokeReportLinks(id: string, owner: string, store: ReportStore, now = Date.now()) {

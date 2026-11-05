@@ -1,4 +1,6 @@
 // Server-side storage for the outreach history (public.outreach_contacts, service role only).
+import { summarizeViews } from './outreach-report-views.ts';
+import { viewStore } from './outreach-report-views-store.ts';
 import { HISTORY_LIMIT, memoryContactStore, type ContactDelivery, type ContactStore, type OutreachContact, type StoredContact } from './outreach-history.ts';
 
 const COLUMNS = 'id,sent_at,sent_by,agency_name,agency_domain,agency_url,contact_name,contact_email,client_store_url,subject,delivery';
@@ -39,9 +41,9 @@ export async function contactStore(): Promise<ContactStore> {
       return data as OutreachContact;
     },
     async list(limit) {
-      const { data, error } = await client.from('outreach_contacts').select(COLUMNS).order('sent_at', { ascending: false }).limit(limit);
+      const { data, error } = await client.from('outreach_contacts').select(`${COLUMNS},report_links_id`).order('sent_at', { ascending: false }).limit(limit);
       if (error) throw problem();
-      return (data ?? []) as OutreachContact[];
+      return (data ?? []) as (OutreachContact & { report_links_id: string | null })[];
     },
   };
 }
@@ -49,7 +51,12 @@ export async function contactStore(): Promise<ContactStore> {
 /** For the outreach page: the history, or a reason it is missing. Sending still works without it. */
 export async function loadOutreachHistory(): Promise<{ contacts: OutreachContact[]; error: string | null }> {
   try {
-    return { contacts: await (await contactStore()).list(HISTORY_LIMIT), error: null };
+    const rows = await (await contactStore()).list(HISTORY_LIMIT);
+    // Views are extra: if they cannot be loaded, the history still shows (with "views unknown").
+    const ids = [...new Set(rows.map((r) => r.report_links_id).filter((id): id is string => !!id))];
+    const summaries = await viewStore().then((s) => s.forSnapshots(ids)).then(summarizeViews).catch(() => null);
+    const contacts = rows.map(({ report_links_id, ...c }) => ({ ...c, views: summaries && report_links_id ? summaries.get(report_links_id) ?? { health: 0, sample: 0, downloads: 0, automated: 0, first: null, last: null } : null }));
+    return { contacts, error: null };
   } catch {
     return { contacts: [], error: 'Outreach history could not be loaded. Apply the outreach-contacts migration and set SUPABASE_SERVICE_ROLE_KEY.' };
   }
