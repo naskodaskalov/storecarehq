@@ -70,7 +70,9 @@ test('the same email is recorded once, and a confirmed retry upgrades an unconfi
   assert.equal(listed.length, 2);
   assert.ok(Date.parse(listed[0].sent_at) > Date.parse(listed[1].sent_at), 'newest first');
   assert.equal((await store.list(1)).length, 1);
-  for (const key of ['body_text', 'payload_digest', 'provider_message_id', 'report_links_id']) assert.equal(key in listed[0], false, `${key} stays on the server`);
+  for (const key of ['body_text', 'payload_digest', 'provider_message_id']) assert.equal(key in listed[0], false, `${key} stays on the server`);
+  // The report-link id is listed for the server to look up report views; loadOutreachHistory drops it before the page.
+  assert.equal(listed[0].report_links_id, followUp.pack.links!.id);
 });
 
 test('dates show in the admin time zone, the same on the server and in the browser', () => {

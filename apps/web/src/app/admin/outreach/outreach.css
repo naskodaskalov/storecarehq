@@ -123,7 +123,7 @@
 .outreach-history .outreach-import-content { padding-top: 20px; border-top: 1px solid var(--border); margin: 0 24px; padding-left: 0; padding-right: 0; }
 .outreach-history .table-empty { padding: 20px 0 4px; text-align: left; }
 .outreach-history-search { max-width: 320px; background: white; }
-.outreach-history-table { min-width: 760px; font-size: 12px; }
+.outreach-history-table { min-width: 880px; font-size: 12px; }
 .outreach-history-table th { text-transform: none; letter-spacing: 0; font-size: 11px; color: #54687b; padding: 10px 12px; }
 .outreach-history-table td { padding: 12px; vertical-align: top; }
 .outreach-history-table td > strong, .outreach-history-table td > span:not(.status-badge), .outreach-history-table td > a { display: block; }
