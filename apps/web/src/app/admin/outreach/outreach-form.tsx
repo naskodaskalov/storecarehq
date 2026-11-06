@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_SECTIONS } from '@storecare/reports';
 import { ReportView } from '@/components/report-view';
 import { CopyButton } from '@/components/copy-button';
-import { COLUMNS, draftMessage, ensureUnique, exportCsv, newPack, parseCsv, restorePacks, serializePacks, validateProspect, type Pack } from '@/lib/outreach';
+import { COLUMNS, draftMessage, exportCsv, newPack, parseCsv, restorePacks, serializePacks, validateProspect, type Pack } from '@/lib/outreach';
 import { SAMPLE_NOTICE, sampleMonthReport } from '@/lib/sample-month-report';
 import { quickReport } from '../actions';
+import { addOutreachLeads, removeOutreachLead, updateOutreachLead } from './actions';
+import { LEAD_SOURCES, leadPack, mergeBackup, outcomeSummary, type OutreachLead } from '@/lib/outreach-leads';
+import { agencyDomain } from '@/lib/outreach-history';
 import { BfcmOnePager } from '@/components/bfcm-one-pager';
 import { validAudit } from '@/lib/bfcm';
 import { EmailComposer, type TestSenderInfo } from './email-composer';
@@ -20,10 +23,22 @@ function download(name: string, value: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function OutreachForm({ sender, history, historyError, timeZone }: { sender: TestSenderInfo; history: OutreachContact[]; historyError: string | null; timeZone: string }) {
-  const [packs, setPacks] = useState<Pack[]>([]);
+const savedKeys = new Set(['reviewed', 'status']);
+const OPEN = ['new', 'prepared'];
+
+/** Adds packs not already in the list (by agency website), keeping the list's own copy of any repeat. */
+function withoutRepeats(current: Pack[], incoming: Pack[]): Pack[] {
+  const seen = new Set(current.map(p => agencyDomain(p.prospect.agency_url)));
+  return [...current, ...incoming.filter(p => { const d = agencyDomain(p.prospect.agency_url); if (seen.has(d)) return false; seen.add(d); return true; })];
+}
+
+export function OutreachForm({ sender, history, historyError, leads, leadsError, timeZone }: { sender: TestSenderInfo; history: OutreachContact[]; historyError: string | null; leads: OutreachLead[]; leadsError: string | null; timeZone: string }) {
+  const [packs, setPacks] = useState<Pack[]>(() => leads.map(leadPack));
+  const [leadInfo, setLeadInfo] = useState(() => new Map(leads.map(l => [l.id, l])));
+  const [notice, setNotice] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const [contacts, setContacts] = useState(history);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(() => Math.max(0, leads.findIndex(l => OPEN.includes(l.status))));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [preparing, setPreparing] = useState<number | null>(null);
@@ -48,7 +63,38 @@ export function OutreachForm({ sender, history, historyError, timeZone }: { send
   }, [dirty]);
 
   function update(index: number, changes: Partial<Pack>) {
-    setPacks(prev => prev.map((p, i) => i === index ? { ...p, ...changes, ...('report' in changes ? { links: undefined } : {}) } : p)); setDirty(true);
+    setPacks(prev => prev.map((p, i) => i === index ? { ...p, ...changes, ...('report' in changes ? { links: undefined } : {}) } : p));
+    if (Object.keys(changes).some(k => !savedKeys.has(k))) setDirty(true);
+    const leadId = packs[index]?.leadId;
+    const saved = Object.fromEntries(Object.entries(changes).filter(([k]) => savedKeys.has(k)));
+    if (leadId && Object.keys(saved).length) void updateOutreachLead(leadId, saved).then(r => { if (!r.ok) setError(r.error); });
+  }
+
+  /** Saves new agencies to the lead list and adds the saved ones to the workspace. Repeats and agencies already
+   *  emailed are skipped. If saving fails, they are added to this tab only, as before. */
+  async function saveNew(incoming: Pack[], source: 'csv' | 'manual' | 'backup'): Promise<boolean> {
+    const result = await addOutreachLeads(incoming.map(p => p.prospect), source);
+    if (!result.ok) {
+      setPacks(prev => withoutRepeats(prev, incoming)); setDirty(true);
+      setError(`${result.error} They were added to this tab only, so export a backup to keep them.`); return false;
+    }
+    const byId = new Map(result.added.map(l => [l.id, l]));
+    const fresh = result.outcomes.flatMap((o, i) => {
+      const lead = o.lead_id ? byId.get(o.lead_id) : undefined;
+      if (!lead) return [];
+      const from = incoming[i], pack = { ...from, ...leadPack(lead), report: from.report, draft: from.draft, preparedAt: from.preparedAt, ...(from.subject !== undefined ? { subject: from.subject } : {}), ...(from.links ? { links: from.links } : {}) };
+      if (from.reviewed || from.status !== 'new') { pack.reviewed = from.reviewed; pack.status = from.status; void updateOutreachLead(lead.id, { reviewed: from.reviewed, status: from.status }).then(r => { if (!r.ok) setError(r.error); }); }
+      return [pack];
+    });
+    setLeadInfo(prev => new Map([...prev, ...result.added.map(l => [l.id, l] as const)]));
+    setPacks(prev => withoutRepeats(prev, fresh)); setNotice(outcomeSummary(result.outcomes)); return true;
+  }
+
+  async function remove(index: number) {
+    const p = packs[index];
+    if (!p || !window.confirm(`Remove ${p.prospect.agency_name} from the list?${p.leadId ? ' It is deleted from the saved leads too.' : ''}`)) return;
+    if (p.leadId) { const r = await removeOutreachLead(p.leadId); if (!r.ok) { setError(r.error); return; } }
+    setPacks(prev => prev.filter((_, i) => i !== index)); setActive(a => Math.max(0, a > index ? a - 1 : Math.min(a, packs.length - 2)));
   }
 
   async function importFile(file: File | undefined, backup: boolean) {
@@ -56,14 +102,18 @@ export function OutreachForm({ sender, history, historyError, timeZone }: { send
     try {
       if (file.size > (backup ? 5_000_000 : 500_000)) throw new Error('File is too large.');
       const source = await file.text();
-      const incoming = backup ? restorePacks(source) : parseCsv(source);
-      setPacks(ensureUnique([...packs, ...incoming])); setDirty(true); setError('');
+      setError(''); setNotice('');
+      if (!backup) { await saveNew(parseCsv(source), 'csv'); return; }
+      const merged = mergeBackup(packs, restorePacks(source));
+      setPacks(merged.packs); setDirty(true);
+      for (const p of merged.changed) void updateOutreachLead(p.leadId!, { reviewed: p.reviewed, status: p.status }).then(r => { if (!r.ok) setError(r.error); });
+      if (merged.unsaved.length) await saveNew(merged.unsaved, 'backup');
     } catch (e) { setError(e instanceof Error ? e.message : 'Import failed.'); }
   }
 
   async function prepare(indices: number[]) {
     if (running.current) return;
-    indices = indices.filter(index => packs[index].reviewed && !packs[index].links && !['contacted', 'replied', 'declined'].includes(packs[index].status));
+    indices = indices.filter(index => packs[index].reviewed && !!packs[index].prospect.client_store_url && !packs[index].links && !['contacted', 'replied', 'declined'].includes(packs[index].status));
     if (!indices.length) return;
     running.current = true; stop.current = false; setBusy(true); setError('');
     setQueued(indices);
@@ -86,7 +136,7 @@ export function OutreachForm({ sender, history, historyError, timeZone }: { send
   }
 
   // Batch preparation skips agencies in the outreach history; prepare one of those on purpose with its own button.
-  const eligible = packs.map((p, i) => p.reviewed && !p.links && !p.report?.ok && p.status === 'new' && !contactedBefore(p).length ? i : -1).filter(i => i >= 0).slice(0, 20);
+  const eligible = packs.map((p, i) => p.reviewed && !!p.prospect.client_store_url && !p.links && !p.report?.ok && p.status === 'new' && !contactedBefore(p).length ? i : -1).filter(i => i >= 0).slice(0, 20);
   const sample = current ? sampleMonthReport(current.prospect.agency_name, current.preparedAt || new Date().toISOString()) : null;
 
   return <>
@@ -100,15 +150,20 @@ export function OutreachForm({ sender, history, historyError, timeZone }: { send
       <details><summary>Add one agency manually</summary>
         <form className="outreach-fields" onSubmit={e => {
           e.preventDefault(); const form = e.currentTarget;
-          try { const p = validateProspect(Object.fromEntries(new FormData(form))); setPacks(ensureUnique([...packs, newPack(p)])); setDirty(true); setError(''); form.reset(); }
-          catch (err) { setError(err instanceof Error ? err.message : 'Check the agency details.'); }
+          let p;
+          try { p = validateProspect(Object.fromEntries(new FormData(form))); }
+          catch (err) { setError(err instanceof Error ? err.message : 'Check the agency details.'); return; }
+          setError(''); setNotice('');
+          void saveNew([newPack(p)], 'manual').then(ok => { if (ok) form.reset(); });
         }}>
           {COLUMNS.map(key => <label className="field" key={key}>{{ agency_name: 'Agency name', agency_url: 'Agency website', directory_url: 'Directory profile (optional)', contact_name: 'Contact name (optional)', contact_email: 'Contact email (optional)', client_store_url: 'Client store website', portfolio_source_url: 'Portfolio reference' }[key]}<input name={key} placeholder={key.endsWith('_url') ? 'https://…' : key === 'contact_email' ? 'hello@agency.com' : undefined} disabled={busy} required={['agency_name', 'agency_url', 'client_store_url', 'portfolio_source_url'].includes(key)} type={key === 'contact_email' ? 'email' : 'text'} maxLength={key.endsWith('_url') ? 300 : 120} /></label>)}
           <button disabled={busy} className="btn">Add agency</button>
         </form>
       </details>
       {error && <p className="error" role="alert">{error}</p>}
-      <p className="small muted outreach-storage-note"><Icon name="clock" size={14} />Your list stays in this tab. Export a backup to keep your progress. Sent emails are saved to the outreach history.</p></div>
+      {notice && <p className="small" role="status">{notice}</p>}
+      {leadsError && <p className="error" role="alert">{leadsError}</p>}
+      <p className="small muted outreach-storage-note"><Icon name="clock" size={14} />Agencies, their review and status are saved, including leads from the daily research. Health checks and drafts stay in this tab, so export a backup to keep them. Sent emails are saved to the outreach history.</p></div>
     </details>
 
     <OutreachHistory contacts={contacts} error={historyError} timeZone={timeZone} />
@@ -129,27 +184,31 @@ export function OutreachForm({ sender, history, historyError, timeZone }: { send
       <div className="outreach-workspace">
         <aside className="outreach-list no-print" aria-label="Agency list">
           <div className="outreach-list-caption">YOUR AGENCIES <span>{packs.length}</span></div>
-          {packs.map((p, i) => <button key={p.prospect.agency_url} className={active === i ? 'is-active' : ''} aria-pressed={active === i} onClick={() => setActive(i)}><span className="outreach-agency-avatar" aria-hidden="true">{p.prospect.agency_name.slice(0, 1).toUpperCase()}</span><span className="outreach-agency-copy"><strong>{p.prospect.agency_name}</strong><span className="outreach-agency-domain">{new URL(p.prospect.agency_url).hostname.replace(/^www\./, '')}</span><span className={`outreach-status ${p.report?.ok && !queued.includes(i) ? 'is-ready' : ''}`}>{queued.includes(i) ? (preparing === i ? 'Preparing reports…' : 'Queued for preparation') : p.report && !p.report.ok ? 'Check failed — retry available' : p.status}{p.reviewed ? ' · reviewed' : ' · needs review'}</span>{(() => { const last = contactedBefore(p)[0]; return last && <span className="outreach-contacted"><Icon name="mail" size={11} />Contacted {contactDay(last.sent_at, timeZone)}</span>; })()}</span></button>)}
+          <label className="outreach-list-filter small"><input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} />Show contacted, replied and declined</label>
+          {packs.map((p, i) => (showAll || OPEN.includes(p.status) || i === active) && <button key={p.prospect.agency_url} className={active === i ? 'is-active' : ''} aria-pressed={active === i} onClick={() => setActive(i)}><span className="outreach-agency-avatar" aria-hidden="true">{p.prospect.agency_name.slice(0, 1).toUpperCase()}</span><span className="outreach-agency-copy"><strong>{p.prospect.agency_name}</strong><span className="outreach-agency-domain">{new URL(p.prospect.agency_url).hostname.replace(/^www\./, '')}</span><span className={`outreach-status ${p.report?.ok && !queued.includes(i) ? 'is-ready' : ''}`}>{queued.includes(i) ? (preparing === i ? 'Preparing reports…' : 'Queued for preparation') : p.report && !p.report.ok ? 'Check failed — retry available' : p.status}{p.reviewed ? ' · reviewed' : ' · needs review'}</span>{(() => { const last = contactedBefore(p)[0]; return last && <span className="outreach-contacted"><Icon name="mail" size={11} />Contacted {contactDay(last.sent_at, timeZone)}</span>; })()}</span></button>)}
         </aside>
         {current && <div className="outreach-detail">
           <section className="card no-print outreach-agency-card">
             <div className="outreach-section-heading"><span className="outreach-step">01</span><div><p className="outreach-eyebrow">REVIEW THE MATCH</p><h2>{current.prospect.agency_name}</h2></div></div>
             <div className="outreach-actions outreach-source-links">
               <a href={current.prospect.agency_url} target="_blank" rel="noreferrer">Agency website ↗</a>
-              <a href={current.prospect.portfolio_source_url} target="_blank" rel="noreferrer">Portfolio evidence ↗</a>
-              <a href={current.prospect.client_store_url} target="_blank" rel="noreferrer">Client store ↗</a>
+              {current.prospect.portfolio_source_url && <a href={current.prospect.portfolio_source_url} target="_blank" rel="noreferrer">Portfolio evidence ↗</a>}
+              {current.prospect.client_store_url && <a href={current.prospect.client_store_url} target="_blank" rel="noreferrer">Client store ↗</a>}
               {current.prospect.directory_url && <a href={current.prospect.directory_url} target="_blank" rel="noreferrer">Directory profile ↗</a>}
             </div>
             <p className="small muted">{current.prospect.contact_name || 'Contact not supplied'} · {current.prospect.contact_email || 'Email not supplied'}</p>
+            {(() => { const lead = current.leadId ? leadInfo.get(current.leadId) : undefined; return <p className="small muted">{current.fitNote && <><span className="outreach-fit">Why it fits: {current.fitNote}</span><br /></>}{lead ? `${LEAD_SOURCES[lead.source]} · added ${contactDay(lead.created_at, timeZone)}` : 'Not saved: this agency is only in this tab.'}</p>; })()}
             {currentPrevious.length > 0 && <div className="outreach-previous" role="note"><Icon name="alert" size={16} /><div>
               <strong>Already contacted {currentPrevious.length === 1 ? 'once' : `${currentPrevious.length} times`}</strong>
               <ul>{currentPrevious.slice(0, 3).map(c => <li key={c.id}>{contactDay(c.sent_at, timeZone)} · {c.contact_email} · “{c.subject}”{c.delivery === 'unconfirmed' ? ' · unconfirmed' : ''}{c.sent_by !== sender.to ? ` · by ${c.sent_by}` : ''}</li>)}</ul>
             </div></div>}
             <label className="outreach-review"><input type="checkbox" disabled={busy} checked={current.reviewed} onChange={e => update(active, { reviewed: e.target.checked })} />I checked the portfolio source and store match. This does not confirm an ongoing client relationship.</label>
             <div className="outreach-actions">
-              <button className="btn" disabled={busy || !current.reviewed || !!current.links || ['contacted', 'replied', 'declined'].includes(current.status)} aria-busy={currentLoading} onClick={() => void prepare([active])}>{currentLoading ? <><span className="spinner" aria-hidden="true" />{preparing === active ? 'Preparing reports…' : 'Queued…'}</> : current.report?.ok ? 'Refresh health check' : 'Prepare this agency'}</button>
+              <button className="btn" disabled={busy || !current.reviewed || !current.prospect.client_store_url || !!current.links || ['contacted', 'replied', 'declined'].includes(current.status)} aria-busy={currentLoading} onClick={() => void prepare([active])}>{currentLoading ? <><span className="spinner" aria-hidden="true" />{preparing === active ? 'Preparing reports…' : 'Queued…'}</> : current.report?.ok ? 'Refresh health check' : 'Prepare this agency'}</button>
+              <button className="btn secondary" disabled={busy} onClick={() => void remove(active)}>Remove from list</button>
               <label className="field">Outreach status<select disabled={busy} value={current.status} onChange={e => update(active, { status: e.target.value as Pack['status'] })}>{['new', 'prepared', 'contacted', 'replied', 'declined'].map(s => <option key={s}>{s}</option>)}</select></label>
             </div>
+            {!current.prospect.client_store_url && <p className="small" role="note">No client store on file for this agency, so it cannot be prepared. Add it again with a store, or remove it.</p>}
             <p className="small muted">Public storefront checks only. No recurring monitoring or checkout test is enabled.</p>
             {current.links && <p className="small muted">Revoke the saved report links in the email preview before refreshing this health check.</p>}
           </section>
