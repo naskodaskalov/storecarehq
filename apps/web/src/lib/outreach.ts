@@ -4,7 +4,9 @@ import { currentOffer, inSeason, leadFinding, offerDay, offerTrialEnd, saleDates
 export const COLUMNS = ['agency_name', 'agency_url', 'directory_url', 'contact_name', 'contact_email', 'client_store_url', 'portfolio_source_url'] as const;
 export type Prospect = Record<typeof COLUMNS[number], string>;
 export type ReportLinks = { id: string; healthToken: string; sampleToken: string; expiresAt: string; sourceDigest: string; origin: string };
-export type Pack = { prospect: Prospect; reviewed: boolean; preparedAt: string; report: QuickReport | null; draft: string; subject?: string; links?: ReportLinks; status: 'new' | 'prepared' | 'contacted' | 'replied' | 'declined' };
+export type Pack = { prospect: Prospect; reviewed: boolean; preparedAt: string; report: QuickReport | null; draft: string; subject?: string; links?: ReportLinks; status: 'new' | 'prepared' | 'contacted' | 'replied' | 'declined';
+  /** The saved lead this pack belongs to (public.outreach_leads), and the research note on why it fits. */
+  leadId?: string; fitNote?: string };
 const statuses = ['new', 'prepared', 'contacted', 'replied', 'declined'];
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 

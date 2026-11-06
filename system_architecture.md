@@ -51,6 +51,27 @@ An agency counts as contacted before when its website domain (ignoring `www.`) o
 a saved row: the agency list shows a "Contacted <date>" badge, the agency card and send panel warn
 before writing again, and batch preparation skips it (it can still be prepared on its own).
 
+### Outreach leads
+
+`outreach_leads` (migration `20261106120000_outreach_leads.sql`) holds one row per agency, keyed by its
+website domain without `www.`: the CSV columns, an optional `fit_note`, where it came from (`research`,
+`csv`, `manual`, `backup`), who added it, the review tick and the status. New rows go only through
+`add_outreach_leads(leads jsonb, lead_source text, added_by text)`, so the daily lead research, CSV
+imports, the manual form and backup restores share one set of checks. It skips, without failing the batch,
+rows missing a required field or with a bad URL or email, agencies already listed, and agencies already
+emailed (domain or contact address in `outreach_contacts`), and returns one outcome per row. Browser roles
+have no access; the service role may read, delete, and update only `reviewed`, `status` and `updated_at`.
+`/admin/outreach` loads the newest 1,000 leads and hides contacted, replied and declined ones unless asked.
+If saving fails, imported agencies are kept in the tab only, as before.
+
+The daily research routine adds leads with, for example:
+
+```sql
+select * from public.add_outreach_leads('[{"agency_name":"…","agency_url":"https://…","directory_url":"",
+  "contact_name":"","contact_email":"…","client_store_url":"https://…","portfolio_source_url":"https://…",
+  "fit_note":"Sells a monthly care plan"}]'::jsonb, 'research', 'lead-research@storecarehq.com');
+```
+
 ### Hosted outreach report links
 
 `outreach-report-links.ts` publishes immutable report-only snapshots, separate from operational
@@ -75,10 +96,11 @@ process-local memory solely for preview/browser testing; it never enables email 
 ### Prospect preparation
 
 `/admin/outreach` uses the existing admin session gate and `quickReport` server action.
-Prospects, review flags, current scan snapshots, editable drafts and manual outreach statuses
-live in browser memory and can be exported/restored through a versioned JSON backup.
+The agency list, review flags and outreach statuses are saved in `outreach_leads` (see below); current
+scan snapshots and editable drafts live in browser memory and can be exported/restored through a
+versioned JSON backup (restoring fills in saved leads by agency domain instead of duplicating them).
 CSV summaries neutralize spreadsheet formulas. Imports require agency/store/portfolio URLs,
-reject duplicate agency domains or contacts, and are capped at 100 prospects. Each batch
+skip duplicate agency domains or contacts, and are capped at 100 prospects per batch. Each batch
 prepares up to 20 reviewed agencies sequentially; failed checks remain retryable.
 
 `sample-month-report.ts` builds a fictional previous-month report using shared report types.
