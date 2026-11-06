@@ -53,7 +53,8 @@ before writing again, and batch preparation skips it (it can still be prepared o
 
 ### Outreach leads
 
-`outreach_leads` (migration `20261106120000_outreach_leads.sql`) holds one row per agency, keyed by its
+`outreach_leads` (migration `20261106120000_outreach_leads.sql`, applied to the StoreCare HQ database on 2026-11-06,
+with the 72 agencies from the earlier research lists backfilled and the 25 already emailed marked contacted) holds one row per agency, keyed by its
 website domain without `www.`: the CSV columns, an optional `fit_note`, where it came from (`research`,
 `csv`, `manual`, `backup`), who added it, the review tick and the status. New rows go only through
 `add_outreach_leads(leads jsonb, lead_source text, added_by text)`, so the daily lead research, CSV
@@ -61,6 +62,8 @@ imports, the manual form and backup restores share one set of checks. It skips, 
 rows missing a required field or with a bad URL or email, agencies already listed, and agencies already
 emailed (domain or contact address in `outreach_contacts`), and returns one outcome per row. Browser roles
 have no access; the service role may read, delete, and update only `reviewed`, `status` and `updated_at`.
+Client store and portfolio are required for new leads but nullable in the table, because some backfilled agencies
+had none; the page shows those as unable to be prepared.
 `/admin/outreach` loads the newest 1,000 leads and hides contacted, replied and declined ones unless asked.
 If saving fails, imported agencies are kept in the tab only, as before.
 

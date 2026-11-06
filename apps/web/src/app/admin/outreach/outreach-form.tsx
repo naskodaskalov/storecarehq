@@ -113,7 +113,7 @@ export function OutreachForm({ sender, history, historyError, leads, leadsError,
 
   async function prepare(indices: number[]) {
     if (running.current) return;
-    indices = indices.filter(index => packs[index].reviewed && !packs[index].links && !['contacted', 'replied', 'declined'].includes(packs[index].status));
+    indices = indices.filter(index => packs[index].reviewed && !!packs[index].prospect.client_store_url && !packs[index].links && !['contacted', 'replied', 'declined'].includes(packs[index].status));
     if (!indices.length) return;
     running.current = true; stop.current = false; setBusy(true); setError('');
     setQueued(indices);
@@ -136,7 +136,7 @@ export function OutreachForm({ sender, history, historyError, leads, leadsError,
   }
 
   // Batch preparation skips agencies in the outreach history; prepare one of those on purpose with its own button.
-  const eligible = packs.map((p, i) => p.reviewed && !p.links && !p.report?.ok && p.status === 'new' && !contactedBefore(p).length ? i : -1).filter(i => i >= 0).slice(0, 20);
+  const eligible = packs.map((p, i) => p.reviewed && !!p.prospect.client_store_url && !p.links && !p.report?.ok && p.status === 'new' && !contactedBefore(p).length ? i : -1).filter(i => i >= 0).slice(0, 20);
   const sample = current ? sampleMonthReport(current.prospect.agency_name, current.preparedAt || new Date().toISOString()) : null;
 
   return <>
@@ -192,8 +192,8 @@ export function OutreachForm({ sender, history, historyError, leads, leadsError,
             <div className="outreach-section-heading"><span className="outreach-step">01</span><div><p className="outreach-eyebrow">REVIEW THE MATCH</p><h2>{current.prospect.agency_name}</h2></div></div>
             <div className="outreach-actions outreach-source-links">
               <a href={current.prospect.agency_url} target="_blank" rel="noreferrer">Agency website ↗</a>
-              <a href={current.prospect.portfolio_source_url} target="_blank" rel="noreferrer">Portfolio evidence ↗</a>
-              <a href={current.prospect.client_store_url} target="_blank" rel="noreferrer">Client store ↗</a>
+              {current.prospect.portfolio_source_url && <a href={current.prospect.portfolio_source_url} target="_blank" rel="noreferrer">Portfolio evidence ↗</a>}
+              {current.prospect.client_store_url && <a href={current.prospect.client_store_url} target="_blank" rel="noreferrer">Client store ↗</a>}
               {current.prospect.directory_url && <a href={current.prospect.directory_url} target="_blank" rel="noreferrer">Directory profile ↗</a>}
             </div>
             <p className="small muted">{current.prospect.contact_name || 'Contact not supplied'} · {current.prospect.contact_email || 'Email not supplied'}</p>
@@ -204,10 +204,11 @@ export function OutreachForm({ sender, history, historyError, leads, leadsError,
             </div></div>}
             <label className="outreach-review"><input type="checkbox" disabled={busy} checked={current.reviewed} onChange={e => update(active, { reviewed: e.target.checked })} />I checked the portfolio source and store match. This does not confirm an ongoing client relationship.</label>
             <div className="outreach-actions">
-              <button className="btn" disabled={busy || !current.reviewed || !!current.links || ['contacted', 'replied', 'declined'].includes(current.status)} aria-busy={currentLoading} onClick={() => void prepare([active])}>{currentLoading ? <><span className="spinner" aria-hidden="true" />{preparing === active ? 'Preparing reports…' : 'Queued…'}</> : current.report?.ok ? 'Refresh health check' : 'Prepare this agency'}</button>
+              <button className="btn" disabled={busy || !current.reviewed || !current.prospect.client_store_url || !!current.links || ['contacted', 'replied', 'declined'].includes(current.status)} aria-busy={currentLoading} onClick={() => void prepare([active])}>{currentLoading ? <><span className="spinner" aria-hidden="true" />{preparing === active ? 'Preparing reports…' : 'Queued…'}</> : current.report?.ok ? 'Refresh health check' : 'Prepare this agency'}</button>
               <button className="btn secondary" disabled={busy} onClick={() => void remove(active)}>Remove from list</button>
               <label className="field">Outreach status<select disabled={busy} value={current.status} onChange={e => update(active, { status: e.target.value as Pack['status'] })}>{['new', 'prepared', 'contacted', 'replied', 'declined'].map(s => <option key={s}>{s}</option>)}</select></label>
             </div>
+            {!current.prospect.client_store_url && <p className="small" role="note">No client store on file for this agency, so it cannot be prepared. Add it again with a store, or remove it.</p>}
             <p className="small muted">Public storefront checks only. No recurring monitoring or checkout test is enabled.</p>
             {current.links && <p className="small muted">Revoke the saved report links in the email preview before refreshing this health check.</p>}
           </section>

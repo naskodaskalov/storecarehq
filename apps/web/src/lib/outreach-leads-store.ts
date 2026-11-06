@@ -4,8 +4,10 @@ import { COLUMNS } from './outreach.ts';
 import { LEAD_LIMIT, memoryLeadStore, type LeadStore, type OutreachLead } from './outreach-leads.ts';
 
 const SELECT = `id,created_at,source,fit_note,reviewed,status,${COLUMNS.join(',')}`;
-type Row = Omit<OutreachLead, 'directory_url' | 'contact_name' | 'contact_email' | 'fit_note'> & Record<'directory_url' | 'contact_name' | 'contact_email' | 'fit_note', string | null>;
-const shown = (r: Row): OutreachLead => ({ ...r, directory_url: r.directory_url ?? '', contact_name: r.contact_name ?? '', contact_email: r.contact_email ?? '', fit_note: r.fit_note ?? '' });
+const OPTIONAL = ['directory_url', 'contact_name', 'contact_email', 'client_store_url', 'portfolio_source_url', 'fit_note'] as const;
+type Row = Omit<OutreachLead, typeof OPTIONAL[number]> & Record<typeof OPTIONAL[number], string | null>;
+// Optional text is '' on the page. Client store and portfolio are always set on new leads; only backfilled ones can lack them.
+const shown = (r: Row): OutreachLead => ({ ...r, ...Object.fromEntries(OPTIONAL.map((k) => [k, r[k] ?? ''])) } as OutreachLead);
 
 // Demo mode starts with two sample leads (reserved .example domains) so the page can be reviewed without a database.
 function demoLeads(): OutreachLead[] {

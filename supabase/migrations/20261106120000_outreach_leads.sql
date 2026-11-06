@@ -15,8 +15,10 @@ create table public.outreach_leads (
   directory_url text check (directory_url ~ '^https?://' and length(directory_url) <= 300),
   contact_name text check (length(contact_name) between 1 and 120),
   contact_email text check (contact_email = lower(contact_email) and contact_email ~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' and length(contact_email) <= 320),
-  client_store_url text not null check (client_store_url ~ '^https?://' and length(client_store_url) <= 300),
-  portfolio_source_url text not null check (portfolio_source_url ~ '^https?://' and length(portfolio_source_url) <= 300),
+  -- Required for every new lead (add_outreach_leads checks them). Nullable only for agencies backfilled from the
+  -- research lists sent before this table, some of which had no client store found.
+  client_store_url text check (client_store_url ~ '^https?://' and length(client_store_url) <= 300),
+  portfolio_source_url text check (portfolio_source_url ~ '^https?://' and length(portfolio_source_url) <= 300),
   fit_note text check (length(fit_note) between 1 and 300),
   reviewed boolean not null default false,
   status text not null default 'new' check (status in ('new', 'prepared', 'contacted', 'replied', 'declined'))
@@ -62,7 +64,7 @@ begin
     v_source := nullif(trim(lead->>'portfolio_source_url'), '');
     v_note := nullif(trim(lead->>'fit_note'), '');
     v_domain := public.outreach_lead_domain(v_url);
-    agency_name := coalesce(v_name, ''); agency_domain := coalesce(v_domain, ''); lead_id := null;
+    agency_name := coalesce(v_name, ''); agency_domain := coalesce(v_domain, ''); lead_id := null; v_id := null;
     if jsonb_typeof(lead) is distinct from 'object' or v_name is null or v_url is null or v_store is null or v_source is null then
       outcome := 'invalid: agency name, agency URL, client store URL and portfolio source URL are required';
     elsif length(v_name) > 120 or coalesce(length(v_contact), 0) > 120 or coalesce(length(v_note), 0) > 300 then
