@@ -3,8 +3,9 @@
 // Website analytics, two layers:
 // - Vercel Web Analytics for every visit: no cookies and no cross-site ID, so it needs no consent.
 //   It only sends data when deployed on Vercel with Web Analytics enabled for the project.
-// - Google Analytics 4, loaded only after the visitor accepts. Nothing is sent to Google before consent
-//   (not even cookieless pings), so the banner is a real choice. Needs NEXT_PUBLIC_GA_ID ("G-…").
+// - Google Analytics 4 and Google Tag Manager, loaded only after the visitor accepts. Nothing is sent
+//   to Google before consent (not even cookieless pings), so the banner is a real choice.
+//   GA4 needs NEXT_PUBLIC_GA_ID ("G-…"); GTM uses the public StoreCare HQ container ID below.
 
 import Script from 'next/script';
 import { useEffect, useState } from 'react';
@@ -12,6 +13,7 @@ import { Analytics as VercelAnalytics } from '@vercel/analytics/next';
 import { track as vercelTrack } from '@vercel/analytics';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+const GTM_ID = 'GTM-PJJ8726D';
 const KEY = 'sc_analytics';
 const OPEN_EVENT = 'sc:cookie-settings';
 
@@ -51,13 +53,14 @@ export function track(name: string, params: Record<string, string | number> = {}
   } catch {
     /* analytics must never break the page */
   }
-  const gtag = (window as unknown as { gtag?: Gtag }).gtag;
-  if (gtag && readChoice() === 'granted') gtag('event', name, params);
+  if (readChoice() !== 'granted') return;
+  const google = window as unknown as { dataLayer?: Record<string, unknown>[]; gtag?: Gtag };
+  google.dataLayer?.push({ event: name, ...params });
+  google.gtag?.('event', name, params);
 }
 
 /** A footer link that reopens the cookie choice, so consent can be withdrawn as easily as it was given. */
 export function CookieSettingsLink({ className }: { className?: string }) {
-  if (!GA_ID) return null;
   return (
     <button type="button" className={className ?? 'cookie-settings-link'} onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}>
       Cookie settings
@@ -92,7 +95,7 @@ export function Analytics() {
     return () => document.removeEventListener('click', onClick);
   }, []);
 
-  if (!GA_ID || !ready) return <VercelAnalytics />;
+  if (!ready) return <VercelAnalytics />;
 
   const decide = (next: Choice) => {
     saveChoice(next);
@@ -110,16 +113,24 @@ export function Analytics() {
       <VercelAnalytics />
       {choice === 'granted' && (
         <>
-          <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
-          <Script id="ga-init" strategy="afterInteractive">
-            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});gtag('config','${GA_ID}',{allow_google_signals:false,allow_ad_personalization_signals:false});`}
+          <Script id="gtm-init" strategy="afterInteractive">
+            {`window.dataLayer=window.dataLayer||[];window.dataLayer.push({'gtm.start':new Date().getTime(),event:'gtm.js'});`}
           </Script>
+          <Script src={`https://www.googletagmanager.com/gtm.js?id=${GTM_ID}`} strategy="afterInteractive" />
+          {GA_ID && (
+            <>
+              <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+              <Script id="ga-init" strategy="afterInteractive">
+                {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});gtag('config','${GA_ID}',{allow_google_signals:false,allow_ad_personalization_signals:false});`}
+              </Script>
+            </>
+          )}
         </>
       )}
       {open && (
         <div className="cookie-banner" role="dialog" aria-live="polite" aria-label="Cookie choice">
           <p>
-            We’d like to use Google Analytics to see how visitors find and use this site. It sets cookies and only runs if you agree.{' '}
+            We’d like to use Google analytics and advertising tags to see how visitors find and use this site. They set cookies and only run if you agree.{' '}
             <a href="/privacy#cookies">Privacy</a>
           </p>
           <div className="cookie-banner-actions">
