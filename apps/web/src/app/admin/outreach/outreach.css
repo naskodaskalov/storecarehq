@@ -35,6 +35,8 @@
 .outreach-progress { margin: -8px 0 0; color: var(--muted); font-size: 12px; }
 .outreach-workspace { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; align-items: start; }
 .outreach-list { display: grid; gap: 8px; position: sticky; top: 24px; max-height: 80vh; overflow: auto; }
+.outreach-fit { color: var(--text); }
+.outreach-list-filter { display: flex; align-items: center; gap: 6px; padding: 0 4px 10px; color: var(--muted); cursor: pointer; }
 .outreach-list-caption { display: flex; justify-content: space-between; padding: 4px 4px 12px; font: 10px var(--mono); color: var(--muted); letter-spacing: .06em; }
 .outreach-list button { display: flex; align-items: flex-start; gap: 10px; text-align: left; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 7px; padding: 14px 10px; cursor: pointer; font: inherit; overflow-wrap: anywhere; transition: background .15s; }
 .outreach-list button:hover { background: #edf2f2; }
@@ -103,7 +105,7 @@
 .outreach-report-tabs { padding-top: 4px; }
 .outreach .btn:disabled { cursor: not-allowed; }
 @media (max-width: 1280px) { .outreach-compose-grid { grid-template-columns: 1fr; } .outreach-workspace { grid-template-columns: 180px minmax(0, 1fr); gap: 20px; } .outreach-upload-grid { grid-template-columns: 1fr 1fr; } .outreach-upload-grid > button { justify-self: start; } }
-@media (max-width: 900px) { .outreach-workspace { grid-template-columns: 1fr; } .outreach-list { position: static; display: flex; overflow-x: auto; max-height: none; padding-bottom: 4px; } .outreach-list-caption { display: none; } .outreach-list button { min-width: 190px; max-width: 220px; flex-shrink: 0; } .outreach-stats > div { padding: 16px; flex-direction: column; align-items: flex-start; gap: 6px; } }
+@media (max-width: 900px) { .outreach-workspace { grid-template-columns: 1fr; } .outreach-list { position: static; display: flex; overflow-x: auto; max-height: none; padding-bottom: 4px; } .outreach-list-caption { display: none; } .outreach-list-filter { flex-shrink: 0; padding: 0 8px 0 0; } .outreach-list button { min-width: 190px; max-width: 220px; flex-shrink: 0; } .outreach-stats > div { padding: 16px; flex-direction: column; align-items: flex-start; gap: 6px; } }
 @media (max-width: 640px) { .outreach { gap: 20px; } .outreach-intro { align-items: flex-start; } .outreach-intro h1 { font-size: 28px; } .outreach-eyebrow { font-size: 9px; } .outreach-mode { padding: 5px 7px; font-size: 10px; } .outreach-mode svg { display: none; } .outreach .card { padding: 18px; } .outreach .outreach-import { padding: 0; } .outreach-import-heading { padding: 18px; gap: 10px; } .outreach-import-content { padding: 0 18px 18px; } .outreach-upload-grid, .outreach-fields { grid-template-columns: 1fr; } .outreach-empty { padding: 36px 12px; } .outreach-empty-steps { flex-direction: column; gap: 12px; align-items: flex-start; } .outreach-empty-steps > svg { display: none; } .outreach-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .outreach-stats > div { padding: 12px; } .outreach-stats span { font-size: 10px; } .outreach-stats strong { font-size: 22px; } .outreach-preview-heading > span { display: none; } }
 @media print {
   .outreach .no-print, .admin-header { display: none !important; }

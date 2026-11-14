@@ -7,6 +7,7 @@ import { requireAgency } from '@/lib/data';
 import { supabaseServer } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { dropStaleStripeLinks, portalConfiguration, priceFor, stripe, stripeEnabled, syncSubscription } from '@/lib/stripe';
+import { offerFromCookies } from '@/lib/signup-offer-cookie';
 
 const APP = () => process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 /** Sign-up (onboarding) and the billing page share these actions; each returns to its own page. */
@@ -76,15 +77,19 @@ async function choose(back: Back, plan: PlanKey) {
     const { error } = await supabaseAdmin().from('agencies').update({ stripe_customer_id: customer }).eq('id', agency.id);
     if (error) fail(back, `Could not save the billing customer: ${error.message}`);
   }
-  const trial = checkoutTrial(agency);
+  // From "Check all your client stores" on an outreach link before Black Friday: free until the offer's end
+  // (2 December) when that is longer than 7 days. The metadata says which outreach link the agency came from.
+  const offer = await offerFromCookies();
+  const trial = checkoutTrial(agency, offer?.trialEnd ?? null);
+  const source = offer ? { outreach_snapshot: offer.snapshotId, ...('trial_end' in trial ? { offer: offer.id } : {}) } : {};
   const session = await stripe().checkout.sessions.create({
     mode: 'subscription',
     customer,
     client_reference_id: agency.id,
     line_items: [{ price, quantity: 1 }],
-    payment_method_collection: 'always', // a card even when the first 7 days are free
+    payment_method_collection: 'always', // a card even when the first days are free
     subscription_data: {
-      metadata: { agency_id: agency.id, plan },
+      metadata: { agency_id: agency.id, plan, ...source },
       ...trial,
       // If the card is removed during the trial, the plan ends instead of renewing unpaid.
       ...(Object.keys(trial).length ? { trial_settings: { end_behavior: { missing_payment_method: 'cancel' as const } } } : {}),

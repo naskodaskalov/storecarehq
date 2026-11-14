@@ -72,6 +72,20 @@ test('new agency without a plan has no access; first checkout gets 7 days, a ret
   assert.deepEqual(checkoutTrial({ ...fresh, trial_ends_at: '2026-11-10T00:00:00Z' }), { trial_period_days: 7 });
 });
 
+test('an outreach offer runs the first trial until its end when that is later than 7 days, never for a returning agency', async () => {
+  const { firstChargeAt } = await import('./billing.ts');
+  const fresh = { ...base, trial_ends_at: null };
+  const offerEnd = Date.parse('2026-12-02T12:00:00Z');
+  const nov5 = Date.parse('2026-11-05T15:00:00Z');
+  assert.deepEqual(checkoutTrial(fresh, offerEnd, nov5), { trial_end: offerEnd / 1000 });
+  assert.equal(firstChargeAt(offerEnd, nov5), offerEnd);
+  const nov26 = Date.parse('2026-11-26T09:00:00Z');
+  assert.deepEqual(checkoutTrial(fresh, offerEnd, nov26), { trial_period_days: 7 }, 'late sign-ups keep the longer 7 days');
+  assert.equal(firstChargeAt(offerEnd, nov26), nov26 + 7 * 864e5);
+  assert.deepEqual(checkoutTrial({ ...fresh, stripe_subscription_id: 'sub_old' }, offerEnd, nov5), {});
+  assert.deepEqual(checkoutTrial(fresh, null, nov5), { trial_period_days: 7 });
+});
+
 test('Managed Payments checkout drops the parameters Stripe rejects; normal checkout keeps them', async () => {
   const { checkoutTaxParams, managedPaymentsEnabled, SAAS_TAX_CODE } = await import('./billing.ts');
   assert.deepEqual(checkoutTaxParams(true), { managed_payments: { enabled: true } });

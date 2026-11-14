@@ -1,60 +1,73 @@
-# Agency outreach preparation
+# Outreach sign-up path (BFCM step 2)
 
-Status: proposed; no product code, production data, or email sending changed.
+Status: approved 5 Nov 2026 (trial until 2 December), built. The previous plan is in `bfcm_audit_plan.md`.
 
 ## Outcome
 
-Prepare personalized outreach packs inside the existing admin area. Each pack contains a dated real storefront health check, a clearly labeled illustrative monthly report, and an editable outreach message. Start with 20 reviewed agencies from Shopify's ongoing website management directory.
+An agency that opens its Black Friday one-pager from an outreach email clicks **Check all your client stores**, signs
+up with that client store already filled in, and ends on the BFCM page, where the check runs by itself. Sign-ups from
+an outreach link until Black Friday get a trial that ends on **2 December** instead of after 7 days.
 
-## Existing behavior verified
+## Flow
 
-- Admin quick reports require the configured admin session, run public storefront checks, support printing/saving as PDF, and generate a copyable note. Results are currently transient.
-- Monthly reporting loads dated monitoring and work records. The scheduled worker skips stores created after the reported month ended.
-- The existing ReportView renders both internal previews and shared client reports.
-- Adding a store now and backdating example hours does not recreate last month's monitoring history.
+1. **Hosted one-pager** (`/outreach/r/<token>`): a "Check all your client stores" button in the top bar and a short
+   panel under the one-pager: one page per store in your branding, ready to send before the sale; the client store is
+   filled in; "Free until 2 December, then from $29 a month. Card required, cancel any time." From Black Friday on it
+   reads "Start your free trial" with the usual 7 days. Hidden when printing. The sample monthly report gets the panel too.
+2. **`GET /outreach/r/<token>/start`** (public like the view and download routes; checks the link is still live):
+   sets `sc_store` to the client store (the cookie the landing-page check already uses to prefill onboarding) and,
+   until Black Friday, `sc_offer`: a signed, expiring offer (httpOnly). Redirects to sign-up (`/login?trial=1`), which
+   shows the offer. A signed-in visitor goes to their workspace as today.
+3. **Sign-up → workspace → plan**: the plan step says "Nothing is charged until 2 December". Checkout gets
+   `trial_end` = 2 Dec 12:00 UTC (a 2 December charge from the US to Australia) instead of 7 days, and the Stripe
+   subscription metadata records the offer and the outreach snapshot (attribution). Whichever is longer wins, so a
+   sign-up close to Black Friday still gets 7 days. Only an agency's first plan, as today.
+4. **Store step**: prefilled (existing). After the store is added, `sc_store` is cleared, so "add another store" starts empty.
+5. **Care plan step** → `/bfcm?run=all&welcome=1` for offer sign-ups (others keep the store page). A welcome notice says
+   the store's first health check takes a few minutes and invites them to add their other client stores meanwhile.
+6. **BFCM board**: a store whose first health check is still running shows "First health check running…" and its
+   Black Friday check starts as soon as that finishes (polls the existing status endpoint; after 10 minutes it stops
+   with a Retry). The server refuses to audit such a store: a one-pager made a minute after adding a store would show
+   speed, links, checkout and uptime as "not checked".
 
-## First implementation: preparation only
+## Choices
 
-### Workflow
+- **Signed cookie, not a public promo code**: only people with an outreach link get the longer trial. It survives email
+  confirmation because confirmation already has to happen in the same browser (PKCE). Signed with `STRIPE_SECRET_KEY`
+  (or `SIGNUP_OFFER_SECRET` if set); without Stripe there is no offer. No new required env var.
+- **No migration**: attribution goes to Stripe metadata; outreach history is unchanged.
+- **Draft email**: the Black Friday draft's closing changes from "I'm setting up the first agencies free" to "There's a
+  button on the one-pager to run it on your other client stores, free until 2 December. Or reply and I'll set it up
+  with you."
 
-1. Add an Outreach tab/link under admin alongside Quick report.
-2. Import a CSV of reviewed agencies: agency_name, agency_url, directory_url, contact_name, contact_email, client_store_url, portfolio_source_url. Also allow entering a single agency. Validate URLs, field lengths, CSV quoting, duplicate agency domains, and duplicate contacts. Never invent emails or assume an agency's own website is a Shopify store.
-3. Require review of the portfolio link/store match before scanning. A public portfolio is evidence of past work, not proof of a current maintenance contract.
-4. Prepare selected packs sequentially in small batches using the existing admin quick-report action. Show per-agency progress, blocked/failed checks, and retry only failures. No checkout automation or recurring monitoring is enabled for prospects.
-5. Build a separate illustrative monthly report with the prospect agency's name and a fictional store, reusing ReportView. Default period: October 2026 when prepared in November 2026, calculated dynamically thereafter. Example work: theme adjustments 2h, image optimization 1.5h, app review 1h, maintenance review 0.5h. All hours and any illustrative metrics are visibly marked as sample data in both screen and print views. Do not claim that these tasks were performed or that the agency endorsed the report.
-6. Draft a short email from verified agency details and actual scan results, linking the observed facts to monitoring/reporting benefits. Include scan date and limitations. Unavailable checks are not failures; do not invent incidents, historic uptime, lost revenue, or improvements.
-7. Let the admin edit/copy the message, print either report, and export a resumable JSON pack plus a spreadsheet-safe CSV summary. Warn before leaving with unsaved work. Export/import retains drafts and statuses without adding prospect data to operational store/work tables.
+## Files
 
-### Exact files
+- `apps/web/src/lib/signup-offer.ts` [NEW] + test: offer window and trial end from `saleDates`, sign/verify, cookie options.
+- `apps/web/src/app/outreach/r/[token]/start/route.ts` [NEW]: the button's target (step 2).
+- `apps/web/src/components/signup-cta.tsx` [NEW]: the panel and the top-bar button.
+- `apps/web/src/app/outreach/r/[token]/page.tsx` [MODIFY]: render them.
+- `apps/web/src/lib/outreach-report-links.ts` [MODIFY]: `readStartTarget(token)`, the client store for either token.
+- `apps/web/src/lib/domains.ts` [MODIFY] + test: `/outreach/r/<token>/start` is public.
+- `apps/web/src/lib/billing.ts` [MODIFY] + test: `checkoutTrial(agency, offerEnd, now)`, the charge date.
+- `apps/web/src/app/(app)/billing/actions.ts` [MODIFY]: offer → `trial_end` and metadata.
+- `apps/web/src/app/login/page.tsx`, `onboarding/page.tsx`, `onboarding/trial/page.tsx`, `(app)/billing/page.tsx` [MODIFY]: offer copy.
+- `apps/web/src/app/onboarding/actions.ts` [MODIFY]: clear `sc_store` after adding; offer sign-ups finish on `/bfcm`.
+- `apps/web/src/lib/bfcm-run.ts`, `(app)/bfcm/bfcm-board.tsx`, `(app)/bfcm/page.tsx` [MODIFY]: first-health-check wait, welcome notice.
+- `apps/web/src/lib/outreach.ts` [MODIFY] + test: the draft's closing.
+- `apps/web/src/app/(legal)/privacy/page.tsx` [MODIFY]: list the `sc_offer` cookie.
+- `apps/web/src/lib/demo.ts` [MODIFY]: an opt-in demo store with a first health check in progress, for browser checks.
 
-- [MODIFY] apps/web/src/app/admin/page.tsx — link to outreach preparation.
-- [NEW] apps/web/src/app/admin/outreach/page.tsx — admin outreach page, request duration/dynamic settings consistent with admin quick reports.
-- [NEW] apps/web/src/app/admin/outreach/outreach-form.tsx — CSV/manual input, review, sequential preparation, editable drafts, print and export/import controls.
-- [NEW] apps/web/src/app/admin/outreach/outreach.css — scoped outreach and print layout, always-visible sample labels.
-- [NEW] apps/web/src/lib/outreach.ts — typed prospect/pack models, CSV parsing and safe export, normalization/deduplication, pack serialization, factual message templates.
-- [NEW] apps/web/src/lib/sample-month-report.ts — deterministic illustrative monthly facts/summary using the existing report types, without database writes.
-- [NEW] apps/web/src/lib/outreach.test.ts — malformed imports, deduplication, formula-safe exports, round-trip state, drafts without fabricated findings.
-- [NEW] apps/web/src/lib/sample-month-report.test.ts — month/year boundaries, explicitly illustrative content, correct hours totals and report type compatibility.
-- [MODIFY] system_architecture.md — document admin-only preparation and isolation from real work/monitoring records.
+## Verification
 
-### Verification
+Unit tests (offer signing: tampered, expired, other key; trial parameters by date; public routes; draft copy),
+typecheck, build, and a demo browser run at desktop and 390 px: hosted link → button → cookies and the sign-up page
+with the offer; plan step copy; the board's first-health-check state, then the one-pager.
 
-- Run web unit tests and repository type checks, then the web production build.
-- Exercise one manual prospect and a small CSV, including failed/blocked scans and export/import recovery.
-- Inspect both print views for sample labels and separation of measured versus illustrative data.
-- Verify admin access is enforced by the existing layout and every reused server action.
-- Confirm preparing packs does not add stores, work, monitoring consent, or outgoing emails.
+## Rollout
 
-## Outreach launch
+Merge = deploy. No migration, no new required env var.
 
-Review the first 20 agencies and their public business contact details. Send reviewed messages to agency contacts, not their portfolio merchants. Lead with one current observation and offer the sample report; do not imply a current client relationship. Initial sending uses the user's mailbox after preparation and recipient/message review.
+## Decision
 
-## Later automation, after validating the first batch
-
-- Directory ingestion: bounded, resumable collection of public profiles with source URLs, pagination, deduplication and respectful request pacing; verify permitted access before running collection. Discover agency business contacts and portfolio candidates for human review.
-- Durable admin prospect database and scan queue, separate from operational agency/store records; status history, resuming jobs and saved report snapshots.
-- Expiring/revocable unlisted report links that are excluded from indexing and retain sample notices. Publishing links must be an explicit action.
-- Outbound sending with a configured sender and reply address, reviewed recipients/messages, durable send deduplication, delivery status and opt-out suppression. Do not reuse ordinary client-report sending as a marketing campaign sender without these changes.
-- Follow-ups stop on replies, opt-outs and bounces; automate sending only once inbound reply detection and suppression are reliable.
-
-These later phases require a separate concrete implementation plan after sender choice, storage and campaign behavior are settled. No production account seeding or backdated operational records are needed for the first implementation.
+Trial end **2 December** (charge that day) for sign-ups from outreach links until the day before Black Friday.
+Approved 5 Nov.

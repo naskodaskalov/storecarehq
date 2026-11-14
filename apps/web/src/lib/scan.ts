@@ -71,6 +71,7 @@ export function fingerprint(r: ProbeResult): Fingerprint {
 
 export function summarize(r: ProbeResult): ScanReply {
   if (r.home.error && !r.home.status) return { ok: false, error: `We could not reach ${new URL(r.baseUrl).host}. Check the address and try again.` };
+  if (r.page?.unavailable) return { ok: false, error: `Shopify shows ${new URL(r.baseUrl).host} as “Store unavailable” right now, so there is nothing public to check.` };
   if (!r.home.blocked && !r.isShopify) return { ok: false, error: 'This does not look like a Shopify store. Try the store’s own domain.' };
   const finalUrl = r.finalUrl ? new URL(r.finalUrl).origin : r.baseUrl;
   const feed = r.productFeed.status === 'ok' ? r.productFeed : null;
@@ -92,7 +93,9 @@ export function summarize(r: ProbeResult): ScanReply {
     soldOut: feed ? feed.products.filter((p) => (p.soldOut?.length ?? 0) > 0).length : null,
     note: r.home.blocked
       ? 'The store’s firewall blocked our visit, so some checks would be limited.'
-      : !r.theme
+      : r.page?.password
+        ? 'The store’s password page is on, so shoppers only see the password form. Checks start once it opens.'
+        : !r.theme
         ? 'Looks like a headless store: theme checks would be limited.'
         : !feed
           ? 'The product list is not public, so price and stock checks would be limited.'

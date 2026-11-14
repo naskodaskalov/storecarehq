@@ -216,9 +216,21 @@ function seed(): Tables {
     speed_samples,
     storefront_snapshots,
     reports: [],
+    store_audits: [],
+    health_check_requests: demoFirstCheck(kite.id),
   };
   tables.reports = autoDrafted([juniper, kite, salt], tables);
   return tables;
+}
+
+/** STORECARE_DEMO_FIRST_CHECK=1: Kite & Kin's first health check is still running, and finishes 25 seconds after the
+ *  demo data is first loaded, to see the BFCM board wait for a newly added store. Off by default. */
+function demoFirstCheck(storeId: string): Row[] {
+  if (process.env.STORECARE_DEMO_FIRST_CHECK !== '1') return [];
+  const at = new Date().toISOString();
+  const row: Row = { id: uid(), store_id: storeId, agency_id: AGENCY, source: 'initial', status: 'running', requested_at: at, started_at: at, finished_at: null, phase: 'speed', results: { uptime: { status: 'completed' }, storefront: { status: 'completed' } } };
+  setTimeout(() => Object.assign(row, { status: 'completed', phase: null, finished_at: new Date().toISOString() }), 25_000).unref?.();
+  return [row];
 }
 
 /** STORECARE_DEMO_BILLING=trialing (default: Stripe trial, card on file) | new (no plan yet) | legacy (old
@@ -356,6 +368,7 @@ class Query implements PromiseLike<Result> {
         id: this.table === 'changes' ? rows.length + 1 : uid(),
         created_at: new Date().toISOString(),
         ...(this.table === 'reports' ? { share_token: [uid(), uid()].join('').replace(/-/g, ''), status: 'draft' } : {}),
+        ...(this.table === 'store_audits' ? { kind: 'bfcm', share_token: [uid(), uid()].join('').replace(/-/g, ''), shared_at: null, note: null, sent_at: null, sent_to: null } : {}),
         ...v,
       }));
       rows.push(...list);
@@ -419,6 +432,14 @@ export function demoClient() {
           data: { period: r.period, status: r.status, summary_text: r.summary_text, facts: r.facts, sections: r.sections, store_name: s?.name, agency_name: a?.name, brand_color: a?.brand_color, logo_url: a?.logo_url ?? null },
           error: null,
         };
+      }
+      if (fn === 'public_audit') {
+        const t = db();
+        const r = (t.store_audits ?? []).find((x) => x.share_token === args.token && x.shared_at);
+        if (!r) return { data: null, error: null };
+        const s = t.stores.find((x) => x.id === r.store_id);
+        const a = t.agencies.find((x) => x.id === r.agency_id);
+        return { data: { audit: r.audit, note: r.note, created_at: r.created_at, store_name: s?.name, agency_name: a?.name, brand_color: a?.brand_color, logo_url: a?.logo_url ?? null }, error: null };
       }
       if (fn === 'uptime_stats') {
         const rows = db().uptime_checks.filter((u) => u.store_id === args.p_store && u.checked_at >= args.p_from && u.checked_at < args.p_to);

@@ -4,6 +4,7 @@ import { normalizeStoreUrl, politeGet, type HostClock } from './http.ts';
 import { detectApps, isShopifyPage, parseScripts, parseSiteName, parseTheme, type DetectedApp, type ThemeInfo } from './page.ts';
 import { fetchProductFeed, type ProductFeed } from './products.ts';
 import { isAllowed, parseRobots, type Robots } from './robots.ts';
+import { checkProducts, readPageState, type PageState, type ProductCheck } from './states.ts';
 import type { Snapshot } from './diff.ts';
 
 export type ProbeResult = {
@@ -21,17 +22,23 @@ export type ProbeResult = {
   productFeed: ProductFeed | { status: 'skipped'; reason: string };
   cartJs: { status: number; blocked: boolean } | { status: 'skipped'; reason: string };
   robots: { found: boolean; homeAllowed: boolean; productsAllowed: boolean; cartAllowed: boolean; crawlDelay?: number };
+  /** What the home page says about the store: password page, "Store unavailable", noindex, promoted products.
+   *  Missing on results recorded before these checks existed. */
+  page?: PageState;
+  /** Stock of the first products the home page links to, when asked for with `featuredProducts`. */
+  featured?: ProductCheck[];
 };
 
 export async function probeStore(
   input: string,
-  opts: { gapMs?: number; maxProductPages?: number; skipProducts?: boolean; skipCart?: boolean } = {},
+  opts: { gapMs?: number; maxProductPages?: number; skipProducts?: boolean; skipCart?: boolean; timeoutMs?: number; featuredProducts?: number } = {},
 ): Promise<ProbeResult> {
   const baseUrl = normalizeStoreUrl(input);
   const clock: HostClock = { last: 0 };
   const gapMs = opts.gapMs ?? 1000;
+  const timeoutMs = opts.timeoutMs;
 
-  const robotsRes = await politeGet(`${baseUrl}/robots.txt`, { clock, gapMs, accept: 'text/plain' });
+  const robotsRes = await politeGet(`${baseUrl}/robots.txt`, { clock, gapMs, accept: 'text/plain', timeoutMs });
   const robots: Robots = robotsRes.ok ? parseRobots(robotsRes.body) : { rules: [] };
   const effectiveGap = Math.max(gapMs, (robots.crawlDelay ?? 0) * 1000);
   const allowed = {
@@ -41,27 +48,35 @@ export async function probeStore(
   };
 
   const home = allowed.home
-    ? await politeGet(`${baseUrl}/`, { clock, gapMs: effectiveGap })
+    ? await politeGet(`${baseUrl}/`, { clock, gapMs: effectiveGap, timeoutMs })
     : null;
   const html = home && !home.blocked ? home.body : '';
   const finalUrl = home?.url ?? null;
   const pageBase = finalUrl ? new URL(finalUrl).origin : baseUrl;
   const scripts = html ? parseScripts(html, pageBase) : [];
+  const page = home && !home.blocked && !home.error
+    ? readPageState({ finalUrl, status: home.status, headers: home.headers, html, robotsText: robotsRes.ok ? robotsRes.body : null })
+    : undefined;
 
-  const homeOk = !!home && !home.blocked && home.status === 200;
+  // A password page or Shopify's "Store unavailable" page answers in place of the store: nothing behind it is public.
+  const closed = page?.password ? 'password page is on' : page?.unavailable ? 'store unavailable' : null;
+  const homeOk = !!home && !home.blocked && home.status === 200 && !closed;
   const productFeed: ProbeResult['productFeed'] = !allowed.products
     ? { status: 'skipped', reason: 'disallowed by robots.txt' }
     : opts.skipProducts
       ? { status: 'skipped', reason: 'not due' }
       : !homeOk
-        ? { status: 'skipped', reason: 'home page not readable' }
+        ? { status: 'skipped', reason: closed ?? 'home page not readable' }
         : await fetchProductFeed(pageBase, { clock, gapMs: effectiveGap, maxPages: opts.maxProductPages });
 
-  let cartJs: ProbeResult['cartJs'] = { status: 'skipped', reason: opts.skipCart ? 'not requested' : 'disallowed by robots.txt' };
+  let cartJs: ProbeResult['cartJs'] = { status: 'skipped', reason: opts.skipCart ? 'not requested' : closed ?? 'disallowed by robots.txt' };
   if (allowed.cart && !opts.skipCart && homeOk) {
-    const c = await politeGet(`${pageBase}/cart.js`, { clock, gapMs: effectiveGap, accept: 'application/json' });
+    const c = await politeGet(`${pageBase}/cart.js`, { clock, gapMs: effectiveGap, accept: 'application/json', timeoutMs });
     cartJs = { status: c.status, blocked: c.blocked };
   }
+  const featured = opts.featuredProducts && homeOk && page
+    ? await checkProducts(pageBase, page.products.slice(0, opts.featuredProducts), { robots, clock, gapMs: effectiveGap, timeoutMs })
+    : undefined;
 
   return {
     input,
@@ -85,6 +100,8 @@ export async function probeStore(
       cartAllowed: allowed.cart,
       crawlDelay: robots.crawlDelay,
     },
+    ...(page ? { page } : {}),
+    ...(featured ? { featured } : {}),
   };
 }
 

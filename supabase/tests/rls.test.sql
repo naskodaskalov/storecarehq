@@ -180,4 +180,95 @@ do $$ begin
   end;
 end $$;
 
+-- BFCM audits: members read and add audits for their own unpaused stores while the plan is active; afterwards only
+-- the note, client link and sent fields change. The client link shows an audit only after it is shared.
+reset role;
+insert into public.stores (agency_id, name, public_url) values (:'agency_a', 'Juniper & Ash', 'https://juniperandash.com') returning id as store_a \gset
+select id as store_b from public.stores where name = 'Own' \gset
+select set_config('test.store_a', :'store_a', false), set_config('test.store_b', :'store_b', false), set_config('test.agency_a', :'agency_a', false);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+insert into public.store_audits (store_id, agency_id, audit, verdict, fixes, looks)
+  values (:'store_a', :'agency_a', '{"version":1,"storeName":"Juniper & Ash"}', 'fix', 1, 2)
+  returning id as audit_a, share_token as token_a \gset
+select set_config('test.audit_a', :'audit_a', false), set_config('test.token_a', :'token_a', false);
+do $$ begin
+  if (select created_by from public.store_audits where id = current_setting('test.audit_a')::uuid) <> '00000000-0000-0000-0000-00000000000a' then raise exception 'audit should record who ran it'; end if;
+  if length(current_setting('test.token_a')) <> 64 then raise exception 'share token should be 64 characters'; end if;
+  begin
+    insert into public.store_audits (store_id, agency_id, audit, verdict) values (current_setting('test.store_b')::uuid, current_setting('test.agency_a')::uuid, '{}', 'ready');
+    raise exception 'A audited another agency''s store under its own agency';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.store_audits (store_id, agency_id, audit, verdict, created_by) values (current_setting('test.store_a')::uuid, current_setting('test.agency_a')::uuid, '{}', 'ready', '00000000-0000-0000-0000-00000000000b');
+    raise exception 'A recorded an audit as someone else';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    update public.store_audits set verdict = 'ready', fixes = 0 where id = current_setting('test.audit_a')::uuid;
+    raise exception 'A rewrote an audit''s result';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    delete from public.store_audits where id = current_setting('test.audit_a')::uuid;
+    raise exception 'A deleted an audit';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+update public.store_audits set note = 'We freeze theme changes from 24 Nov.' where id = :'audit_a';
+
+-- Not shared yet: the client link shows nothing; then it does, with the agency's branding; then not again.
+reset role;
+set role anon;
+do $$ begin
+  if public.public_audit(current_setting('test.token_a')) is not null then raise exception 'unshared audit visible through its link'; end if;
+  begin
+    perform 1 from public.store_audits;
+    raise exception 'anonymous visitors can read audits';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+update public.store_audits set shared_at = now() where id = :'audit_a';
+reset role;
+set role anon;
+do $$ declare r jsonb; begin
+  r := public.public_audit(current_setting('test.token_a'));
+  if r is null or r->>'agency_name' <> 'Northline Studio' or r->>'note' <> 'We freeze theme changes from 24 Nov.' or r->'audit'->>'storeName' <> 'Juniper & Ash' then raise exception 'shared audit link returned %', r; end if;
+  if public.public_audit(left(current_setting('test.token_a'), 31)) is not null or public.public_audit('') is not null then raise exception 'short tokens must not match'; end if;
+end $$;
+
+-- Other agencies see nothing and change nothing; expired plans and paused stores can't be audited.
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+update public.store_audits set shared_at = null where id = :'audit_a';
+do $$ begin
+  if exists (select 1 from public.store_audits) then raise exception 'B can see A''s audits'; end if;
+  begin
+    insert into public.store_audits (store_id, agency_id, audit, verdict) values (current_setting('test.store_b')::uuid, (select agency_id from public.stores where id = current_setting('test.store_b')::uuid), '{}', 'ready');
+    raise exception 'an agency without an active plan added an audit';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+do $$ begin
+  if (select shared_at from public.store_audits where id = current_setting('test.audit_a')::uuid) is null then raise exception 'B turned off A''s client link'; end if;
+end $$;
+update public.stores set status = 'paused' where id = :'store_a';
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+do $$ begin
+  begin
+    insert into public.store_audits (store_id, agency_id, audit, verdict) values (current_setting('test.store_a')::uuid, current_setting('test.agency_a')::uuid, '{}', 'ready');
+    raise exception 'a paused store was audited';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+update public.stores set status = 'active' where id = :'store_a';
+
 select 'rls ok' as result;

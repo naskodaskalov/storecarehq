@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icon';
 import { defaultOutreachSubject, outreachEmail } from '@/lib/outreach-email';
+import { bfcmOutreach } from '@/lib/outreach';
 import type { Pack, ReportLinks } from '@/lib/outreach';
 import { contactDay, type OutreachContact } from '@/lib/outreach-history';
 import { approveOutreachTest, sendOutreachTest, publishOutreachReports, revokeOutreachReports } from './actions';
@@ -10,7 +11,7 @@ import { approveOutreachTest, sendOutreachTest, publishOutreachReports, revokeOu
 export type TestSenderInfo = { from: string; to: string; replyTo?: string; mode: 'agency' | 'test'; ready: boolean; storageReady: boolean; reason: string };
 
 export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubject, onLinks, onSent, editor }: { pack: Pack; sender: TestSenderInfo; busy: boolean; previous: OutreachContact | null; timeZone: string; onSubject: (value: string) => void; onLinks: (value: ReportLinks | undefined) => void; onSent: (contact: OutreachContact | undefined, accepted: boolean) => void; editor: ReactNode }) {
-  const subject = pack.subject ?? defaultOutreachSubject(pack.prospect.agency_name, pack.prospect.client_store_url);
+  const subject = pack.subject ?? defaultOutreachSubject(pack.prospect.agency_name, pack.prospect.client_store_url, !!pack.report && bfcmOutreach(pack.report));
   const recipient = sender.mode === 'agency' ? pack.prospect.contact_email.trim() : sender.to;
   const recipientReady = /^[^\s@<>;,\r\n]+@[^\s@<>;,\r\n]+\.[^\s@<>;,\r\n]+$/.test(recipient);
   const [approval, setApproval] = useState<{ token: string; expiresAt: number } | null>(null);

@@ -1,4 +1,7 @@
 import { SubmitButton } from '@/components/submit-button';
+import { TRIAL_DAYS } from '@/lib/billing';
+import { offerDay, offerTrialEnd } from '@/lib/signup-offer';
+import { offerFromCookies } from '@/lib/signup-offer-cookie';
 import { createWorkspace } from './actions';
 import { OnboardingFrame } from './steps';
 
@@ -6,6 +9,7 @@ const BANDS = ['1–5', '6–15', '16–40', '40+'];
 
 export default async function Step1({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
+  const offerEnd = offerTrialEnd(await offerFromCookies());
   return (
     <OnboardingFrame step={1}>
       <section className="onb-card">
@@ -32,7 +36,7 @@ export default async function Step1({ searchParams }: { searchParams: Promise<{ 
           </fieldset>
           {error && <div className="error" role="alert">{error === 'name' ? 'Enter your agency name.' : error}</div>}
           <div className="row" style={{ borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
-            <span className="small muted">Next: pick a plan. The first 7 days are free.</span>
+            <span className="small muted">Next: pick a plan. {offerEnd ? `It’s free until ${offerDay(offerEnd)}.` : `The first ${TRIAL_DAYS} days are free.`}</span>
             <SubmitButton pendingText="Creating workspace…">Create workspace →</SubmitButton>
           </div>
         </form>

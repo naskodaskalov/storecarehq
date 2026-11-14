@@ -51,6 +51,30 @@ An agency counts as contacted before when its website domain (ignoring `www.`) o
 a saved row: the agency list shows a "Contacted <date>" badge, the agency card and send panel warn
 before writing again, and batch preparation skips it (it can still be prepared on its own).
 
+### Outreach leads
+
+`outreach_leads` (migration `20261106120000_outreach_leads.sql`, applied to the StoreCare HQ database on 2026-11-06,
+with the 72 agencies from the earlier research lists backfilled and the 25 already emailed marked contacted) holds one row per agency, keyed by its
+website domain without `www.`: the CSV columns, an optional `fit_note`, where it came from (`research`,
+`csv`, `manual`, `backup`), who added it, the review tick and the status. New rows go only through
+`add_outreach_leads(leads jsonb, lead_source text, added_by text)`, so the daily lead research, CSV
+imports, the manual form and backup restores share one set of checks. It skips, without failing the batch,
+rows missing a required field or with a bad URL or email, agencies already listed, and agencies already
+emailed (domain or contact address in `outreach_contacts`), and returns one outcome per row. Browser roles
+have no access; the service role may read, delete, and update only `reviewed`, `status` and `updated_at`.
+Client store and portfolio are required for new leads but nullable in the table, because some backfilled agencies
+had none; the page shows those as unable to be prepared.
+`/admin/outreach` loads the newest 1,000 leads and hides contacted, replied and declined ones unless asked.
+If saving fails, imported agencies are kept in the tab only, as before.
+
+The daily research routine adds leads with, for example:
+
+```sql
+select * from public.add_outreach_leads('[{"agency_name":"…","agency_url":"https://…","directory_url":"",
+  "contact_name":"","contact_email":"…","client_store_url":"https://…","portfolio_source_url":"https://…",
+  "fit_note":"Sells a monthly care plan"}]'::jsonb, 'research', 'lead-research@storecarehq.com');
+```
+
 ### Hosted outreach report links
 
 `outreach-report-links.ts` publishes immutable report-only snapshots, separate from operational
@@ -75,10 +99,11 @@ process-local memory solely for preview/browser testing; it never enables email 
 ### Prospect preparation
 
 `/admin/outreach` uses the existing admin session gate and `quickReport` server action.
-Prospects, review flags, current scan snapshots, editable drafts and manual outreach statuses
-live in browser memory and can be exported/restored through a versioned JSON backup.
+The agency list, review flags and outreach statuses are saved in `outreach_leads` (see below); current
+scan snapshots and editable drafts live in browser memory and can be exported/restored through a
+versioned JSON backup (restoring fills in saved leads by agency domain instead of duplicating them).
 CSV summaries neutralize spreadsheet formulas. Imports require agency/store/portfolio URLs,
-reject duplicate agency domains or contacts, and are capped at 100 prospects. Each batch
+skip duplicate agency domains or contacts, and are capped at 100 prospects per batch. Each batch
 prepares up to 20 reviewed agencies sequentially; failed checks remain retryable.
 
 `sample-month-report.ts` builds a fictional previous-month report using shared report types.
@@ -156,3 +181,75 @@ sign-ups with their workspace, plan state and store count; last-7-day product ac
 `monitoring_freshness()` result. Days start at midnight in `STORECARE_ADMIN_TIMEZONE` (default
 Europe/Sofia). Deleted and anonymous auth users are excluded; deleted stores and workspaces are not
 counted. Demo mode shows sample numbers.
+
+# BFCM readiness audit
+
+`/bfcm` (nav item "BFCM audit", shown from 60 days before Black Friday until Cyber Monday, or while on the page;
+the Overview shows a countdown banner) checks every unpaused client store and keeps one dated one-pager per run in
+`store_audits` (migration `20261105120000_store_audits.sql`). Black Friday is the day after the fourth Thursday of
+November; `saleDates` in `lib/bfcm.ts` rolls to next year after Cyber Monday.
+
+The board posts each store to `POST /api/bfcm/<id>`, three at a time, and shows Waiting / Checking / result /
+Retry per row. It is a route handler, not a server action, because Next.js runs a page's server actions one after
+another. The handler rejects other origins and calls `runAudit` (`lib/bfcm-run.ts`): signed in, agency member, billing
+access, store found and not paused; a check of the same store in the last 2 minutes is returned instead of a new one.
+`runStoreAudit` (`lib/bfcm-data.ts`) reads monitoring data under RLS (latest home speed sample, latest site check,
+checkout runs from 48 hours, open incidents, 30-day uptime, 14 days of theme/app changes) and runs one live pass:
+`probeStore` without feed or cart, 10 s per request, plus up to 3 product JSON requests. Certificate and domain are
+re-read live only when the site check is older than 3 days. `buildBfcmAudit` is pure and shared with outreach.
+Verdicts: `fix` (anything to fix), `partial` ("Not fully checked": the storefront could not be loaded and nothing
+needs fixing, so a store is never called ready on checks that did not run), `look`, `ready`. Failed checks have no
+email phrase, so they never become a claim in an email. Demo mode returns fixed results per store after a short delay.
+
+An audit row is immutable apart from `note`, `shared_at`, `sent_at` and `sent_to` (column grants). RLS lets members
+read their agency's audits and insert only for their own agency's unpaused stores, as themselves, while the plan has
+access; there are no deletes (they go with the store). Each row gets a 64-character random `share_token`; the client
+link `/r/audit/<token>` is public (middleware passes `/r/`) and reads only through `public_audit(token)`, a security
+definer function that returns the audit, note and agency branding when `shared_at` is set and the token is at least 32
+characters. Turning the link off clears `shared_at`; the page is noindex/nofollow/noarchive. Sending uses the agency's
+branded email layout (`brandedEmailHtml`, shared with monthly reports) through Resend with an idempotency key per
+audit, note version and recipient; without Resend the agency gets a mailto link and marks it as sent. Sending turns
+the link on. The one-pager prints on one A4 or Letter page through the browser print dialog (`body:has(.bfcm-print)`).
+
+Storefront states live in `packages/storefront/src/states.ts` and run inside `probeStore` with no extra requests: the
+password page (`/password` answers 200 with `pageType` "password"), "Store unavailable" (404), noindex (meta in the
+head or `X-Robots-Tag` for all bots or Googlebot), Googlebot disallowed from `/`, and product handles the home page
+links to (`<main>` first, own host only). `checkProducts` reads `/products/<handle>.js` (stock from `available`,
+404 = gone) within robots.txt rules. On a password or unavailable page the probe skips the feed and cart. The worker's
+hourly storefront snapshot skips both states, so turning a password page on or off no longer logs apps as removed
+or added; the landing scan no longer calls a password page "headless".
+
+Outreach: the quick report carries a prospect one-pager (live checks only; checkout, uptime and recent changes show
+as not checked), except when the storefront blocked us and nothing needs fixing. Until the day before Black Friday
+the default subject is "Black Friday check on <host>" and the draft opens with the first fix or specific finding
+(speed, links, SSL, domain; never app weight). Hosted health links and the email's health document include the
+one-pager only for reports that have one, so earlier snapshots, links and JSON backups are unchanged; a tampered
+one-pager in a backup is rejected.
+
+## Outreach sign-up path
+
+Hosted outreach links (`/outreach/r/<token>`, health and sample) show a "Check all your client stores" bar above
+the report and a panel under it (`components/signup-cta.tsx`, hidden in print). Both go to
+`/outreach/r/<token>/start` (public like view and download; `isOutreachReportPath`), which resolves the bundle with
+`readStartTarget` (server only: the snapshot id never reaches the page) and redirects to sign-up (`/login?trial=1`)
+with two cookies: `sc_store`, the client store (the same cookie the landing-page check sets, on `.storecarehq.com` in
+production so it replaces that one; onboarding's store step prefills from it and `addStore` clears it), and, while
+the offer is open, `sc_offer` (httpOnly, expires at Black Friday). An unknown, expired or revoked link opens sign-up
+without cookies.
+
+The offer (`currentOffer` in `lib/bfcm.ts`, pure; signing in `lib/signup-offer.ts`, server only) is open in the
+Black Friday outreach window (60 days before Black Friday until the day before) and ends its trial at noon UTC two
+days after Cyber Monday (2 December 2026). The cookie is `v1.<offer>.<snapshot>.<trialEnd>.<expires>.<HMAC>`, signed
+with `SIGNUP_OFFER_SECRET` or else `STRIPE_SECRET_KEY` (no key: no offer, and the page doesn't promise one).
+`offerFromCookies()` (`lib/signup-offer-cookie.ts`) verifies it for sign-up, workspace, plan and Billing copy and
+for Checkout: `checkoutTrial(agency, offerEnd)` returns `trial_end` instead of `trial_period_days: 7` when the offer
+ends later than 7 days from now (so a late sign-up keeps 7 days), and never for an agency that subscribed before.
+The subscription metadata records `outreach_snapshot` and, when the offer applied, `offer` (attribution in Stripe;
+no database column). `billingState` already reads a Stripe trial's end from `current_period_end`. After the
+care-plan step an offer sign-up goes to `/bfcm?run=all&welcome=1` and the cookie is cleared; others keep the store page.
+
+The BFCM board waits for a new store's first health check: `runAudit` answers 202 `{ waiting: true }` while the
+store's newest `health_check_requests` row is the `initial` one and still queued or running (`firstCheckRunning`,
+ignored after 20 minutes), so no one-pager is made from empty monitoring. The board shows "First health check
+running…", polls `/api/stores/<id>/health-check` every 5 s for up to 10 minutes, then asks again (or offers a
+retry). Demo: `STORECARE_DEMO_FIRST_CHECK=1` gives Kite & Kin a first check that finishes 25 s after the data loads.

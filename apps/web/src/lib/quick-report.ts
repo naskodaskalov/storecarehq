@@ -19,6 +19,7 @@ import {
 } from '@storecare/storefront';
 import { summarize, type ScanSummary } from './scan.ts';
 import { checkupNote, findings, type Finding } from './scan-findings.ts';
+import { buildBfcmAudit, liveFromProbe, type BfcmAudit } from './bfcm.ts';
 
 export type Speed = { performance: number | null; seo: number | null; accessibility: number | null; lcpMs: number | null } | { error: string };
 
@@ -45,6 +46,8 @@ export type QuickReport =
       looks: number;
       /** A plain note an agency can send the store owner, built from the findings. */
       note: string;
+      /** The same checks as a Black Friday readiness one-pager. Missing on reports saved before it existed. */
+      bfcm?: BfcmAudit;
     }
   | { ok: false; error: string };
 
@@ -136,6 +139,7 @@ export function buildQuickReport(input: QuickReportInput, preparedBy = ''): Quic
   const all = sections.flatMap((section) => section.items);
   // The note leads with the headline finding per topic, not every broken URL.
   const noteItems = all.filter((f) => !/ answers \d+\.$/.test(f.text));
+  const bfcm = prospectAudit(input, summary.siteName ?? summary.host, summary.url, now);
   return {
     ok: true,
     host: summary.host,
@@ -146,7 +150,26 @@ export function buildQuickReport(input: QuickReportInput, preparedBy = ''): Quic
     sections,
     looks: all.filter((f) => f.tone === 'look').length,
     note: checkupNote(summary, preparedBy, noteItems),
+    // A one-pager that only says the storefront blocked us is no reason to write: those prospects get the health check.
+    ...(bfcm.verdict === 'partial' ? {} : { bfcm }),
   };
+}
+
+/** The quick report's live checks as a prospect's Black Friday one-pager: no checkout, uptime or change history. */
+export function prospectAudit(input: QuickReportInput, storeName: string, url: string, now: number): BfcmAudit {
+  const at = input.probe.checkedAt;
+  const s = input.speed, c = input.cert, d = input.domain;
+  return buildBfcmAudit({
+    kind: 'prospect',
+    storeName,
+    url,
+    now,
+    live: liveFromProbe(input.probe),
+    speed: !s ? null : 'error' in s ? { error: s.error } : { at, performance: s.performance, lcpMs: s.lcpMs },
+    ssl: !c ? null : 'error' in c ? { at, expiresAt: null, error: c.error } : { at, expiresAt: c.expiresAt, error: null },
+    domain: !d ? null : { at, name: d.domain, expiresAt: 'expiresAt' in d ? d.expiresAt : null, error: 'error' in d ? d.error : null },
+    links: input.links ? { at, checked: input.links.checked, broken: input.links.broken } : null,
+  });
 }
 
 type PsiJson = {
@@ -187,13 +210,13 @@ export async function runQuickReport(input: string, preparedBy = ''): Promise<Qu
   const host = new URL(baseUrl).hostname;
   const speedRun = pageSpeed(`${baseUrl}/`);
   const [probe, cert, domain] = await Promise.all([
-    probeStore(baseUrl, { maxProductPages: 2, gapMs: 400 }),
+    probeStore(baseUrl, { maxProductPages: 2, gapMs: 400, featuredProducts: 3 }),
     checkCertificate(host).catch((e: Error) => ({ error: e.message })),
     domainExpiry(host).catch((e: Error) => ({ domain: host, error: e.message })),
   ]);
 
   let links: QuickReportInput['links'] = null;
-  if (probe.home.status === 200 && !probe.home.blocked) {
+  if (probe.home.status === 200 && !probe.home.blocked && !probe.page?.password) {
     const origin = probe.finalUrl ? new URL(probe.finalUrl).origin : baseUrl;
     const robotsRes = await politeGet(`${origin}/robots.txt`, { accept: 'text/plain' });
     const robots: Robots = robotsRes.ok ? parseRobots(robotsRes.body) : { rules: [] };

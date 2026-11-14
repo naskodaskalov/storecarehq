@@ -1,8 +1,17 @@
 'use server';
 
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { normalizeStoreUrl, probeStore } from '@storecare/storefront';
 import { supabaseServer } from '@/lib/supabase';
+import { OFFER_COOKIE, sharedCookieDomain, STORE_COOKIE } from '@/lib/signup-offer';
+import { offerFromCookies } from '@/lib/signup-offer-cookie';
+
+/** Drop a cookie with the domain it was set with (the store cookie is shared by www. and app. in production). */
+async function forget(name: string, shared: boolean) {
+  const domain = shared ? sharedCookieDomain((await headers()).get('host') ?? '') : undefined;
+  (await cookies()).set(name, '', { path: '/', maxAge: 0, ...(domain ? { domain } : {}) });
+}
 
 async function ensureEmailAlerts(supabase: Awaited<ReturnType<typeof supabaseServer>>, agencyId: string, email?: string) {
   if (!email) return 'An account email is needed for incident alerts.';
@@ -97,6 +106,8 @@ export async function addStore(formData: FormData) {
   // Store limit or ended trial (database trigger): explain on the billing page, where the fix is.
   if (error?.hint === 'billing') redirect(`/billing?error=${encodeURIComponent(error.message)}`);
   if (error || !store) redirect(`/onboarding/store?error=${encodeURIComponent(error?.message ?? 'Could not add the store. Please try again.')}`);
+  // The prefilled store is in: the next "add a store" starts empty.
+  await forget(STORE_COOKIE, true);
 
   const { error: planError } = await supabase.from('care_plans').insert({ store_id: store.id, agency_id: agencyId });
   const alertProblem = await ensureEmailAlerts(supabase, agencyId, user.email);
@@ -147,5 +158,11 @@ export async function savePlan(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   const alertProblem = await ensureEmailAlerts(supabase, store.agency_id, user?.email);
   if (alertProblem) fail(alertProblem);
+  // Signed up from "Check all your client stores" on an outreach link: finish on the Black Friday check, which
+  // starts once the store's first health check is done. The offer has done its job at checkout.
+  if (await offerFromCookies()) {
+    await forget(OFFER_COOKIE, false);
+    redirect('/bfcm?run=all&welcome=1');
+  }
   redirect(`/stores/${storeId}?welcome=1`);
 }

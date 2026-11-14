@@ -12,6 +12,7 @@ import { signOut } from '@/app/auth/actions';
 import { SubmitButton } from '@/components/submit-button';
 import { Icon } from '@/components/icon';
 import { SideNav } from '@/components/side-nav';
+import { inSeason } from '@/lib/bfcm';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { agency } = await requireAgency();
@@ -33,7 +34,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <div className="shell">
       <SideNav label="Main" brand={<Link href="/" className="brand"><div className="mark">SC</div><span className="brand-name">StoreCare HQ</span></Link>}>
         <div className="workspace-identity"><span className="nav-caption">Workspace</span><div className="workspace-name">{agency.name}</div></div>
-        <NavLinks isAdmin={isAdmin} themeDetector={themeDetector} />
+        <NavLinks isAdmin={isAdmin} themeDetector={themeDetector} bfcm={inSeason()} />
         <div className="nav-foot">
           <Link href="/settings" className="nav-account" title="Agency settings" aria-label={`${agency.name}: agency settings`}><span className="account-avatar">{agency.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><div style={{ fontWeight: 600 }}>{agency.name}</div></Link>
           <div className="small muted">

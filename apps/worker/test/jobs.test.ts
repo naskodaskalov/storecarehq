@@ -114,6 +114,21 @@ describe('jobs against Postgres', { skip: !process.env.TEST_DATABASE_URL && 'TES
     assert.ok(rows[0].work_entry_id, 'change should be matched to the work entry');
   });
 
+  test('storefront diff: the password page and "Store unavailable" write no snapshot and log no app removals', async () => {
+    const store = await seedStore(db!.pool, { public_url: 'https://locked.example' });
+    const state = { pageType: 'password', password: true, unavailable: false, noindex: null, googleBlocked: false, products: [] };
+    const locked = async () => probeResult({ finalUrl: 'https://locked.example/password', theme: null, apps: [], page: state, productFeed: { status: 'skipped', reason: 'password page is on' } });
+    const closed = async () => probeResult({ home: { status: 404, ms: 40, blocked: false }, theme: null, apps: [], page: { ...state, pageType: null, password: false, unavailable: true }, productFeed: { status: 'skipped', reason: 'store unavailable' } });
+    await runStorefrontDiff(db!.pool, store, async () => probeResult());
+    for (const probe of [locked, closed, locked]) assert.equal((await runStorefrontDiff(db!.pool, store, probe)).changes.length, 0);
+    const reopened = await runStorefrontDiff(db!.pool, store, async () => probeResult());
+    assert.equal(reopened.changes.length, 0, 'coming back from the password page is not "apps added"');
+    const { rows } = await db!.pool.query(`select count(*)::int as n from public.storefront_snapshots where store_id = $1`, [store.id]);
+    assert.equal(rows[0].n, 2);
+    const { rows: [s] } = await db!.pool.query(`select status, limited_reason from public.stores where id = $1`, [store.id]);
+    assert.deepEqual(s, { status: 'active', limited_reason: null });
+  });
+
   test('storefront diff: blocked visits write no snapshot; only 3 in a row mark the store limited', async () => {
     const store = await seedStore(db!.pool, { public_url: 'https://blocked.example' });
     const blocked = async () =>

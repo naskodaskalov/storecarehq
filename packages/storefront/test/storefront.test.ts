@@ -201,3 +201,111 @@ test('parseSiteName reads the store name from og:site_name, in either attribute 
   assert.equal(parseSiteName('<meta property="og:site_name" content="  ">'), null);
   assert.equal(parseSiteName(HTML), null);
 });
+
+// Store states, from responses recorded on live stores in November 2026.
+import { blocksGoogle, checkProducts, headerNoindex, isPasswordPage, isUnavailablePage, noindexSource, probeStore, productHandles, readPageState, serverPageType } from '../src/index.ts';
+
+const PASSWORD_HEADERS = { 'server-timing': 'processing;dur=98, db;dur=43, theme;desc="2225882", pageType;desc="password", servedBy;desc="g78x"', 'x-robots-tag': 'nofollow' };
+const PASSWORD_HTML = '<html><head><title>Please Log In</title></head><body><form method="post" action="/password" id="login_form" accept-charset="UTF-8" class="storefront-password-form"><input type="password" name="password"></form></body></html>';
+
+test('states: password page found by final URL, Server-Timing page type or its form', () => {
+  assert.equal(serverPageType(PASSWORD_HEADERS), 'password');
+  assert.equal(serverPageType({ 'server-timing': 'processing;dur=18, pageType;desc="index"' }), 'index');
+  assert.equal(serverPageType({}), null);
+  assert.ok(isPasswordPage('https://shop.example.com/password', {}, ''));
+  assert.ok(isPasswordPage('https://shop.example.com/en-gb/password', {}, ''));
+  assert.ok(isPasswordPage('https://shop.example.com/', PASSWORD_HEADERS, ''));
+  assert.ok(isPasswordPage('https://shop.example.com/', {}, PASSWORD_HTML));
+  assert.ok(!isPasswordPage('https://shop.example.com/', {}, '<form action="/account/login"></form><a href="/pages/password-reset">x</a>'));
+  const s = readPageState({ finalUrl: 'https://shop.example.com/password', status: 200, headers: PASSWORD_HEADERS, html: PASSWORD_HTML, robotsText: null });
+  assert.deepEqual([s.password, s.unavailable, s.noindex, s.products], [true, false, null, []]);
+});
+
+test('states: Shopify’s "Store unavailable" page is not a password page and not open', () => {
+  const html = '<html><head><title>Store unavailable</title></head><body><h1 class="headline" id="hero-text">This store will be right back</h1></body></html>';
+  assert.ok(isUnavailablePage(404, html));
+  assert.ok(!isUnavailablePage(200, html), 'a normal 200 page that mentions the phrase is not the error page');
+  assert.ok(!isUnavailablePage(404, '<title>Page not found</title>'));
+  const s = readPageState({ finalUrl: 'https://x.myshopify.com/', status: 404, headers: {}, html, robotsText: null });
+  assert.deepEqual([s.unavailable, s.password, s.noindex], [true, false, null]);
+});
+
+test('states: noindex from a robots meta tag (any attribute order) or X-Robots-Tag, for Google or everyone', () => {
+  assert.equal(noindexSource({}, '<head><meta name="robots" content="noindex,nofollow"></head>'), 'meta');
+  assert.equal(noindexSource({}, `<head><meta content='noindex' name='googlebot'></head>`), 'meta');
+  assert.equal(noindexSource({}, '<head><meta name="robots" content="none"></head>'), 'meta');
+  assert.equal(noindexSource({}, '<head><meta name="robots" content="index, follow, max-image-preview:large"></head>'), null);
+  assert.equal(noindexSource({}, '<head></head><body><meta name="robots" content="noindex"></body>'), null, 'a tag in the body is not the page’s own');
+  assert.equal(noindexSource({ 'x-robots-tag': 'noindex' }, ''), 'header');
+  assert.ok(headerNoindex('googlebot: noindex'));
+  assert.ok(headerNoindex('unavailable_after: 25 Jun 2010 15:00:00 PST, noindex'));
+  assert.ok(!headerNoindex('bingbot: noindex'));
+  assert.ok(!headerNoindex('nofollow'), 'the password page’s own header');
+});
+
+test('states: robots.txt blocking Googlebot from the home page', () => {
+  assert.ok(blocksGoogle('User-agent: *\nDisallow: /'));
+  assert.ok(blocksGoogle('User-agent: Googlebot\nDisallow: /\n\nUser-agent: *\nAllow: /'));
+  assert.ok(!blocksGoogle('User-agent: *\nAllow: /\nDisallow: /cart\nDisallow: /collections/*sort_by*'));
+  assert.ok(!blocksGoogle('User-agent: AhrefsBot\nDisallow: /'));
+  assert.ok(!blocksGoogle(null));
+});
+
+test('states: products the home page links to, main content first, own host only', () => {
+  const html = `<header><a href="/products/menu-gift-card">Gift card</a></header>
+    <main id="MainContent">
+      <a href="/collections/autumn/products/hearthwood-candle-300g?variant=1">Candle</a>
+      <div x-bind:href="(cardRefs['72']?.selectedUrl) || '/products/fig-cedar-diffuser'"></div>
+      <a href='https://www.juniperandash.com/en-gb/products/linen-room-spray'>Spray</a>
+      <img src="//juniperandash.com/cdn/shop/products/candle_1200x.jpg">
+      <script>fetch('/products/hearthwood-candle-300g.js')</script>
+      <a href="https://other-store.com/products/not-ours">x</a>
+      <script type="application/json">{"url":"https:\\/\\/juniperandash.com\\/products\\/json-linked"}</script>
+    </main>`;
+  assert.deepEqual(productHandles(html, 'https://juniperandash.com/'), ['hearthwood-candle-300g', 'fig-cedar-diffuser', 'linen-room-spray', 'json-linked', 'menu-gift-card']);
+  assert.deepEqual(productHandles('<a href="/products/a">a</a><a href="/products/b">b</a>', 'https://x.com/', 1), ['a']);
+});
+
+test('states: product JSON tells available, sold out, gone and unreadable apart; stops at a bot check', async () => {
+  const bodies: Record<string, { status: number; body: string; blocked?: boolean }> = {
+    'https://s.com/products/a.js': { status: 200, body: JSON.stringify({ title: 'A', available: true }) },
+    'https://s.com/products/b.js': { status: 200, body: JSON.stringify({ title: 'B', available: false, variants: [{ available: false }] }) },
+    'https://s.com/products/c.js': { status: 404, body: '' },
+    'https://s.com/products/d.js': { status: 200, body: JSON.stringify({ title: 'D', variants: [{ available: false }, { available: true }] }) },
+    'https://s.com/products/e.js': { status: 429, body: '', blocked: true },
+    'https://s.com/products/f.js': { status: 200, body: '{}' },
+  };
+  const seen: string[] = [];
+  const get = (async (url: string) => {
+    seen.push(url);
+    const r = bodies[url];
+    return { url, status: r.status, ok: r.status === 200, headers: {}, body: r.body, ms: 1, blocked: !!r.blocked };
+  }) as unknown as NonNullable<NonNullable<Parameters<typeof checkProducts>[2]>['get']>;
+  const r = await checkProducts('https://s.com', ['a', 'b', 'c', 'd', 'e', 'f'], { get, gapMs: 0, robots: parseRobots('User-agent: *\nDisallow: /products/d') });
+  assert.deepEqual(r.map((x) => [x.handle, x.state]), [['a', 'available'], ['b', 'sold_out'], ['c', 'missing'], ['d', 'unreadable'], ['e', 'unreadable']]);
+  assert.equal(r[0].title, 'A');
+  assert.ok(!seen.includes('https://s.com/products/d.js'), 'robots.txt is respected');
+  assert.ok(!seen.includes('https://s.com/products/f.js'), 'a bot check stops the run');
+});
+
+test('probe: a password page skips the feed and cart, and reports the state', async () => {
+  const realFetch = globalThis.fetch;
+  const asked: string[] = [];
+  globalThis.fetch = (async (input: string | URL) => {
+    const url = String(input);
+    asked.push(url);
+    if (url.endsWith('/robots.txt')) return new Response('User-agent: *\nAllow: /\nDisallow: /cart', { status: 200 });
+    const res = new Response(PASSWORD_HTML, { status: 200, headers: PASSWORD_HEADERS });
+    Object.defineProperty(res, 'url', { value: 'https://locked.example.com/password' });
+    return res;
+  }) as typeof fetch;
+  try {
+    const r = await probeStore('locked.example.com', { gapMs: 0 });
+    assert.equal(r.page?.password, true);
+    assert.equal(r.productFeed.status, 'skipped');
+    assert.deepEqual(r.cartJs, { status: 'skipped', reason: 'password page is on' });
+    assert.deepEqual(asked, ['https://locked.example.com/robots.txt', 'https://locked.example.com/']);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
