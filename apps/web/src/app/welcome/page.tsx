@@ -20,6 +20,7 @@ import { StickyCta } from './sticky-cta';
 import { StickyHeader } from './sticky-header';
 import { MonthReplay, type ReplayDay, type ReplayEvent } from './month-replay';
 import { WatchDial, type WatchCheck } from './watch-dial';
+import { ProductTour } from './product-tour';
 import './landing.css';
 
 const TITLE = 'StoreCare HQ: monitoring and monthly reports for Shopify care plans';
@@ -304,58 +305,84 @@ export default async function Landing() {
           </div>
         </section>
 
-        <section className="lp-log" aria-labelledby="log-title">
-          <div className="lp-log-copy">
-            <h2 id="log-title">Everything that happens to a store, in one log</h2>
-            <p>
-              Clients install apps, change prices and swap themes without telling you. StoreCare HQ checks every store
-              every 30 minutes and every morning, writes down what changed, and flags what could break a sale.
-            </p>
-            <p>
-              Changes that match your work log are marked as yours. The rest are flagged, so you hear about them
-              before the client asks why sales dipped.
-            </p>
-          </div>
-          <LiveLog lines={LOG} times={LOG_TIMES} />
-        </section>
-
-        <section className="lp-replay" aria-labelledby="replay-title">
-          <div className="lp-replay-head">
-            <h2 id="replay-title">Your client reads one page. Here’s the month behind it.</h2>
-            <p>
-              1,488 uptime checks, 31 checkout tests, a speed score every morning, and every change matched to the
-              work you logged. Step through October on the sample store and see where each day lands in the report.
-            </p>
-            <SampleReportLink />
-          </div>
-          <MonthReplay days={REPLAY} store="Juniper & Ash" month="October" year={2026} monthIndex={9} />
-        </section>
-        </BrandProvider>
-
-        <section className="lp-watch" aria-labelledby="watch-title">
-          <div className="lp-watch-inner">
-            <div className="lp-watch-head">
-              <p className="lp-watch-kicker">What it checks</p>
-              <h2 id="watch-title">75 checks a day on every client store. You read one line when something’s wrong.</h2>
+        <section id="tour" className="lp-tour" aria-labelledby="tour-title">
+          <div className="lp-tour-inner">
+            <div className="lp-tour-head">
+              <p className="lp-tour-kicker">See it work</p>
+              <h2 id="tour-title">Everything your care plan does, on one screen. Pick a view.</h2>
             </div>
-            <WatchDial checks={CHECKS} />
-            <p className="lp-watch-cta">
+            <ProductTour
+              tabs={[
+                {
+                  id: 'log',
+                  label: 'The change log',
+                  hint: 'What happened today',
+                  panel: (
+                    <div className="lp-tour-split">
+                      <div className="lp-tour-copy">
+                        <h3>Every change on every store, in one log</h3>
+                        <p>
+                          Clients install apps, change prices and swap themes without telling you. StoreCare HQ checks every
+                          store every 30 minutes and every morning, and flags what could break a sale.
+                        </p>
+                        <p>Changes that match your work log are marked as yours. The rest are flagged, so you hear first.</p>
+                      </div>
+                      <LiveLog lines={LOG} times={LOG_TIMES} />
+                    </div>
+                  ),
+                },
+                {
+                  id: 'month',
+                  label: 'A month on one store',
+                  hint: 'How it lands in the report',
+                  panel: (
+                    <div className="lp-tour-split">
+                      <div className="lp-tour-copy">
+                        <h3>Your client reads one page. Here’s the month behind it.</h3>
+                        <p>
+                          1,488 uptime checks, 31 checkout tests, a speed score every morning, and every change matched to the
+                          work you logged. Step through October and see where each day lands in the report.
+                        </p>
+                        <SampleReportLink />
+                      </div>
+                      <MonthReplay days={REPLAY} store="Juniper & Ash" month="October" year={2026} monthIndex={9} />
+                    </div>
+                  ),
+                },
+                {
+                  id: 'checks',
+                  label: 'What it checks',
+                  hint: '75 checks a day per store',
+                  panel: (
+                    <div className="lp-tour-dial">
+                      <h3>75 checks a day on every client store. You read one line when something’s wrong.</h3>
+                      <WatchDial checks={CHECKS} />
+                    </div>
+                  ),
+                },
+                {
+                  id: 'book',
+                  label: 'Your own stores',
+                  hint: 'Try it on your client list',
+                  panel: (
+                    <div className="lp-tour-book">
+                      <div className="lp-tour-copy">
+                        <h3>Paste your client list. See your dashboard before you sign up.</h3>
+                        <p>Up to five stores, checked side by side. No account: the list stays in this browser.</p>
+                      </div>
+                      <PortfolioCheck signup={signup} />
+                    </div>
+                  ),
+                },
+              ]}
+            />
+            <p className="lp-tour-cta">
               <a href={signup} className="btn lp-btn-big">Put your stores on watch</a>
               <span>7 days free. The first checks run within half an hour.</span>
             </p>
           </div>
         </section>
-
-        <section id="book" className="lp-book-sec" aria-labelledby="book-title">
-          <div className="lp-book-head">
-            <h2 id="book-title">Paste your client list. See your dashboard before you sign up.</h2>
-            <p>
-              Up to five stores, checked side by side, the way StoreCare HQ shows them every morning. No account: the list
-              stays in this browser, so next time you’ll see what changed on each.
-            </p>
-          </div>
-          <PortfolioCheck signup={signup} />
-        </section>
+        </BrandProvider>
 
         <section id="how" className="lp-how" aria-labelledby="how-title">
           <h2 id="how-title">How it works</h2>

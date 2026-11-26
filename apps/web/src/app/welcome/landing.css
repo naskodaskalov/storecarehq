@@ -613,3 +613,41 @@ html:has(.lp-head) { scroll-padding-top: 92px; }
 }
 @keyframes lp-note-in { to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .lp-note { animation: none; opacity: 1; transform: none; } }
+
+/* Product tour: the change log, a month on one store, the checks and the visitor's own stores as four tabs in one
+   dark band (the dial was designed for it; the light cards read as product on it). */
+.lp-tour { margin: 104px 0 0; padding: 88px 24px 80px; background: radial-gradient(1100px 520px at 20% 0%, #12302c 0%, #111317 62%); color: #e9ebee; scroll-margin-top: 64px;
+  --uptime: #4fc1b2; --storefront: #8fb4ff; --daily: #f0a35c; }
+.lp-tour-inner { max-width: var(--lp-max); margin: 0 auto; }
+.lp-tour-kicker { color: var(--uptime); font-weight: 700; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 12px; }
+.lp-tour-head h2 { color: #fff; max-width: 22ch; }
+.lp-tour-tabs { margin-top: 36px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; border-bottom: 1px solid #2a2e36; }
+.lp-tour-tab { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 2px; padding: 14px 14px 16px; border-radius: 12px 12px 0 0; border-bottom: 3px solid transparent; margin-bottom: -1px; transition: background .15s, border-color .15s; }
+.lp-tour-tab:hover { background: #ffffff08; }
+.lp-tour-tab[aria-selected='true'] { background: #ffffff0d; border-bottom-color: var(--uptime); }
+.lp-tour-tab:focus-visible { outline: 3px solid var(--uptime); outline-offset: -3px; }
+.lp-tour-num { grid-row: span 2; font: 600 13px var(--mono); color: #6f7682; padding-top: 3px; }
+.lp-tour-tab[aria-selected='true'] .lp-tour-num { color: var(--uptime); }
+.lp-tour-label { font-weight: 700; font-size: 16px; color: #c9ced6; }
+.lp-tour-tab[aria-selected='true'] .lp-tour-label { color: #fff; }
+.lp-tour-hint { font-size: 13px; color: #8d94a0; }
+.lp-tour-panel { padding-top: 40px; animation: lp-rise .3s ease-out; }
+.lp-tour-panel:focus-visible { outline: 2px solid #ffffff30; outline-offset: 8px; border-radius: 8px; }
+.lp-tour-panel h3 { margin: 0; color: #fff; font-size: clamp(22px, 2.4vw, 28px); line-height: 1.2; letter-spacing: -0.02em; }
+.lp-tour-split { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 56px; align-items: start; }
+.lp-tour-copy p { color: #b9bfc8; font-size: 17px; line-height: 1.6; margin: 16px 0 0; max-width: 42ch; }
+.lp-tour-copy .lp-replay-link { color: var(--uptime); }
+.lp-tour-dial h3 { max-width: 30ch; }
+.lp-tour-book .lp-tour-copy p { max-width: 60ch; }
+.lp-tour-book .lp-book { margin-top: 28px; }
+.lp-tour .lp-replay-box, .lp-tour .lp-book-form { color: var(--ink); }
+.lp-tour-cta { margin: 48px 0 0; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.lp-tour-cta span { color: #9aa1ad; font-size: 15px; }
+@media (prefers-reduced-motion: reduce) { .lp-tour-panel { animation: none; } }
+@media (max-width: 900px) {
+  .lp-tour-split { grid-template-columns: 1fr; gap: 28px; }
+  .lp-tour-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 0; }
+  .lp-tour-tab { border-radius: 12px; border: 1px solid #2a2e36; margin: 0; }
+  .lp-tour-tab[aria-selected='true'] { border-color: var(--uptime); }
+}
+@media (max-width: 640px) { .lp-tour { padding: 64px 16px 56px; margin-top: 72px; } .lp-tour-hint { display: none; } .lp-tour-tab { padding: 12px; } }
