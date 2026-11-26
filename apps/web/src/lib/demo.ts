@@ -2,6 +2,7 @@
 // so the app can be shown and reviewed without a Supabase project. Supports only the query
 // features the app uses. Data lives in process memory and resets on restart.
 
+import { portalRawFromRows } from './client-portal';
 import { assembleMonthData, buildFacts, DEFAULT_SECTIONS, monthPeriod, periodRange, previousPeriod, templateSummary, type MonthRows } from '@storecare/reports';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -218,8 +219,22 @@ function seed(): Tables {
     reports: [],
     store_audits: [],
     health_check_requests: demoFirstCheck(kite.id),
+    requests: [
+      { store: juniper, ago: 0.15 * DAY, subject: 'Can we add a gift-wrap option before Friday?', body: 'Customers keep asking for it. £3 per order, a checkbox on the cart page would do.', name: 'Maya Ortiz', urgency: 'urgent', status: 'new' },
+      { store: juniper, ago: 2 * DAY, subject: 'Swap the homepage banner for the Black Friday one', body: 'New images are in the shared Drive folder.', name: 'Maya Ortiz', urgency: 'normal', status: 'in_progress' },
+      { store: juniper, ago: 12 * DAY, subject: 'Turn off the old pop-up', body: null, name: 'Maya Ortiz', urgency: 'normal', status: 'done' },
+      { store: ferro, ago: 0.4 * DAY, subject: 'Payment page is blank on my phone', body: 'Tried twice on iPhone, the payment step shows nothing.', name: 'Jonas Ferro', urgency: 'urgent', status: 'in_progress' },
+      { store: bloom, ago: 3 * DAY, subject: 'Add the winter bundle to the menu', body: null, name: 'Ava Chen', urgency: 'normal', status: 'new' },
+    ].map((r) => ({
+      id: uid(), store_id: r.store.id, agency_id: AGENCY, from_name: r.name, from_email: r.store.client_contact_email, subject: r.subject, body: r.body,
+      status: r.status, urgency: r.urgency, source: 'portal', received_at: iso(r.ago), updated_at: iso(r.ago), work_entry_id: null,
+    })),
   };
   tables.reports = autoDrafted([juniper, kite, salt], tables);
+  // Juniper & Ash's client portal is on, and last month's report went out, so the portal has something to link.
+  Object.assign(tables.stores[0], { portal_token: DEMO_PORTAL_TOKEN, portal_enabled_at: iso(20 * DAY) });
+  const sent = tables.reports.find((r) => r.store_id === juniper.id);
+  if (sent) Object.assign(sent, { status: 'sent', sent_at: iso(20 * DAY), sent_to: juniper.client_contact_email });
   return tables;
 }
 
@@ -302,6 +317,9 @@ function autoDrafted(stores: Row[], t: Tables): Row[] {
     };
   });
 }
+
+/** Juniper & Ash's portal link in demo mode: /p/<this>. */
+export const DEMO_PORTAL_TOKEN = 'c1'.repeat(32);
 
 const g = globalThis as unknown as { __storecareDemo?: Tables };
 const db = (): Tables => (g.__storecareDemo ??= seed());
@@ -440,6 +458,18 @@ export function demoClient() {
         const s = t.stores.find((x) => x.id === r.store_id);
         const a = t.agencies.find((x) => x.id === r.agency_id);
         return { data: { audit: r.audit, note: r.note, created_at: r.created_at, store_name: s?.name, agency_name: a?.name, brand_color: a?.brand_color, logo_url: a?.logo_url ?? null }, error: null };
+      }
+      if (fn === 'public_store_portal') return { data: portalRawFromRows(db(), String(args.token ?? '')), error: null };
+      if (fn === 'submit_portal_request') {
+        const t = db();
+        const s = t.stores.find((x) => typeof args.token === 'string' && x.portal_token === args.token);
+        if (!s) return { data: null, error: { message: 'portal_not_found' } };
+        const recent = t.requests.filter((q) => q.store_id === s.id && q.source === 'portal' && q.received_at >= new Date(Date.now() - 3600e3).toISOString());
+        if (recent.length >= 10) return { data: null, error: { message: 'rate_limited' } };
+        const at = new Date().toISOString();
+        const id = uid();
+        t.requests.push({ id, store_id: s.id, agency_id: s.agency_id, from_name: args.p_name || null, from_email: String(args.p_email).toLowerCase(), subject: args.p_subject, body: args.p_body || null, status: 'new', urgency: args.p_urgency ?? 'normal', source: 'portal', received_at: at, updated_at: at, work_entry_id: null });
+        return { data: id, error: null };
       }
       if (fn === 'uptime_stats') {
         const rows = db().uptime_checks.filter((u) => u.store_id === args.p_store && u.checked_at >= args.p_from && u.checked_at < args.p_to);

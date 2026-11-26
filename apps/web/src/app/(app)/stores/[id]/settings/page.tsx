@@ -3,7 +3,10 @@ import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase';
 import { host } from '@/lib/format';
 import { SubmitButton } from '@/components/submit-button';
-import { deleteStore, saveStore, setPaused, retryAlert } from './actions';
+import { headers } from 'next/headers';
+import { deleteStore, saveStore, setPaused, setPortal, retryAlert } from './actions';
+import { CopyButton } from '@/components/copy-button';
+import { portalUrl } from '@/lib/client-portal';
 import { Icon } from '@/components/icon';
 
 const SAVED: Record<string, string> = {
@@ -12,6 +15,9 @@ const SAVED: Record<string, string> = {
   url: 'Saved. The address changed, so monitoring starts fresh with a new snapshot on the next run.',
   paused: 'Monitoring paused. No checks run for this store until you resume it.',
   resumed: 'Monitoring resumed. Checks start again on the next run.',
+  portal_on: 'Client portal is on. Copy the link below and send it to your client.',
+  portal_new: 'New portal link made. The old link no longer works.',
+  portal_off: 'Client portal turned off. The link no longer works.',
 };
 
 /** Common IANA zones first; the store's current zone is always included. */
@@ -40,6 +46,7 @@ export default async function StoreSettings({
   ]);
   if (!store) notFound();
   const paused = store.status === 'paused';
+  const portalLink = store.portal_token ? portalUrl((await headers()).get('host') ?? '', store.portal_token) : null;
 
   return (
     <div className="workspace-page settings-page">
@@ -49,7 +56,7 @@ export default async function StoreSettings({
         <p>{host(store.public_url)}{paused ? ' · monitoring paused' : ''}</p>
       </div><Link href={`/stores/${id}`} className="btn tertiary"><Icon name="store" size={16} />Store overview</Link></header>
 
-      <nav className="store-section-nav" aria-label="Settings sections"><a href="#store-settings">Store</a><a href="#client-settings">Client</a><a href="#care-plan-settings">Care plan</a><a href="#checkout-settings">Checkout</a><a href="#alert-settings">Alerts</a></nav>
+      <nav className="store-section-nav" aria-label="Settings sections"><a href="#store-settings">Store</a><a href="#client-settings">Client</a><a href="#care-plan-settings">Care plan</a><a href="#checkout-settings">Checkout</a><a href="#alert-settings">Alerts</a><a href="#client-portal">Client portal</a></nav>
 
       {saved && SAVED[saved] && <div className="notice" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }} role="status">{SAVED[saved]}</div>}
       {error && <div className="notice error" role="alert">{error}</div>}
@@ -157,6 +164,39 @@ export default async function StoreSettings({
           <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
         </div>
       </form>
+
+      <section className="workspace-section portal-settings" id="client-portal">
+        <h2>Client portal</h2>
+        <p className="muted" style={{ margin: 0 }}>
+          An always-on page for your client, in your brand: live status, 30-day uptime, checkout and speed, care-plan hours,
+          the work you did, past reports, and a form to send you requests. Requests land in <Link href="/requests">Requests</Link> and
+          alert you like an incident. No login for the client: anyone with the link can open it.
+        </p>
+        {portalLink ? (
+          <>
+            <div className="portal-link-row">
+              <input aria-label="Client portal link" readOnly value={portalLink} className="mono" />
+              <CopyButton text={portalLink} />
+              <a href={portalLink} target="_blank" rel="noopener" className="btn secondary">Open<span className="sr-only"> (new tab)</span></a>
+            </div>
+            <p className="small muted" style={{ margin: 0 }}>
+              On since {new Date(store.portal_enabled_at ?? Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
+              Work entries show their client description; only approved or sent reports are listed.
+            </p>
+            <div className="row" style={{ justifyContent: 'flex-start', gap: 10 }}>
+              <form action={setPortal}><input type="hidden" name="store" value={store.id} /><input type="hidden" name="op" value="rotate" />
+                <SubmitButton secondary pendingText="Making a new link…">Make a new link</SubmitButton></form>
+              <form action={setPortal}><input type="hidden" name="store" value={store.id} /><input type="hidden" name="op" value="off" />
+                <SubmitButton secondary pendingText="Turning off…">Turn off</SubmitButton></form>
+            </div>
+          </>
+        ) : (
+          <form action={setPortal}>
+            <input type="hidden" name="store" value={store.id} /><input type="hidden" name="op" value="on" />
+            <SubmitButton pendingText="Turning on…"><Icon name="link" size={16} />Turn on client portal</SubmitButton>
+          </form>
+        )}
+      </section>
 
       <section className="workspace-section workspace-table-section">
         <h2>Alert delivery history</h2>

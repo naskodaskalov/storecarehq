@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { APP_ORIGIN, hostRouting, isPublicPath, isWebsiteHost, isOutreachReportPath, SHARE_IMAGE_PATH, sessionRouting, WEBSITE_PAGES, MONITORING_HEALTH_PATH } from './lib/domains';
 
-// /r/<token> is the client's report link: no account, the token is the key. /welcome is the landing page.
+// /r/<token> is the client's report link and /p/<token> the client portal: no account, the token is the key. /welcome is the landing page.
 // /api/stripe/webhook is called by Stripe and checks its own signature.
 
 export async function middleware(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
   // The public website never needs to read or refresh an agency session.
-  if ((isWebsiteHost(host) && (path === '/welcome' || path === SHARE_IMAGE_PATH || WEBSITE_PAGES.includes(path))) || path === '/api/contact' || path === '/api/scan' || path === MONITORING_HEALTH_PATH || path === '/api/stripe/webhook' || path.startsWith('/r/') || path === '/robots.txt' || path === '/sitemap.xml') return NextResponse.next();
+  if ((isWebsiteHost(host) && (path === '/welcome' || path === SHARE_IMAGE_PATH || WEBSITE_PAGES.includes(path))) || path === '/api/contact' || path === '/api/scan' || path === MONITORING_HEALTH_PATH || path === '/api/stripe/webhook' || path.startsWith('/r/') || path.startsWith('/p/') || path === '/robots.txt' || path === '/sitemap.xml') return NextResponse.next();
   // Layouts read the path (the app layout sends lapsed agencies to /billing from any other page).
   request.headers.set('x-pathname', request.nextUrl.pathname);
   if (process.env.STORECARE_DEMO === '1') {

@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/', label: 'Overview', icon: 'home', match: (p: string) => p === '/' },
   { href: '/#client-stores', label: 'Stores', icon: 'store', match: (p: string) => p.startsWith('/stores') },
   { href: '/work', label: 'Work log', icon: 'work', match: (p: string) => p.startsWith('/work') },
+  { href: '/requests', label: 'Requests', icon: 'mail', match: (p: string) => p.startsWith('/requests') },
   { href: '/reports', label: 'Reports', icon: 'report', match: (p: string) => p.startsWith('/reports') },
   { href: '/bfcm', label: 'BFCM audit', icon: 'tag', match: (p: string) => p.startsWith('/bfcm') },
   { href: '/settings', label: 'Agency settings', icon: 'settings', match: (p: string) => p.startsWith('/settings') },
@@ -16,7 +17,8 @@ const LINKS = [
 ];
 
 /** bfcm: the Black Friday audit is in season (two months before Black Friday through Cyber Monday), or open. */
-export function NavLinks({ isAdmin = false, themeDetector, bfcm = false }: { isAdmin?: boolean; themeDetector?: string; bfcm?: boolean }) {
+/** openRequests: client requests not done yet, shown as a badge on Requests. */
+export function NavLinks({ isAdmin = false, themeDetector, bfcm = false, openRequests = 0 }: { isAdmin?: boolean; themeDetector?: string; bfcm?: boolean; openRequests?: number }) {
   const path = usePathname();
   const shown = LINKS.filter((l) => l.href !== '/bfcm' || bfcm || path.startsWith('/bfcm'));
   const links = isAdmin ? [...shown, { href: '/admin', label: 'Admin workspace', icon: 'report', match: (p: string) => p.startsWith('/admin') }] : shown;
@@ -25,6 +27,7 @@ export function NavLinks({ isAdmin = false, themeDetector, bfcm = false }: { isA
       {links.map((l) => (
         <Link key={l.href} href={l.href} aria-current={l.match(path) ? 'page' : undefined}>
           <Icon name={l.icon as IconName} />{l.label}
+          {l.href === '/requests' && openRequests > 0 && <span className="nav-badge" aria-label={`${openRequests} open`}>{openRequests}</span>}
         </Link>
       ))}
       {themeDetector && (

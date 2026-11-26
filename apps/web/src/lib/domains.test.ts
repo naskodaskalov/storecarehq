@@ -30,7 +30,7 @@ test('direct app entry validates session, with protected routes requiring authen
   assert.deepEqual(sessionRouting('app.storecarehq.com', '/', false), { kind: 'redirect', path: '/login' });
   assert.equal(sessionRouting('app.storecarehq.com', '/stores/123', true), null);
   assert.deepEqual(sessionRouting('app.storecarehq.com', '/stores/123', false), { kind: 'redirect', path: '/login' });
-  for (const path of ['/login', '/auth/forgot-password', '/auth/callback', '/r/client-token', '/api/stripe/webhook']) {
+  for (const path of ['/login', '/auth/forgot-password', '/auth/callback', '/r/client-token', '/p/' + 'c1'.repeat(32), '/api/stripe/webhook']) {
     assert.equal(sessionRouting('app.storecarehq.com', path, false), null);
   }
   assert.equal(isPublicPath('/login-malicious'), false);
@@ -42,7 +42,7 @@ test('legacy app URLs move to app with query intact, without forwarding submitte
     assert.deepEqual(hostRouting(host, '/login', '?trial=1'), { kind: 'redirect', url: `${APP_ORIGIN}/login?trial=1` });
     assert.deepEqual(hostRouting(host, '/stores/123', '?tab=checks'), { kind: 'redirect', url: `${APP_ORIGIN}/stores/123?tab=checks` });
     assert.deepEqual(hostRouting(host, '/login', '', 'POST'), { kind: 'reject' });
-    for (const path of ['/r/client-token', '/auth/callback', '/auth/password', '/api/stripe/webhook']) assert.equal(hostRouting(host, path), null);
+    for (const path of ['/r/client-token', '/p/' + 'c1'.repeat(32), '/auth/callback', '/auth/password', '/api/stripe/webhook']) assert.equal(hostRouting(host, path), null);
   }
   assert.deepEqual(hostRouting('www.storecarehq.com', '/', '', 'POST'), { kind: 'reject' });
   assert.equal(new URL(hostRouting('www.storecarehq.com', '//evil.example/path')!.kind === 'redirect'

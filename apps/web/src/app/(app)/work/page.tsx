@@ -20,7 +20,7 @@ async function logWork(formData: FormData) {
   const date = String(formData.get('date') || new Date().toISOString().slice(0, 10));
   const title = String(formData.get('title') ?? '').trim();
   const minutes = Math.round(Number(formData.get('hours') || 0) * 60);
-  if (!title || minutes <= 0) redirect(`/work?store=${storeId}&error=1`);
+  if (!title || minutes <= 0) redirect(`/work?store=${storeId}${formData.get('request') ? `&request=${encodeURIComponent(String(formData.get('request')))}` : ''}&error=1`);
 
   const { data: entry } = await supabase
     .from('work_entries')
@@ -53,14 +53,25 @@ async function logWork(formData: FormData) {
     const ids = (changes ?? []).filter((c) => workEntryExplains(c, text)).map((c) => c.id);
     if (ids.length) await supabase.from('changes').update({ work_entry_id: entry.id }).in('id', ids);
   }
+  // Logged from a client request ("Log work & close"): close the request and link it to this work.
+  const requestId = String(formData.get('request') ?? '');
+  if (entry && requestId) {
+    await supabase.from('requests').update({ status: 'done', work_entry_id: entry.id, updated_at: new Date().toISOString() }).eq('id', requestId).eq('store_id', storeId);
+    revalidatePath('/requests');
+    revalidatePath('/', 'layout');
+    redirect('/requests?saved=done');
+  }
   revalidatePath('/work');
   redirect(`/work?store=${storeId}&saved=1`);
 }
 
-export default async function Work({ searchParams }: { searchParams: Promise<{ store?: string; saved?: string; error?: string }> }) {
-  const { store: selected, saved, error } = await searchParams;
+export default async function Work({ searchParams }: { searchParams: Promise<{ store?: string; saved?: string; error?: string; request?: string }> }) {
+  const { store: selected, saved, error, request: requestId } = await searchParams;
   const { agency } = await requireAgency();
   const supabase = await supabaseServer();
+  const { data: request } = requestId
+    ? await supabase.from('requests').select('id, store_id, subject, status').eq('id', requestId).maybeSingle()
+    : { data: null };
   const [{ data: stores }, { data: entries }] = await Promise.all([
     supabase.from('stores').select('id, name').eq('agency_id', agency.id).order('name'),
     supabase
@@ -88,10 +99,16 @@ export default async function Work({ searchParams }: { searchParams: Promise<{ s
           <p className="muted" style={{ margin: 0 }}>Add a store first.</p>
         ) : (
           <form action={logWork} className="work-entry-form">
+            {request && request.status !== 'done' && (
+              <div className="notice" role="status" style={{ margin: 0 }}>
+                Logging work for the client request <strong>{request.subject}</strong>. Saving closes the request and the client sees it as done in their portal.
+                <input type="hidden" name="request" value={request.id} />
+              </div>
+            )}
             <div className="work-entry-basics">
               <div className="field">
                 <label htmlFor="store">Store</label>
-                <select id="store" name="store" defaultValue={selected ?? stores[0].id}>
+                <select id="store" name="store" defaultValue={request?.store_id ?? selected ?? stores[0].id}>
                   {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
@@ -106,11 +123,11 @@ export default async function Work({ searchParams }: { searchParams: Promise<{ s
             </div>
             <div className="field">
               <label htmlFor="title">What did you do?</label>
-              <input id="title" name="title" type="text" placeholder="Published autumn theme after testing checkout" required />
+              <input id="title" name="title" type="text" placeholder="Published autumn theme after testing checkout" required defaultValue={request && request.status !== 'done' ? request.subject : undefined} />
             </div>
             <div className="field">
               <label htmlFor="client_text">How to describe it to the client <span className="muted" style={{ fontWeight: 400 }}>(optional, used in the report)</span></label>
-              <textarea id="client_text" name="client_text" />
+              <textarea id="client_text" name="client_text" defaultValue={request && request.status !== 'done' ? `Done: ${request.subject}` : undefined} />
             </div>
             <div className="row work-entry-footer">
               <label className="check" style={{ alignItems: 'center' }}><input type="checkbox" name="counts" defaultChecked style={{ marginTop: 0 }} /> Counts toward the care plan</label>

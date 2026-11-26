@@ -11,7 +11,7 @@ export const EXPORT_TABLES = {
   reports: 'id, store_id, period, status, summary_text, sections, facts, sent_to, sent_at, created_at, updated_at',
   changes: 'id, store_id, occurred_at, kind, summary, risky, work_entry_id',
   incidents: 'id, store_id, kind, opened_at, resolved_at, cause, client_note',
-  requests: 'id, store_id, from_email, subject, body, status, received_at',
+  requests: 'id, store_id, from_name, from_email, subject, body, status, urgency, source, received_at, updated_at, work_entry_id',
   store_audits: 'id, store_id, kind, created_at, verdict, fixes, looks, audit, note, shared_at, sent_at, sent_to',
 } as const;
 export const EXPORT_AGENCY_COLUMNS = 'name, brand_color, logo_url, sender_email, plan, subscription_status, trial_ends_at, current_period_end, created_at';

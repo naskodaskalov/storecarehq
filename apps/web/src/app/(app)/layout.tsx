@@ -17,7 +17,10 @@ import { inSeason } from '@/lib/bfcm';
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { agency } = await requireAgency();
   const supabase = await supabaseServer();
-  const { count } = await supabase.from('stores').select('id', { count: 'exact', head: true }).eq('agency_id', agency.id);
+  const [{ count }, { count: openRequests }] = await Promise.all([
+    supabase.from('stores').select('id', { count: 'exact', head: true }).eq('agency_id', agency.id),
+    supabase.from('requests').select('id', { count: 'exact', head: true }).eq('agency_id', agency.id).in('status', ['new', 'in_progress']),
+  ]);
   const billing = billingState(agency);
   const isAdmin = await currentUserIsAdmin();
   const requestHeaders = await headers();
@@ -34,7 +37,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <div className="shell">
       <SideNav label="Main" brand={<Link href="/" className="brand"><div className="mark">SC</div><span className="brand-name">StoreCare HQ</span></Link>}>
         <div className="workspace-identity"><span className="nav-caption">Workspace</span><div className="workspace-name">{agency.name}</div></div>
-        <NavLinks isAdmin={isAdmin} themeDetector={themeDetector} bfcm={inSeason()} />
+        <NavLinks isAdmin={isAdmin} themeDetector={themeDetector} bfcm={inSeason()} openRequests={openRequests ?? 0} />
         <div className="nav-foot">
           <Link href="/settings" className="nav-account" title="Agency settings" aria-label={`${agency.name}: agency settings`}><span className="account-avatar">{agency.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><div style={{ fontWeight: 600 }}>{agency.name}</div></Link>
           <div className="small muted">

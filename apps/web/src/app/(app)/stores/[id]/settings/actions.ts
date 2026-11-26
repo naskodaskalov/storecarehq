@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { normalizeStoreUrl } from '@storecare/storefront';
 import { supabaseServer } from '@/lib/supabase';
+import { newPortalToken } from '@/lib/client-portal';
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 const back = (id: string, q: string) => redirect(`/stores/${id}/settings?${q}`);
@@ -123,4 +124,21 @@ export async function deleteStore(formData: FormData) {
   if (error) back(id, 'error=' + encodeURIComponent(error.message));
   revalidatePath('/');
   redirect('/?deleted=' + encodeURIComponent(store.name));
+}
+
+/** Client portal: turn on (new link), make a new link (the old one stops working), or turn off. */
+export async function setPortal(formData: FormData) {
+  const id = str(formData, 'store');
+  const op = str(formData, 'op');
+  const supabase = await supabaseServer();
+  const { data: store } = await supabase.from('stores').select('id, portal_token').eq('id', id).single();
+  if (!store) redirect('/');
+  const update = op === 'off'
+    ? { portal_token: null, portal_enabled_at: null }
+    : { portal_token: newPortalToken(), portal_enabled_at: new Date().toISOString() };
+  const { error } = await supabase.from('stores').update(update).eq('id', id);
+  if (error) back(id, 'error=' + encodeURIComponent('Could not update the client portal. Please try again.'));
+  revalidatePath(`/stores/${id}`);
+  revalidatePath(`/stores/${id}/settings`);
+  back(id, op === 'off' ? 'saved=portal_off#client-portal' : op === 'rotate' ? 'saved=portal_new#client-portal' : 'saved=portal_on#client-portal');
 }

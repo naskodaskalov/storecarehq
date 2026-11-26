@@ -1029,3 +1029,29 @@ a.activity-text:hover { text-decoration: underline; text-underline-offset: 3px; 
   .bfcm-sheet h2 { font-size: 14px; margin-bottom: 6px; }
   .bfcm-verdict, .bfcm-check-mark, .bfcm-sheet-head, .report-mark, .bfcm-check-tone { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Client portal settings and the client request inbox. */
+.portal-link-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.portal-link-row input { flex: 1 1 320px; min-width: 0; height: 40px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg); font-size: 12px; }
+.requests-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+.requests-tabs a { padding: 8px 12px; font-size: 14px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.requests-tabs a[aria-current='page'] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.request-list { list-style: none; margin: 0; padding: 0; }
+.request-item { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; padding: 16px 0; border-top: 1px solid var(--rule); }
+.request-item:first-child { border-top: 0; padding-top: 0; }
+.request-item.is-urgent { box-shadow: inset 3px 0 0 var(--warn); padding-left: 12px; }
+.request-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.request-main h3 { margin: 0; font-size: 15px; }
+.request-body { margin: 0; font-size: 14px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.request-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.request-meta a { font-weight: 600; color: var(--text); text-decoration: none; }
+.request-urgent { padding: 1px 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-border); font-weight: 700; }
+.request-status { padding: 1px 8px; border-radius: 99px; border: 1px solid var(--border); background: #fff; }
+.request-status.status-in_progress { color: var(--warn); border-color: var(--warn-border); }
+.request-status.status-done { color: var(--accent); border-color: var(--accent-mid); }
+.request-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 0 0 auto; }
+.portal-link-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.portal-link-list li { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.portal-link-url { flex: 1 1 260px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-badge { margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+@media (max-width: 640px) { .request-item { flex-direction: column; } .request-actions { justify-content: flex-start; } }
