@@ -2,7 +2,7 @@
 // browser tab and the daily lead research can add to it directly. Only the list and its review/status are saved;
 // health checks and email drafts stay in the tab.
 // No server-only imports here: the outreach page uses these helpers in the browser too. Storage: outreach-leads-store.ts.
-import { COLUMNS, newPack, validateProspect, type Pack, type Prospect } from './outreach.ts';
+import { COLUMNS, newPack, noStoreDraftMessage, validateProspect, type Pack, type Prospect } from './outreach.ts';
 import { agencyDomain } from './outreach-history.ts';
 
 export type LeadSource = 'research' | 'csv' | 'manual' | 'backup';
@@ -47,7 +47,7 @@ export function validLeadChanges(input: unknown): LeadChanges {
 /** A saved lead as a workspace pack, with nothing prepared yet. */
 export function leadPack(lead: OutreachLead): Pack {
   const prospect = Object.fromEntries(COLUMNS.map((k) => [k, lead[k] ?? ''])) as Prospect;
-  return { ...newPack(prospect), leadId: lead.id, fitNote: lead.fit_note || undefined, reviewed: lead.reviewed, status: lead.status };
+  return { ...newPack(prospect), ...(prospect.client_store_url ? {} : { draft: noStoreDraftMessage(prospect) }), leadId: lead.id, fitNote: lead.fit_note || undefined, reviewed: lead.reviewed, status: lead.status };
 }
 
 const domainOf = (p: Pack) => agencyDomain(p.prospect.agency_url);

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icon';
 import { defaultOutreachSubject, outreachEmail } from '@/lib/outreach-email';
-import { bfcmOutreach } from '@/lib/outreach';
+import { bfcmOutreach, textOnlyPack, TEXT_ONLY_SUBJECT } from '@/lib/outreach';
 import type { Pack, ReportLinks } from '@/lib/outreach';
 import { contactDay, type OutreachContact } from '@/lib/outreach-history';
 import { approveOutreachTest, sendOutreachTest, publishOutreachReports, revokeOutreachReports } from './actions';
@@ -11,7 +11,8 @@ import { approveOutreachTest, sendOutreachTest, publishOutreachReports, revokeOu
 export type TestSenderInfo = { from: string; to: string; replyTo?: string; mode: 'agency' | 'test'; ready: boolean; storageReady: boolean; reason: string };
 
 export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubject, onLinks, onSent, editor }: { pack: Pack; sender: TestSenderInfo; busy: boolean; previous: OutreachContact | null; timeZone: string; onSubject: (value: string) => void; onLinks: (value: ReportLinks | undefined) => void; onSent: (contact: OutreachContact | undefined, accepted: boolean) => void; editor: ReactNode }) {
-  const subject = pack.subject ?? defaultOutreachSubject(pack.prospect.agency_name, pack.prospect.client_store_url, !!pack.report && bfcmOutreach(pack.report));
+  const textOnly = textOnlyPack(pack);
+  const subject = pack.subject ?? (textOnly ? TEXT_ONLY_SUBJECT : defaultOutreachSubject(pack.prospect.agency_name, pack.prospect.client_store_url, !!pack.report && bfcmOutreach(pack.report)));
   const recipient = sender.mode === 'agency' ? pack.prospect.contact_email.trim() : sender.to;
   const recipientReady = /^[^\s@<>;,\r\n]+@[^\s@<>;,\r\n]+\.[^\s@<>;,\r\n]+$/.test(recipient);
   const [approval, setApproval] = useState<{ token: string; expiresAt: number } | null>(null);
@@ -26,13 +27,15 @@ export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubjec
   const currentIdentity = useRef(identity);
   currentIdentity.current = identity;
   useEffect(() => { setApproval(null); setSent(false); setMessage(''); }, [identity]);
-  const canPrepare = !!pack.report?.ok && pack.reviewed && !!pack.draft.trim() && !!subject.trim();
+  const canPrepare = (textOnly || (!!pack.report?.ok && pack.reviewed)) && !!pack.draft.trim() && !!subject.trim();
   let preview = null, previewError = '';
   if (canPrepare) {
     try { preview = outreachEmail(input); }
     catch (e) { previewError = e instanceof Error ? e.message : 'Check the email content.'; }
   }
   const pages = preview ? [preview.html, ...preview.documents.map(d => d.html)] : [];
+  // Preview tabs: index into pages, or 3 for the plain text. A text-only email has no report documents.
+  const tabs = (textOnly ? [[0, 'Email'], [3, 'Plain text']] : [[0, 'Email'], [1, 'Health check preview'], [2, 'Sample report preview'], [3, 'Plain text']]) as [number, string][];
 
   async function run(send: boolean) {
     if (lock.current) return;
@@ -49,7 +52,7 @@ export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubjec
       } else {
         const result = await approveOutreachTest(input);
         if (original !== currentIdentity.current) return;
-        if (result.ok) { setApproval({ token: result.token, expiresAt: result.expiresAt }); setMessage('This exact subject, text, recipient and saved report links are approved for 15 minutes.'); }
+        if (result.ok) { setApproval({ token: result.token, expiresAt: result.expiresAt }); setMessage(textOnly ? 'This exact subject, text and recipient are approved for 15 minutes.' : 'This exact subject, text, recipient and saved report links are approved for 15 minutes.'); }
         else setMessage(result.error);
       }
     } catch { setMessage('The request could not finish. Your draft is still here.'); }
@@ -80,23 +83,23 @@ export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubjec
     <dl className="outreach-sender"><dt>From</dt><dd>{sender.from}</dd><dt>To</dt><dd>{recipient || 'Missing contact_email in CSV'}</dd><dt>Reply-to</dt><dd>{sender.replyTo || sender.to}</dd></dl>
     <label className="field">Subject<input type="text" value={subject} maxLength={200} disabled={pending || busy} onChange={e => onSubject(e.target.value)} /></label>
     {editor}
-    <div className="outreach-link-tools"><div><strong>Reports for this introduction</strong><p className="small muted">Share two report links. Recipients can view, download or save them as PDF.</p></div>
+    {textOnly ? <p className="outreach-test-notice" role="note"><Icon name="mail" size={16} /><span><strong>Text-only introduction</strong> · No client store on file, so this email has no health check or report links. Ask them to reply with a store.</span></p> : <div className="outreach-link-tools"><div><strong>Reports for this introduction</strong><p className="small muted">Share two report links. Recipients can view, download or save them as PDF.</p></div>
     <div className="outreach-actions">
       <button type="button" className="btn secondary" disabled={!preview || !sender.storageReady || pending || busy || !!pack.links} onClick={() => void manageLinks(false)}>Create report links</button>
       {pack.links && <button type="button" className="btn danger" disabled={pending || busy} onClick={() => void manageLinks(true)}>Revoke report links</button>}
     </div>
     {!sender.storageReady && <p className="small muted">Configure server-side report storage and apply the report-links migration to publish reports.</p>}
     {pack.links && <div className="outreach-link-status"><p>Saved links expire {pack.links.expiresAt.slice(0, 10)}. Anyone with a link can view its report.</p><a href={`${pack.links.origin}/outreach/r/${pack.links.healthToken}`} target="_blank" rel="noreferrer">Open saved health check</a><a href={`${pack.links.origin}/outreach/r/${pack.links.sampleToken}`} target="_blank" rel="noreferrer">Open saved sample report</a></div>}
-    </div>
+    </div>}
     {previewError && <p className="error" role="alert">{previewError}</p>}
     </div><div className="outreach-compose-preview">
     <div className="outreach-preview-heading"><strong>Preview</strong><span><span className="outreach-live-dot" />Updates as you write</span></div>
     {preview ? <>
       <div className="outreach-actions outreach-preview-tabs" aria-label="Email preview selection">
-        {['Email', 'Health check preview', 'Sample report preview', 'Plain text'].map((label, i) => <button key={label} type="button" className={`btn ${tab === i ? '' : 'secondary'}`} aria-pressed={tab === i} onClick={() => setTab(i)}>{label}</button>)}
+        {tabs.map(([i, label]) => <button key={label} type="button" className={`btn ${tab === i ? '' : 'secondary'}`} aria-pressed={tab === i} onClick={() => setTab(i)}>{label}</button>)}
       </div>
       {tab === 3 ? <pre className="outreach-text-preview">{preview.text}</pre> : <iframe sandbox="" referrerPolicy="no-referrer" title={['Outreach email preview', 'Health check document preview', 'Sample report document preview'][tab]} srcDoc={pages[tab]} className="outreach-email-preview" />}
-    </> : <div className="outreach-preview-empty"><Icon name="report" size={30} /><strong>A preview worth sending.</strong><p>Prepare a health check and write your introduction. Your email and both reports will appear here.</p></div>}
+    </> : <div className="outreach-preview-empty"><Icon name="report" size={30} /><strong>A preview worth sending.</strong><p>{textOnly ? 'Write your introduction and subject. The email preview will appear here.' : 'Prepare a health check and write your introduction. Your email and both reports will appear here.'}</p></div>}
     </div></div>
     <div className="outreach-send-panel">
     {!sender.ready && <p className="small muted">{sender.reason}</p>}
@@ -104,7 +107,7 @@ export function EmailComposer({ pack, sender, busy, previous, timeZone, onSubjec
     {previous && !sent && <p className="outreach-previous" role="note"><Icon name="alert" size={16} /><span><strong>Already contacted on {contactDay(previous.sent_at, timeZone)}</strong> ({previous.contact_email}). Sending again adds a follow-up to the outreach history.</span></p>}
     <p className="outreach-recipient-confirmation">Recipient: <strong>{recipient || 'Not supplied'}</strong></p>
     <div className="outreach-actions">
-      <button type="button" className="btn secondary" disabled={!sender.ready || !recipientReady || !preview || !pack.links || pending || busy || sent} onClick={() => void run(false)}>{pending ? 'Working…' : approval ? 'Renew approval' : 'Approve email'}</button>
+      <button type="button" className="btn secondary" disabled={!sender.ready || !recipientReady || !preview || (!pack.links && !textOnly) || pending || busy || sent} onClick={() => void run(false)}>{pending ? 'Working…' : approval ? 'Renew approval' : 'Approve email'}</button>
       <button type="button" className="btn" disabled={!sender.ready || !recipientReady || !approval || pending || busy || sent} onClick={() => void run(true)}><Icon name={sent ? 'check' : 'mail'} size={16} />{sent ? 'Accepted by Resend' : 'Send approved email'}</button>
     </div>
     {message && <p role="status" aria-live="polite">{message}</p>}

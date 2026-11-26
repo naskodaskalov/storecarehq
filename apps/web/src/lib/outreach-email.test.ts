@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { outreachEmail, validateTestEmail } from './outreach-email.ts';
-import { newPack, validateProspect } from './outreach.ts';
+import { newPack, noStoreDraftMessage, TEXT_ONLY_SUBJECT, validateProspect } from './outreach.ts';
 import type { QuickReport } from './quick-report.ts';
 
 function input() {
@@ -70,4 +70,26 @@ test('the signature links storecarehq.com, and only our own site', async () => {
     assert.equal(linkOwnSite(untouched), untouched, untouched);
   const value = input(); value.pack.draft = 'Hi,\n\nNasko\nStoreCare HQ · storecarehq.com';
   assert.match(outreachEmail(value).html, /StoreCare HQ · <a href="https:\/\/www.storecarehq.com"[^>]*>storecarehq.com<\/a>/);
+});
+
+test('an agency without a client store gets a text-only introduction: no report buttons and no documents', () => {
+  const pack = newPack(validateProspect({ agency_name: 'Glaze <Digital>', agency_url: 'glaze.example.com', contact_email: 'hello@glaze.example.com' }, { storeOptional: true }));
+  pack.draft = noStoreDraftMessage(pack.prospect);
+  const email = outreachEmail({ pack, subject: TEXT_ONLY_SUBJECT });
+  assert.equal(email.subject, 'A free health check for one of your Shopify clients');
+  assert.equal(email.documents.length, 0);
+  assert.doesNotMatch(email.html, /View the health check|Sample monthly report|outreach\/r\/|Create report links/);
+  assert.match(email.html, /Glaze &lt;Digital&gt;/);
+  assert.match(email.html, /Reply &quot;no&quot;/);
+  assert.match(email.text, /^Hi there,/);
+  assert.match(email.text, /couldn't find a store that I could confidently link to Glaze <Digital>/);
+  assert.doesNotMatch(email.text, /outreach\/r\/|example data/);
+  // It needs an introduction, and can't smuggle in report links or a check.
+  assert.throws(() => outreachEmail({ pack: { ...pack, draft: ' ' }, subject: TEXT_ONLY_SUBJECT }), /introduction/);
+  assert.throws(() => outreachEmail({ pack: { ...pack, links: input().pack.links }, subject: TEXT_ONLY_SUBJECT }), /no health check or report links/);
+});
+
+test('agencies added by hand or CSV still need a client store and its portfolio source', () => {
+  assert.throws(() => validateProspect({ agency_name: 'A', agency_url: 'a.example.com' }), /client store URL/);
+  assert.throws(() => validateProspect({ agency_name: 'A', agency_url: 'a.example.com', client_store_url: 'store.example.com' }, { storeOptional: true }), /portfolio source/);
 });
