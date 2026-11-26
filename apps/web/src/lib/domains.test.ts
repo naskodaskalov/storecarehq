@@ -114,6 +114,8 @@ test('landing store scans stay on the website host without requiring a session',
   for (const host of ['www.storecarehq.com', 'storecarehq.com', 'localhost:3000']) {
     assert.equal(hostRouting(host, '/api/scan', '', 'POST'), null);
     assert.equal(sessionRouting(host, '/api/scan', false), null);
+    assert.equal(hostRouting(host, '/api/bfcm-check', '', 'POST'), null);
+    assert.equal(sessionRouting(host, '/api/bfcm-check', false), null);
   }
   assert.equal(isPublicPath('/api/scan/other'), false);
 });

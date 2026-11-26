@@ -20,6 +20,9 @@ import { StickyCta } from './sticky-cta';
 import { StickyHeader } from './sticky-header';
 import { MonthReplay, type ReplayDay, type ReplayEvent } from './month-replay';
 import { WatchDial, type WatchCheck } from './watch-dial';
+import { BfcmCheck } from './bfcm-check';
+import { bfcmLive } from '@/lib/bfcm-check';
+import { countdown, saleDates } from '@/lib/bfcm';
 import './landing.css';
 
 const TITLE = 'StoreCare HQ: monitoring and monthly reports for Shopify care plans';
@@ -237,6 +240,8 @@ export default async function Landing() {
   const login = appLink(host, '/login');
   const signup = appLink(host, '/login?trial=1');
   const facts = sampleFacts();
+  // Around Black Friday the readiness check leads the page; it switches itself off after Cyber Monday.
+  const bf = bfcmLive() ? { ...saleDates(), label: countdown() } : null;
   const nav = (
     <>
       <a href="#check">Check a store</a>
@@ -253,6 +258,11 @@ export default async function Landing() {
         // Our own constants, serialised; "<" is escaped so no text in them can close the script tag.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, '\\u003c') }}
       />
+      {bf && (
+        <a href="#bfcm" className="lp-bf-bar">
+          <strong>{bf.label}.</strong> Check any client store’s readiness free, and send them the one-pager <span aria-hidden="true">→</span>
+        </a>
+      )}
       <StickyHeader>
         <div className="lp-top">
           <Link href="/" className="lp-brand" aria-label="StoreCare HQ home">
@@ -285,6 +295,12 @@ export default async function Landing() {
           </div>
           <BrandReport facts={facts} summary={templateSummary(facts)} sections={DEFAULT_SECTIONS} />
         </section>
+
+        {bf && (
+          <section id="bfcm" className="lp-bf" aria-labelledby="bfcm-title">
+            <BfcmCheck signup={signup} blackFriday={bf.blackFriday} cyberMonday={bf.cyberMonday} label={bf.label} />
+          </section>
+        )}
 
         <section className="lp-oldway" aria-labelledby="oldway-title">
           <div className="lp-oldway-head">
