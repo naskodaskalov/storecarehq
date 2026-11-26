@@ -1,6 +1,7 @@
 // Server-side transport boundary. Keep provider details out of the email composer.
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { outreachEmail, type TestEmailInput } from './outreach-email.ts';
+import { textOnlyPack } from './outreach.ts';
 
 export type TestDeliveryConfig = {
   apiKey: string;
@@ -34,7 +35,7 @@ const replyAddress = (c: TestDeliveryConfig) => c.replyTo || c.adminEmail;
 
 function payloadFor(input: TestEmailInput, c: TestDeliveryConfig) {
   assertReady(c);
-  if (!input.pack.links) throw new Error('Create report links before approving or sending.');
+  if (!input.pack.links && !textOnlyPack(input.pack)) throw new Error('Create report links before approving or sending.');
   const email = outreachEmail(input);
   const to = c.mode === 'agency' ? input.pack.prospect.contact_email.trim().toLowerCase() : c.adminEmail;
   if (!emailAddress.test(to)) throw new Error('Add one valid agency contact_email to the CSV before approving or sending.');

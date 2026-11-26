@@ -16,7 +16,9 @@ function publicUrl(value: string): string {
   return url.href;
 }
 
-export function validateProspect(input: unknown): Prospect {
+/** New agencies need a client store and its portfolio source. `storeOptional` accepts a saved lead without a store
+ *  (the daily research can save one), which can still get a text-only introduction. */
+export function validateProspect(input: unknown, { storeOptional = false } = {}): Prospect {
   if (!object(input)) throw new Error('Invalid agency record.');
   const p = {} as Prospect;
   for (const key of COLUMNS) {
@@ -24,7 +26,8 @@ export function validateProspect(input: unknown): Prospect {
     if (typeof v !== 'string' || v.length > (key.endsWith('_url') ? 300 : 120)) throw new Error(`Invalid ${key}.`);
     p[key] = v.trim();
   }
-  if (!p.agency_name || !p.agency_url || !p.client_store_url || !p.portfolio_source_url) throw new Error('Agency name, agency URL, client store URL and portfolio source URL are required.');
+  const storeMissing = storeOptional && !p.client_store_url;
+  if (!p.agency_name || !p.agency_url || (!storeMissing && (!p.client_store_url || !p.portfolio_source_url))) throw new Error('Agency name, agency URL, client store URL and portfolio source URL are required.');
   if (p.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.contact_email)) throw new Error('Invalid contact email.');
   for (const key of ['agency_url', 'directory_url', 'client_store_url', 'portfolio_source_url'] as const) if (p[key]) p[key] = publicUrl(p[key]);
   return p;
@@ -125,6 +128,23 @@ export function draftMessage(p: Prospect, report: QuickReport, sender = 'Nasko',
   ].join('\n\n');
 }
 
+/** An agency with no client store on file: it can't get a health check or report links, so its introduction goes
+ *  out as text only. */
+export const textOnlyPack = (p: Pack) => !p.prospect.client_store_url;
+
+export const TEXT_ONLY_SUBJECT = 'A free health check for one of your Shopify clients';
+
+/** The introduction for an agency with no client store: asks them to name one instead of guessing. */
+export function noStoreDraftMessage(p: Prospect, sender = 'Nasko'): string {
+  return [
+    `Hi ${firstName(p.contact_name)},`,
+    `I'm building StoreCare HQ, a tool for Shopify agencies that run care plans. It checks client stores every day (uptime, checkout, speed, theme and app changes) and creates a monthly report under your brand.`,
+    `I usually send agencies a one-page health check for one of their client stores. I couldn't find a store that I could confidently link to ${p.agency_name}, though, so I didn't want to guess.`,
+    `If you reply with any client store URL, I'll run the check and send you the report, along with a sample monthly report under your name. It's free, and there's no setup or store access needed.`,
+    `${sender}\nStoreCare HQ · storecarehq.com`,
+  ].join('\n\n');
+}
+
 export function exportCsv(packs: Pack[]): string {
   const cell = (value: string) => `"${(/^[\s]*[=+@\-\t\r\n]/.test(value) ? "'" : '') + value.replace(/"/g, '""')}"`;
   return [ [...COLUMNS, 'status', 'checked_at', 'subject', 'draft'], ...packs.map(p => [...COLUMNS.map(k => p.prospect[k]), p.status, p.report?.ok ? p.report.checkedAt : '', p.subject || '', p.draft]) ].map(row => row.map(cell).join(',')).join('\r\n');
@@ -159,6 +179,6 @@ export function restorePacks(source: string): Pack[] {
         if (report.bfcm !== undefined && !validAudit(report.bfcm)) throw new Error('Invalid Black Friday check.');
       }
     }
-    return { prospect: validateProspect(raw.prospect), reviewed: raw.reviewed, draft: raw.draft, preparedAt: raw.preparedAt, status: raw.status as Pack['status'], report: report as QuickReport | null, ...(raw.subject !== undefined ? { subject: raw.subject as string } : {}), ...(links ? { links } : {}) };
+    return { prospect: validateProspect(raw.prospect, { storeOptional: true }), reviewed: raw.reviewed, draft: raw.draft, preparedAt: raw.preparedAt, status: raw.status as Pack['status'], report: report as QuickReport | null, ...(raw.subject !== undefined ? { subject: raw.subject as string } : {}), ...(links ? { links } : {}) };
   }));
 }

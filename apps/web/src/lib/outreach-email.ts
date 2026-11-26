@@ -1,4 +1,4 @@
-import { bfcmOutreach, restorePacks, type Pack } from './outreach.ts';
+import { bfcmOutreach, restorePacks, textOnlyPack, type Pack } from './outreach.ts';
 import { SAMPLE_NOTICE, sampleMonthReport } from './sample-month-report.ts';
 import { CHECK_LABELS, headline, longDate, shortDate, validAudit, type BfcmAudit } from './bfcm.ts';
 
@@ -53,16 +53,30 @@ export function validateTestEmail(input: unknown): TestEmailInput {
   const serialized = JSON.stringify({ version: 1, packs: [raw.pack] });
   if (serialized.length > 200_000) throw new Error('This report is too large to email.');
   const pack = restorePacks(serialized)[0];
-  if (!pack.reviewed || !pack.report?.ok) throw new Error('Review the agency and prepare a successful health check first.');
+  if (textOnlyPack(pack)) {
+    // No client store: nothing to check or link, so the introduction goes out on its own.
+    if (pack.report || pack.links) throw new Error('An agency without a client store has no health check or report links.');
+  } else if (!pack.reviewed || !pack.report?.ok) throw new Error('Review the agency and prepare a successful health check first.');
   if (!pack.draft.trim()) throw new Error('Write an introduction before approving.');
   if (typeof raw.subject !== 'string' || !raw.subject.trim() || raw.subject.length > 200 || /[\r\n\x00-\x1f]/.test(raw.subject)) throw new Error('Enter a subject of up to 200 characters, without line breaks.');
+  if (!pack.report) return { pack, subject: raw.subject.trim() };
   const r = pack.report;
   if (r.sections.length > 16 || r.sections.some(s => s.title.length > 160 || s.items.length > 100 || s.items.some(i => i.text.length > 3000))) throw new Error('Report findings are too large.');
   return { pack, subject: raw.subject.trim() };
 }
 
+const draftParagraphs = (draft: string) => draft.split(/\n\s*\n/).filter(Boolean).map(p => `<p style="margin:0 0 18px;font-size:16px;line-height:26px;color:#314c50">${linkOwnSite(esc(p)).replace(/\n/g, '<br>')}</p>`).join('');
+
+/** The introduction alone, for an agency without a client store: no report buttons, no documents. */
+function textOnlyEmail(pack: Pack, subject: string): OutreachEmail {
+  const note = 'Not relevant? Reply "no" and I won\'t follow up.';
+  const html = document('', `Prepared for ${pack.prospect.agency_name}`, `${draftParagraphs(pack.draft)}<table role="presentation" width="100%"><tr><td bgcolor="#f0f7f5" style="padding:14px 16px;border-left:3px solid #2747a8;font-size:13px;line-height:20px;color:#4a6064">${esc(note)}</td></tr></table>`);
+  return { subject, html, text: `${pack.draft}\n\n${note}\n`, documents: [] };
+}
+
 export function outreachEmail(input: TestEmailInput): OutreachEmail {
   const { pack, subject } = validateTestEmail(input);
+  if (textOnlyPack(pack)) return textOnlyEmail(pack, subject);
   const report = pack.report;
   if (!report?.ok) throw new Error('Health check is unavailable.');
   const sample = sampleMonthReport(pack.prospect.agency_name, pack.preparedAt || report.checkedAt);
@@ -76,7 +90,7 @@ export function outreachEmail(input: TestEmailInput): OutreachEmail {
   const button = (url: string, label: string) => `<p style="margin:0 0 14px"><a href="${esc(url)}" style="display:inline-block;padding:15px 24px;border-radius:7px;background:#2747a8;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold">${label}</a></p>`;
   const healthLabel = bfcmOutreach(report) ? 'View the Black Friday check' : 'View the health check';
   const buttons = urls ? `<div style="margin:26px 0 8px">${button(urls.health, healthLabel)}${button(urls.sample, 'Sample monthly report')}</div>` : '<p>Create report links in the admin screen before approving this email.</p>';
-  const paragraphs = pack.draft.split(/\n\s*\n/).filter(Boolean).map(p => `<p style="margin:0 0 18px;font-size:16px;line-height:26px;color:#314c50">${linkOwnSite(esc(p)).replace(/\n/g, '<br>')}</p>`).join('');
+  const paragraphs = draftParagraphs(pack.draft);
   const html = document('', `Prepared for ${pack.prospect.agency_name}`, `${paragraphs}${buttons}<table role="presentation" width="100%"><tr><td bgcolor="#f0f7f5" style="padding:14px 16px;border-left:3px solid #2747a8;font-size:13px;line-height:20px;color:#4a6064">${esc(note)}${links ? ` Links work until ${esc(links.expiresAt.slice(0, 10))}.` : ''}</td></tr></table>`);
   return { subject: `${subject}`, html, text: `${pack.draft}\n\n${urls ? `${bfcmOutreach(report) ? 'Black Friday check' : 'Health check'}: ${urls.health}\nSample monthly report: ${urls.sample}\n\n` : 'Create report links before approving.\n\n'}${note}\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
 }

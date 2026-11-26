@@ -108,3 +108,22 @@ test('replies go to OUTREACH_REPLY_TO when it is set, otherwise to the signed-in
   const broken = testDeliveryConfig('owner@example.com', { RESEND_API_KEY: 'k', OUTREACH_REPLY_TO: 'not-an-email' });
   assert.throws(() => approveTestDelivery(value, broken, now), /OUTREACH_REPLY_TO/);
 });
+
+test('a text-only introduction (no client store) can be approved and sent without report links', async () => {
+  const pack = newPack(validateProspect({ agency_name: 'Glaze Digital', agency_url: 'glaze.example.com', contact_email: 'hello@glaze.example.com' }, { storeOptional: true }));
+  pack.draft = 'Hi there,\n\nWhich client store should I check?';
+  const value: TestEmailInput = { pack, subject: 'A free health check for one of your Shopify clients' };
+  const live = testDeliveryConfig('owner@example.com', { RESEND_API_KEY: 'fake-test-key', OUTREACH_FROM: config.from });
+  const approval = approveTestDelivery(value, live, now);
+  const request: typeof fetch = async (_url, options) => {
+    const payload = JSON.parse(String(options?.body));
+    assert.deepEqual(payload.to, ['hello@glaze.example.com']);
+    assert.equal(payload.subject, 'A free health check for one of your Shopify clients');
+    assert.doesNotMatch(payload.text, /outreach\/r\//);
+    return Response.json({ id: 'text-only-id' });
+  };
+  assert.deepEqual(await sendApprovedTest(value, approval.token, live, request, now), { state: 'accepted', id: 'text-only-id' });
+  // An agency with a store still needs its report links.
+  const withStore = input(); delete withStore.pack.links;
+  assert.throws(() => approveTestDelivery(withStore, live, now), /report links/);
+});

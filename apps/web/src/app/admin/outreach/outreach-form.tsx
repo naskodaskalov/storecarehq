@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_SECTIONS } from '@storecare/reports';
 import { ReportView } from '@/components/report-view';
 import { CopyButton } from '@/components/copy-button';
-import { COLUMNS, draftMessage, exportCsv, newPack, parseCsv, restorePacks, serializePacks, validateProspect, type Pack } from '@/lib/outreach';
+import { COLUMNS, draftMessage, exportCsv, newPack, noStoreDraftMessage, parseCsv, restorePacks, serializePacks, textOnlyPack, validateProspect, type Pack } from '@/lib/outreach';
 import { SAMPLE_NOTICE, sampleMonthReport } from '@/lib/sample-month-report';
 import { quickReport } from '../actions';
 import { addOutreachLeads, removeOutreachLead, updateOutreachLead } from './actions';
@@ -208,7 +208,7 @@ export function OutreachForm({ sender, history, historyError, leads, leadsError,
               <button className="btn secondary" disabled={busy} onClick={() => void remove(active)}>Remove from list</button>
               <label className="field">Outreach status<select disabled={busy} value={current.status} onChange={e => update(active, { status: e.target.value as Pack['status'] })}>{['new', 'prepared', 'contacted', 'replied', 'declined'].map(s => <option key={s}>{s}</option>)}</select></label>
             </div>
-            {!current.prospect.client_store_url && <p className="small" role="note">No client store on file for this agency, so it cannot be prepared. Add it again with a store, or remove it.</p>}
+            {!current.prospect.client_store_url && <p className="small" role="note">No client store on file for this agency, so it cannot be prepared. You can still send a text-only introduction below, or add it again with a store.</p>}
             <p className="small muted">Public storefront checks only. No recurring monitoring or checkout test is enabled.</p>
             {current.links && <p className="small muted">Revoke the saved report links in the email preview before refreshing this health check.</p>}
           </section>
@@ -227,7 +227,10 @@ export function OutreachForm({ sender, history, historyError, leads, leadsError,
               onSent={(contact, accepted) => { if (contact) setContacts(prev => [contact, ...prev.filter(c => c.id !== contact.id)]); if (accepted) update(active, { status: 'contacted' }); }} editor={<>
             <div className="field"><label htmlFor="outreach-draft">Email draft</label><textarea id="outreach-draft" rows={13} disabled={currentLoading} value={current.draft} onChange={e => update(active, { draft: e.target.value })} maxLength={20000} /></div>
             <div className="outreach-actions"><CopyButton text={current.draft} label="Copy email draft" />
-              <button className="btn secondary" disabled={currentLoading || !current.report?.ok} onClick={() => { if (current.report && (!current.draft || window.confirm('Replace your edited draft with a fresh draft from the current check?'))) update(active, { draft: draftMessage(current.prospect, current.report) }); }}>Regenerate draft</button>
+              <button className="btn secondary" disabled={currentLoading || (!current.report?.ok && !textOnlyPack(current))} onClick={() => {
+                if (textOnlyPack(current)) { if (!current.draft || window.confirm('Replace your edited draft with the text-only introduction?')) update(active, { draft: noStoreDraftMessage(current.prospect) }); return; }
+                if (current.report && (!current.draft || window.confirm('Replace your edited draft with a fresh draft from the current check?'))) update(active, { draft: draftMessage(current.prospect, current.report) });
+              }}>Regenerate draft</button>
             </div>
             </>} />
           </section>

@@ -2,19 +2,26 @@
 
 import { requireAdmin } from '@/lib/admin-session';
 import { approveTestDelivery, deliveryFingerprint, sendApprovedTest, testDeliveryConfig, type TestDeliveryResult } from '@/lib/outreach-delivery';
-import type { TestEmailInput } from '@/lib/outreach-email';
+import { validateTestEmail, type TestEmailInput } from '@/lib/outreach-email';
 import { contactRow, type OutreachContact } from '@/lib/outreach-history';
 import { contactStore } from '@/lib/outreach-history-store';
 import { leadStore } from '@/lib/outreach-leads-store';
 import { validLeadChanges, validLeadId, type LeadOutcome, type OutreachLead } from '@/lib/outreach-leads';
-import { validateProspect } from '@/lib/outreach';
+import { textOnlyPack, validateProspect } from '@/lib/outreach';
 import { publishReportLinks, reportStore, requireSavedReports, revokeReportLinks } from '@/lib/outreach-report-links';
 
 export type SendResult = TestDeliveryResult & { contact?: OutreachContact; historyError?: string };
 
+/** The email as it will be sent: with its saved report links checked, or, for an agency without a client store,
+ *  the text-only introduction (which has no reports to check). */
+async function sendableEmail(input: TestEmailInput, owner: string): Promise<TestEmailInput> {
+  const email = validateTestEmail(input);
+  return textOnlyPack(email.pack) ? email : requireSavedReports(input, owner, await reportStore());
+}
+
 export async function approveOutreachTest(input: TestEmailInput) {
   const { email } = await requireAdmin();
-  try { const saved = await requireSavedReports(input, email, await reportStore()); return { ok: true as const, ...approveTestDelivery(saved, testDeliveryConfig(email)) }; }
+  try { const saved = await sendableEmail(input, email); return { ok: true as const, ...approveTestDelivery(saved, testDeliveryConfig(email)) }; }
   catch (e) { return { ok: false as const, error: e instanceof Error ? e.message : 'The email could not be approved.' }; }
 }
 
@@ -23,7 +30,7 @@ export async function approveOutreachTest(input: TestEmailInput) {
 export async function sendOutreachTest(input: TestEmailInput, token: string): Promise<SendResult> {
   const { email } = await requireAdmin();
   try {
-    const saved = await requireSavedReports(input, email, await reportStore());
+    const saved = await sendableEmail(input, email);
     const config = testDeliveryConfig(email);
     const result = await sendApprovedTest(saved, token, config);
     if (result.state === 'failed' || config.mode !== 'agency') return result;
