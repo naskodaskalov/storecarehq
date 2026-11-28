@@ -53,6 +53,12 @@ test('an unanswered check or open down incident shows the store as down; checkou
   assert.equal(buildPortal(raw({ last_check: null })).status.tone, 'none');
 });
 
+test('a store added this month gets no rollover, like the monthly report', () => {
+  const p = buildPortal(raw({ minutes_last_month: null }));
+  assert.equal(p.hours?.rolledOver, 0);
+  assert.equal(p.hours?.available, 10);
+});
+
 test('expiring plans have no rollover and overage is reported, not hidden', () => {
   const p = buildPortal(raw({ plan: { name: 'Essentials', hours_included: 4, rollover_rule: 'expire' }, minutes_this_month: 330 }));
   assert.equal(p.hours?.rolledOver, 0);

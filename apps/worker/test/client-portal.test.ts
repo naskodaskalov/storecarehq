@@ -118,3 +118,11 @@ test('browser roles cannot change portal tokens of other agencies or read reques
     assert.equal(res.rows.length, 0);
   });
 });
+
+test('no rollover minutes for a store added after last month began', options, async () => {
+  const { store, token } = await portalStore();
+  const read = async () => (await db!.pool.query('select public.public_store_portal($1) as p', [token])).rows[0].p;
+  assert.equal((await read()).minutes_last_month, null, 'seeded stores are created now');
+  await db!.pool.query(`update public.stores set created_at = date_trunc('month', now() at time zone 'UTC') - interval '1 month' where id = $1`, [store.id]);
+  assert.equal((await read()).minutes_last_month, 0, 'on the plan from the first day of last month');
+});
