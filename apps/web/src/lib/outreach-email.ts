@@ -74,7 +74,8 @@ function textOnlyEmail(pack: Pack, subject: string): OutreachEmail {
   return { subject, html, text: `${pack.draft}\n\n${note}\n`, documents: [] };
 }
 
-export function outreachEmail(input: TestEmailInput): OutreachEmail {
+/** now: when the email goes out (defaults to the current time); decides whether it is still Black Friday season. */
+export function outreachEmail(input: TestEmailInput, now = Date.now()): OutreachEmail {
   const { pack, subject } = validateTestEmail(input);
   if (textOnlyPack(pack)) return textOnlyEmail(pack, subject);
   const report = pack.report;
@@ -88,9 +89,10 @@ export function outreachEmail(input: TestEmailInput): OutreachEmail {
   const links = pack.links;
   const urls = links ? { health: `${links.origin}/outreach/r/${links.healthToken}`, sample: `${links.origin}/outreach/r/${links.sampleToken}` } : null;
   const button = (url: string, label: string) => `<p style="margin:0 0 14px"><a href="${esc(url)}" style="display:inline-block;padding:15px 24px;border-radius:7px;background:#2747a8;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold">${label}</a></p>`;
-  const healthLabel = bfcmOutreach(report) ? 'View the Black Friday check' : 'View the health check';
+  const inBfcm = bfcmOutreach(report, now);
+  const healthLabel = inBfcm ? 'View the Black Friday check' : 'View the health check';
   const buttons = urls ? `<div style="margin:26px 0 8px">${button(urls.health, healthLabel)}${button(urls.sample, 'Sample monthly report')}</div>` : '<p>Create report links in the admin screen before approving this email.</p>';
   const paragraphs = draftParagraphs(pack.draft);
   const html = document('', `Prepared for ${pack.prospect.agency_name}`, `${paragraphs}${buttons}<table role="presentation" width="100%"><tr><td bgcolor="#f0f7f5" style="padding:14px 16px;border-left:3px solid #2747a8;font-size:13px;line-height:20px;color:#4a6064">${esc(note)}${links ? ` Links work until ${esc(links.expiresAt.slice(0, 10))}.` : ''}</td></tr></table>`);
-  return { subject: `${subject}`, html, text: `${pack.draft}\n\n${urls ? `${bfcmOutreach(report) ? 'Black Friday check' : 'Health check'}: ${urls.health}\nSample monthly report: ${urls.sample}\n\n` : 'Create report links before approving.\n\n'}${note}\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
+  return { subject: `${subject}`, html, text: `${pack.draft}\n\n${urls ? `${inBfcm ? 'Black Friday check' : 'Health check'}: ${urls.health}\nSample monthly report: ${urls.sample}\n\n` : 'Create report links before approving.\n\n'}${note}\n`, documents: [{ filename: 'current-health-check.html', html: health }, { filename: 'sample-monthly-report.html', html: sampleHtml }] };
 }

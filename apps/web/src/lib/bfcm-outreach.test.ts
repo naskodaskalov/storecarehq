@@ -96,8 +96,10 @@ test('hosted links carry the one-pager and the agency it was prepared for; the e
   const links = await publishReportLinks(input, 'admin@example.com', store, 'https://app.storecarehq.com', NOW);
   const view = await readPublicReport(links.healthToken, store, NOW);
   assert.ok(view?.kind === 'health' && view.health.bfcm?.storeName === 'Example Shop');
-  const email = outreachEmail({ ...input, pack: { ...pack, links } });
+  const email = outreachEmail({ ...input, pack: { ...pack, links } }, NOW);
   assert.match(email.text, /Black Friday check: https:\/\/app\.storecarehq\.com\/outreach\/r\//);
+  const after = outreachEmail({ ...input, pack: { ...pack, links } }, Date.parse('2026-12-05T10:00:00Z'));
+  assert.match(after.text, /^Health check: https/m, 'after the sale weekend the same email links a health check');
   const legacy = buildSnapshot({ pack: { ...pack, report: { ...(pack.report as Extract<QuickReport, { ok: true }>), bfcm: undefined } }, subject: 'x' });
   assert.deepEqual(Object.keys(legacy.health), ['host', 'checkedAt', 'sections'], 'older reports snapshot exactly as before');
 });
