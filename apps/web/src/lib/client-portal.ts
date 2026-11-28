@@ -22,7 +22,8 @@ export type PortalRaw = {
   plan: { name: string; hours_included: number | string; rollover_rule: string } | null;
   month_start: string;
   minutes_this_month: number;
-  minutes_last_month: number;
+  /** Null when the store was not on the plan for all of last month: no rollover, as in the monthly report. */
+  minutes_last_month: number | null;
   work: { work_date: string; minutes: number; text: string }[];
   uptime_days: { day: string; checks: number; ok: number }[];
   last_check: { checked_at: string; ok: boolean; ms: number | null } | null;
@@ -140,7 +141,7 @@ export function buildPortal(raw: PortalRaw, now = new Date(raw.generated_at)): P
   if (raw.plan) {
     const included = Number(raw.plan.hours_included) || 0;
     const used = round1(Number(raw.minutes_this_month) / 60);
-    const rolledOver = raw.plan.rollover_rule === 'one_month' ? round1(Math.max(0, included - Number(raw.minutes_last_month) / 60)) : 0;
+    const rolledOver = raw.plan.rollover_rule === 'one_month' && raw.minutes_last_month !== null ? round1(Math.max(0, included - Number(raw.minutes_last_month) / 60)) : 0;
     const available = round1(included + rolledOver);
     hours = {
       planName: raw.plan.name,
@@ -264,7 +265,7 @@ export function portalRawFromRows(t: Record<string, Row[]>, token: string, now =
     plan: plan ? { name: plan.name, hours_included: plan.hours_included, rollover_rule: plan.rollover_rule } : null,
     month_start: monthStart,
     minutes_this_month: minutes(monthStart),
-    minutes_last_month: minutes(prevStart, monthStart),
+    minutes_last_month: !s.created_at || s.created_at.slice(0, 10) <= prevStart ? minutes(prevStart, monthStart) : null,
     work: work
       .filter((w) => w.work_date >= since(45).slice(0, 10) && (w.counts_to_plan || w.client_text?.trim()))
       .sort((x, y) => y.work_date.localeCompare(x.work_date) || String(y.created_at).localeCompare(String(x.created_at)))
