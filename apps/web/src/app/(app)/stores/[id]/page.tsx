@@ -126,6 +126,9 @@ export default async function StorePage({ params, searchParams }: { params: Prom
           </div>
         </div>
         <div className="store-detail-actions">
+          {store.portal_token
+            ? <a className="btn secondary" href={`/p/${store.portal_token}`} target="_blank" rel="noopener" title="The page your client sees"><Icon name="link" size={16} />Client portal<span className="sr-only"> (new tab)</span></a>
+            : <Link className="btn secondary" href={`/stores/${store.id}/settings#client-portal`}><Icon name="link" size={16} />Set up client portal</Link>}
           <Link className="btn secondary" href={`/stores/${store.id}/settings`}>Settings</Link>
           <Link className="btn" href={`/work?store=${store.id}`}><Icon name="plus" size={16} />Log time</Link>
         </div>

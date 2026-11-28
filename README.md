@@ -14,8 +14,18 @@ storefront. No Shopify app, no client approval.
 | `supabase/migrations` | Postgres schema with row-level security per agency. |
 | `scripts/probe-stores.ts` | The phase 1 check: what can we see on a list of real stores? Results in [`docs/storefront-check.md`](docs/storefront-check.md). |
 
-Not built yet: the monthly report pipeline (draft → approve → PDF → email), branding settings, client request inbox,
-billing. The Shopify connector is phase 2.
+### Client portal and request inbox
+
+Each client store can get an always-on, agency-branded page at `/p/<token>` (store settings → Client portal):
+live status, 30-day uptime strip, checkout pass rate, mobile speed trend, care-plan hours with rollover, the work
+logged for the client, problems caught, approved reports, and a request form. No login for the client; the
+64-character token is the key and can be rotated or turned off. Data comes only through
+`public_store_portal(token)` (client-facing fields only, and only while the agency has an active plan).
+Requests go through `submit_portal_request(...)` (validated, rate-limited per store), land in **Requests** in the
+app, and queue an email/Slack alert through the alert outbox. "Log work & close" turns a request into a work
+entry, so it shows up in the portal and the monthly report. Migration: `20261126120000_client_portal.sql`.
+
+The Shopify connector is phase 2.
 
 ## Run it locally
 

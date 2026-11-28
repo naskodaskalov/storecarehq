@@ -8,11 +8,18 @@ create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
 do $$ begin
+  -- Parallel test databases share roles, so another file can create one between the check and the create.
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then
-    create role authenticated nologin;
+    begin
+      create role authenticated nologin;
+    exception when duplicate_object or unique_violation then null;
+    end;
   end if;
   if not exists (select 1 from pg_roles where rolname = 'anon') then
-    create role anon nologin;
+    begin
+      create role anon nologin;
+    exception when duplicate_object or unique_violation then null;
+    end;
   end if;
   if not exists (select 1 from pg_roles where rolname = 'service_role') then
     begin
